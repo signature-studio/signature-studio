@@ -6,12 +6,28 @@ import { absoluteRect, subtree, rootOf } from './dump.mjs';
 import { windowTable, openLids, newWindows, closeNew, pixelHashRegion, guestText, waitTable, persist, picture } from './common.mjs';
 import { regionHash } from './picture.mjs';
 import { sleep } from './flow.mjs';
+import { place } from './layout.mjs';
 
 export const SETTINGS_CLS = 'TMIDIForm';
 export const SELECTOR_CLS = 'TQuickSheetSelector';
-/** the x offsets (guest px from the selector's left) of the tabs, as the inventory measured them (features/generated/settings.tsv) */
-export const TAB_X = { MIDI: 6, Audio: 54, General: 114, File: 186, Theme: 234, Project: 306, Info: 378, Debug: 438, Account: 498, About: 570 };
+/**
+ * the settings window at DPR 1 (668 x 900 guest px, the window table); a part inside a panel is placed by its DPR 1 offset over that size (Issue #1507)
+ */
+export const SETTINGS_W1 = { w: 668, h: 900 };
+/**
+ * the click of each tab, as the ratio of the selector's width (the selector is 658 px wide at DPR 1): the tab's DPR 1 x from the selector's left, plus 8 px
+ * into the tab (features/generated/settings.tsv: MIDI 6, Audio 54, General 114, File 186, Theme 234, Project 306, Info 378, Debug 438, Account 498, About 570)
+ */
+export const TAB_CLICK = {
+  MIDI: (6 + 8) / 658, Audio: (54 + 8) / 658, General: (114 + 8) / 658, File: (186 + 8) / 658, Theme: (234 + 8) / 658,
+  Project: (306 + 8) / 658, Info: (378 + 8) / 658, Debug: (438 + 8) / 658, Account: (498 + 8) / 658, About: (570 + 8) / 658,
+};
 export const MIDI_TITLE = 'Settings - MIDI input / output devices';
+
+/** a place (guest px) inside a panel: the DPR 1 offset (dx, dy) from the panel's top-left, scaled by the settings window's size now (w) over its DPR 1 size */
+export function inPanel(panel, w, dx, dy) {
+  return { x: panel.x + (dx / SETTINGS_W1.w) * w.w, y: panel.y + (dy / SETTINGS_W1.h) * w.h };
+}
 
 /** the settings window's top-level entry of a table (its lid is the settings' own), or null */
 export function settingsWin(t) {
@@ -82,7 +98,8 @@ export async function goTab(guest, name) {
   const sel = w ? selectorIn(t0, w.lid) : null;
   if (!sel) return null;
   const r = absoluteRect(t0, sel.lid);
-  await guest.click(r.x + TAB_X[name] + 8, r.y + r.h / 2);
+  const c = place(r, TAB_CLICK[name], 0.5);
+  await guest.click(c.x, c.y);
   const sheet = await waitTable(guest, async (t) => {
     const ww = settingsWin(t);
     return ww ? sheetNamed(t, ww.lid, name) : null;
@@ -271,7 +288,8 @@ export async function gridRun(ctx, page, title, n) {
     const grid = grids[n];
     if (!grid) return { ok: false, engineState: await engineState(g), notes: [`no grid ${n} in "${title}" (${grids.length} grids)`], results: {} };
     const h0 = await pixelHashRegion(g, grid.rect);
-    await g.click(grid.rect.x + 40, grid.rect.y + 12);
+    const first = inPanel(grid.rect, w, 40, 12);
+    await g.click(first.x, first.y);
     await sleep(800);
     await goTab(g, page);
     const h1 = await pixelHashRegion(g, grid.rect);
@@ -290,13 +308,19 @@ export async function languageRun(ctx, index) {
     if (!pn) return { ok: false, engineState: await engineState(g), notes: ['no Language panel on General'], results: {} };
     const L = pn.panel.rect;
     const h0 = await pixelHashRegion(g, L);
-    await g.click(L.x + 60, L.y + 30);
+    const open0 = inPanel(L, pn.w, 60, 30);
+    await g.click(open0.x, open0.y);
     await sleep(900);
     const pop = onePopup(await s.popups());
     if (!pop) return { ok: false, engineState: await engineState(g), notes: ['the Language drop-down did not open (one popup)'], results: {} };
     const at = itemPlace(pop, index, 8);
     await g.click(at.x, at.y);
     await sleep(1200);
+    // the change of the language stops the engine (a known defect): the display is then not judged, and the stop is written to the results
+    const stoppedState = await engineState(g);
+    if (stoppedState !== 'engine-idle') {
+      return { ok: false, engineState: stoppedState, notes: [`item ${index}: the engine is ${stoppedState} after the choice; the panel is not judged`], results: { index, stopped: true, changed: null, afterReloadDiffers: null } };
+    }
     await goTab(g, 'General');
     const open = (await s.popups()).length;
     const h1 = await pixelHashRegion(g, (await panelOnPage(g, 'General', /^Language/, s))?.panel.rect ?? L);
@@ -306,7 +330,7 @@ export async function languageRun(ctx, index) {
     const h2 = pn2 ? await pixelHashRegion(g, pn2.panel.rect) : null;
     const state = await engineState(g);
     const ok = open === 0 && h1 !== h0 && h2 !== null && h2 !== h0 && state === 'engine-idle';
-    return { ok, engineState: state, notes: [`item ${index}: drop-down closed ${open === 0}; panel changed ${h1 !== h0}; after reload the panel is drawn and differs from English ${h2 !== null && h2 !== h0}`], results: { index, popupsAfter: open, changed: h1 !== h0, afterReloadDiffers: h2 !== h0 } };
+    return { ok, engineState: state, notes: [`item ${index}: drop-down closed ${open === 0}; panel changed ${h1 !== h0}; after reload the panel is drawn and differs from English ${h2 !== null && h2 !== h0}`], results: { index, stopped: false, popupsAfter: open, changed: h1 !== h0, afterReloadDiffers: h2 !== h0 } };
   });
 }
 
@@ -326,11 +350,10 @@ export async function themeRun(ctx, name, row, col) {
       await g.wheel(G.x + G.w / 2, G.y + G.h / 2, 12, 120);
       await sleep(600);
     }
-    const y = row >= 4 ? G.y + 386 : G.y + Math.min(59 + 140 * row, 440);
-    const x = G.x + 99 + 202 * col;
+    const tile = inPanel(G, w, 99 + 202 * col, row >= 4 ? 386 : Math.min(59 + 140 * row, 440));
     const from = await g.ev('window.__app.engineLog().length');
     const h0 = await hashWin(g, w);
-    await g.click(x, y);
+    await g.click(tile.x, tile.y);
     await sleep(1500);
     const lines = (await themeLines(g, from)).filter((l) => new RegExp(`[\\\\/]${reEscape(name)}\\.flstheme`, 'i').test(l));
     await goTab(g, 'Theme');
@@ -359,7 +382,8 @@ export async function choiceOpenRun(ctx, page, title, dx, dy) {
     const sheet = await goTab(g, page);
     const pn = sheet !== null ? await panelOnPage(g, page, title, s) : null;
     if (!pn) return { ok: false, engineState: await engineState(g), notes: [`no panel "${title}" on ${page}`], results: {} };
-    await g.click(pn.panel.rect.x + dx, pn.panel.rect.y + dy);
+    const at = inPanel(pn.panel.rect, pn.w, dx, dy);
+    await g.click(at.x, at.y);
     await sleep(900);
     const pops = await s.popups();
     const pop = onePopup(pops);
@@ -380,11 +404,13 @@ export async function choicePickRun(ctx, page, title, dx, dy, pick, { gateKept =
     if (!pn) return { ok: false, engineState: await engineState(g), notes: [`no panel "${title}" on ${page}`], results: {} };
     const R = pn.panel.rect;
     const h0 = await pixelHashRegion(g, R);
-    await g.click(R.x + dx, R.y + dy);
+    const press = inPanel(R, pn.w, dx, dy);
+    await g.click(press.x, press.y);
     await sleep(900);
     const pop = onePopup(await s.popups());
     if (!pop) return { ok: false, engineState: await engineState(g), notes: ['the drop-down did not open'], results: {} };
-    const n = Math.max(2, Math.round(pop.h / 19.5));
+    // one item is 19.5 guest px high at DPR 1: the items of the drop-down are its height over the item's height now
+    const n = Math.max(2, Math.round(pop.h / ((19.5 / SETTINGS_W1.h) * pn.w.h)));
     const k = Math.min(n - 1, pick);
     const at = itemPlace(pop, k, n);
     await g.click(at.x, at.y);
@@ -414,16 +440,20 @@ export async function checkRun(ctx, page, title, dx, dy) {
     const sheet = await goTab(g, page);
     const pn = sheet !== null ? await panelOnPage(g, page, title, s) : null;
     if (!pn) return { ok: false, engineState: await engineState(g), notes: [`no panel "${title}" on ${page}`], results: {} };
-    const x = pn.panel.rect.x + dx, y = pn.panel.rect.y + dy;
-    const h0 = await hashAround(g, x, y);
+    const box = inPanel(pn.panel.rect, pn.w, dx, dy);
+    const x = box.x, y = box.y;
+    // the picture around the box: 12 guest px at DPR 1 (scaled with the settings window)
+    const r = 12 * (pn.w.w / SETTINGS_W1.w);
+    const h0 = await hashAround(g, x, y, r);
     await g.click(x, y);
     await sleep(700);
     await goTab(g, page);
-    const h1 = await hashAround(g, x, y);
+    const h1 = await hashAround(g, x, y, r);
     await s.reopen();
     await goTab(g, page);
     const pn2 = await panelOnPage(g, page, title, s);
-    const h2 = pn2 ? await hashAround(g, pn2.panel.rect.x + dx, pn2.panel.rect.y + dy) : null;
+    const at2 = pn2 ? inPanel(pn2.panel.rect, pn2.w, dx, dy) : null;
+    const h2 = at2 ? await hashAround(g, at2.x, at2.y, r) : null;
     const state = await engineState(g);
     const ok = h1 !== h0 && state === 'engine-idle';
     return { ok, engineState: state, notes: [`${title} box at ${dx},${dy}: changed ${h1 !== h0}; picture after reload same ${h2 === h1} (not gated: unexplained, see the report)`], results: { changed: h1 !== h0, pictureSameAfterReload: h2 === h1 } };

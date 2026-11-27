@@ -50,6 +50,13 @@ export class EngineFiles {
       try { fs = await this.fs(); } catch (e) { cancel(`the browser's file storage is not available (${describeError(e)})`); return; }
       if (!fs.persistent && !this.notedMemory) { this.notedMemory = true; this.log('warn', memoryNotice(fs.why)); }
       if (disposed) return;
+      if (request.manage) {
+        // Issue #1521: File > Manage files: the plain file window (nothing is chosen); closing it ends the engine's wait
+        const ex = new Explorer(root, fs, { close: () => cancel('closed by the person') });
+        await ex.navigate(this.lastDir);
+        if (!disposed) this.explorer = ex;
+        return;
+      }
       const config = configOf(request, this.lastDir);
       filesUsage.c.engine[config.mode]++;
       const ex = new Explorer(root, fs, { close: () => cancel('cancelled by the person') }, {

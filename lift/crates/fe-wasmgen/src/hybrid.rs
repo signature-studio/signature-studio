@@ -41,6 +41,10 @@ fn req<'a>(m: &'a BTreeMap<String, String>, k: &str) -> Result<&'a str, String> 
 /// The modules: one line each, `NAME<TAB>DLL FILE<TAB>ARGS` (the arguments of the one-module fe-wasmgen; paths relative to the repository).
 fn read_modules(path: &str) -> Result<Vec<Module>, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
+    modules_of(&text).map_err(|e| format!("{path}: {e}"))
+}
+
+fn modules_of(text: &str) -> Result<Vec<Module>, String> {
     let mut out = Vec::new();
     for l in text.lines() {
         if l.trim().is_empty() || l.starts_with('#') {
@@ -48,7 +52,7 @@ fn read_modules(path: &str) -> Result<Vec<Module>, String> {
         }
         let f: Vec<&str> = l.split('\t').collect();
         if f.len() < 2 {
-            return Err(format!("{path}: a line without the DLL file: {l}"));
+            return Err(format!("a line without the DLL file: {l}"));
         }
         let args = f[2..].join(" ").split_whitespace().map(str::to_string).collect();
         out.push(Module { name: f[0].to_string(), pe: f[1].to_string(), args });
@@ -452,6 +456,14 @@ mod tests {
         let names = sec(0, &[&[4u8][..], b"name", &[1, sub.len() as u8][..], &sub].concat());
         let module = [&b"\0asm\x01\0\0\0"[..], &sec(1, &[1, 0x60, 0, 0]), &sec(3, &[2, 0, 0]), &names].concat();
         assert_eq!(names_table(&module).unwrap(), "index\tkind\tva\tname\n0\tf\t0x40\tf_40\n1\tf\t0x40\tf_40\n");
+    }
+
+    /// Issue #1395: a module row's arguments are its row's (the `--rva-tables FILE` of a plugin row is one argument pair, as the row gives it).
+    #[test]
+    fn the_module_rows_keep_the_arguments_of_their_row_and_the_rva_table_pair() {
+        let m = modules_of("effects.x.x_x64.dll\teffects.x.x_x64.6800000.dll\t--pdata --reloc-seeds --rva-tables lift/plugins/x/rva-tables.txt\n").unwrap();
+        assert_eq!(m[0].pe, "effects.x.x_x64.6800000.dll");
+        assert_eq!(m[0].args, ["--pdata", "--reloc-seeds", "--rva-tables", "lift/plugins/x/rva-tables.txt"]);
     }
 
     #[test]

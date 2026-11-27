@@ -1,19 +1,26 @@
-// The plugins' steps (Issue #1493): the shared parts of the plugin scenarios (scenarios/plugins/builtin-*.mjs, external-*.mjs, position-*.mjs, and the tool and preset scenarios).
+// The plugins' steps (Issue #1493; the insertion and the observations: Issue #1508): the shared parts of the plugin scenarios (scenarios/plugins/builtin-*.mjs, external-*.mjs, position-*.mjs, and the tool and preset scenarios).
 // A plugin is put in a Mixer insert slot from the Plugin database: a slow double-click selects Insert 1 (its panel with Slot 1..10 appears at the right edge of the Mixer window);
 // a click on Slot 1 opens the picker (More plugins..., Plugin database, Categories / Simple / Tree); the Plugin database item opens the Browser's Plugin database (Installed).
 // The places are fractions of the Mixer window's size (measured at 4k-dpr1: the window is 3436 x 500 guest px). The UI is drawn at the display's scale, so the places follow the window.
-// Pure parts (the row and the source of a generated scenario) come first; the runtime parts use the page's reads (window table, engine log, audio.detail()) and real mouse and key events.
+// The insertion is not reachable in this build (#1508, measured at 4k-dpr1): the Installed folder lists names (the engine's enum-dir line) but draws no row, and the
+// picker's More plugins... list (Select effect plugin) shows 0 effects. insertFromDatabase reads the rows from the picture and stops there (no row, no entry).
+// Pure parts (the row and the source of a generated scenario) come first; the runtime parts use the page's reads (window table, engine log, picture) and real mouse and key events.
 import { windowTable, openLids, newWindows, pixelHashRegion } from './common.mjs';
 import { absoluteRect } from './dump.mjs';
 import { sleep } from './flow.mjs';
+import { ensureMixer } from './input.mjs';
 
 export const FEATURE_KINDS = ['window', 'param', 'audio', 'stop'];
 export const INSERT1 = { fx: 125 / 3436, fy: 72 / 500 };
 export const SLOT1 = { fx: 3252 / 3436, fy: 70 / 500 };
 export const DB_ITEM = { dx: 60, dy: 30 };
+/** the Installed row of the Browser's tree, and the area under it where its rows are drawn (guest px at 4k-dpr1) */
+export const INSTALLED = { x: 70, y: 183 };
+export const INSTALLED_LIST = { x: 0, y: 200, w: 372, h: 160 };
 export const POPUP = 'TQuickPopupMenuWindow';
 export const MIXER = 'TFXForm';
 export const DB_TEXT = /Plugin database\\Installed/;
+const ENUM_INSTALLED = /enum-dir: (\d+) ".*Plugin database\\Installed\\\*\.\*"/;
 
 /** the built-in and external rows of the generated plugins table (features/generated/plugins.tsv): main-effects, main-generators, external; `tool` rows are not plugins */
 export function pluginRows(tsvText) {
@@ -30,21 +37,17 @@ export function kindOf(row) {
   return null;
 }
 
-/** the Issue (`#n`) of a plugin's own defect, from the Issue table: the batch row (`内蔵エフェクト N: a・b を…`, `内蔵インストゥルメント N: …`) that lists the name,
- *  else the row that names it (`Serum 2 を…`, `Fruity Filter と Fruity Delay 2 を…`); null when the table has none */
-export function issueFor(name, kind, issuesTsv) {
+/** the Issue numbers (`#n`) of the table's batch rows that list a built-in plugin, in the table's order: `内蔵エフェクト N: a・b を…` (effects) and
+ *  `内蔵インストゥルメント N: …` (generators). A row that names one plugin only is not a batch. Closed Issues are included: the caller leaves them out */
+export function batchIssuesNaming(name, kind, issuesTsv) {
   const rows = String(issuesTsv).split(/\r?\n/).slice(1).map((l) => l.split('\t')).filter((f) => f.length >= 3);
   const batch = kind === 'effects' ? /内蔵エフェクト \d+: (.*?) を/ : kind === 'generators' ? /内蔵インストゥルメント \d+: (.*?) を/ : null;
-  const inBatch = batch ? rows.find((f) => batch.exec(f[2]) && batch.exec(f[2])[1].split('・').map((s) => s.trim()).includes(name)) : null;
-  const starts = rows.find((f) => f[2].startsWith(`${name} を`) || f[2].startsWith(`${name} と `));
-  const named = starts ?? rows.find((f) => f[2].includes(`${name} を`) || f[2].includes(`${name} と `));
-  const hit = inBatch ?? named ?? null;
-  return hit ? `#${hit[1].replace('#', '')}` : null;
-}
-
-/** the mark of a plugin scenario: the plugin's own Issue, or 'new' when the table has none (an unlisted defect) */
-export function markFor(name, kind, issuesTsv) {
-  return issueFor(name, kind, issuesTsv) ?? 'new';
+  if (!batch) return [];
+  const listed = (title) => {
+    const m = batch.exec(title);
+    return m !== null && m[1].split('・').map((s) => s.trim()).includes(name);
+  };
+  return rows.filter((f) => listed(f[2])).map((f) => `#${f[1].replace('#', '')}`);
 }
 
 /** the rectangle of the Mixer window (guest px), or null when it is not shown */
@@ -72,6 +75,7 @@ export async function openSlotPicker(guest) {
   await guest.focusDesktop();
   await guest.escape();
   await sleep(500);
+  await ensureMixer(guest);
   const r = await mixerRect(guest);
   if (!r) return { error: 'the Mixer (TFXForm) is not shown', pop: null };
   await slowDoubleClick(guest, r.x + Math.round(INSERT1.fx * r.w), r.y + Math.round(INSERT1.fy * r.h));
@@ -91,15 +95,53 @@ export async function openPluginDatabase(guest) {
   return { opened: true, error: null };
 }
 
-/** the engine's lines about the Plugin database's Installed folder (the listings and the missing paths), from the line `from` on (the log is kept for the whole page) */
-export async function databaseLines(guest, from = 0) {
-  const lines = await guest.ev(`window.__app.engineLog().slice(${Number(from)})`);
+/** the engine's lines about the Plugin database's Installed folder (the listings and the missing paths), from the line `from` on: the scenario's start (the log is kept for the whole page) */
+export async function databaseLines(guest, from) {
+  if (!Number.isInteger(from)) throw new Error('databaseLines needs the engine log length at the start of the scenario (from)');
+  const lines = await guest.ev(`window.__app.engineLog().slice(${from})`);
   return lines.filter((l) => DB_TEXT.test(l));
 }
 
-/** the plugin's entry in the Plugin database: the engine's lines name it (its folder or its file under Installed) */
+/** the number of names the Installed folder's listing returned (the largest enum-dir count of the lines); null when there is no listing */
+export function installedCount(lines) {
+  const counts = lines.map((l) => ENUM_INSTALLED.exec(l)).filter(Boolean).map((m) => Number(m[1]));
+  return counts.length ? Math.max(...counts) : null;
+}
+
+/** the plugin's entry in the Plugin database: the engine's lines name it (its folder or its file under Installed). The engine's lines have no names (#1508): a false here says nothing */
 export function databaseHas(lines, name) {
   return lines.some((l) => l.includes(name) && DB_TEXT.test(l));
+}
+
+/** whether the Installed folder draws rows: the folder is selected (a click on its row) and opened (Right); the rows are drawn under it, so the picture there changes */
+export async function installedRowsShown(guest) {
+  const before = await pixelHashRegion(guest, INSTALLED_LIST);
+  await guest.click(INSTALLED.x, INSTALLED.y);
+  await sleep(400);
+  await guest.key('ArrowRight', 'ArrowRight', 39);
+  await sleep(1200);
+  const after = await pixelHashRegion(guest, INSTALLED_LIST);
+  return before !== after;
+}
+
+/**
+ * puts a plugin of the Plugin database into the selected Mixer insert (#1508): the picker's Plugin database item opens the Browser's Installed folder, and the
+ * entry is chosen on its row. The rows are read from the picture, and a name only from a drawn row. Returns { ok, notes, results }; results.insert and results.window
+ * are written after the choice (null when there is none). In this build the rows are not drawn: ok is false and the notes say so.
+ */
+export async function insertFromDatabase(guest, name) {
+  const from = await guest.ev('window.__app.engineLog().length');
+  const db = await openPluginDatabase(guest);
+  const results = { count: null, named: { [name]: false }, insert: null, window: null };
+  if (!db.opened) return { ok: false, notes: [`the picker did not open (${db.error})`], results };
+  const lines = await databaseLines(guest, from);
+  results.count = installedCount(lines);
+  const rows = await installedRowsShown(guest);
+  results.named = { [name]: rows };
+  const listed = results.count === null ? 'no listing of Installed in the engine log since the scenario started (the listing is written once per page)' : `the Installed folder lists ${results.count} name(s) (the engine's enum-dir line)`;
+  const notes = [listed, `the rows under Installed: ${rows ? 'drawn' : 'not drawn'}`];
+  if (!rows) return { ok: false, notes: [...notes, `no entry for ${name} can be chosen: the Plugin database draws no row`], results };
+  return { ok: false, notes: [...notes, `the row of ${name} is not located (its place is not measured yet)`], results };
 }
 
 /** the plugin's window in the window table (a top-level window or a child, by its title or caption naming the plugin); null when there is none */
@@ -124,23 +166,16 @@ export async function nonSilentWhilePlaying(guest, ms) {
 }
 
 /**
- * the four steps of a plugin (the scenario's run): the window opens (from the Plugin database, by the plugin's name); a parameter changes (a drag inside the window:
- * the picture's hash of the window changes); the audio is processed (Generators: non-silent quanta while playing; Effects: the output's picture of the chain is not checked here, notes only);
- * the engine stays engine-idle. Returns { ok, engineState, notes, results }. The steps after the window run only when the window opened.
+ * the steps of a plugin (the scenario's run): the plugin is put into the insert from the Plugin database (insertFromDatabase: stops here when no entry can be
+ * chosen); the window opens (by the plugin's name); a parameter changes (a drag inside the window: the picture's hash of the window changes); the audio is processed
+ * (Generators: non-silent quanta while playing; Effects: the output's picture of the chain is not checked here, notes only); the engine stays engine-idle.
+ * Returns { ok, engineState, notes, results }. The steps after the insertion run only when the entry was chosen, and the ones after the window only when the window opened.
  */
 export async function pluginSteps(guest, { name, kind }) {
-  const notes = [];
-  const results = { window: null, param: null, audio: null, stop: null };
-  const from = await guest.ev('window.__app.engineLog().length');
-  const db = await openPluginDatabase(guest);
-  if (!db.opened) return { ok: false, engineState: (await guest.state())?.state ?? null, notes: [`the picker did not open (${db.error})`], results };
-  const lines = await databaseLines(guest, from);
-  notes.push(`the Plugin database lists ${lines.length} line(s) under Installed`);
-  if (!databaseHas(lines, name)) {
-    notes.push(`the Plugin database has no entry for ${name} (the Installed folder is empty in this build)`);
-    return { ok: false, engineState: (await guest.state())?.state ?? null, notes, results };
-  }
-  // the entry is in the database: it is put into the selected insert (a double-click on the entry; unconfirmed in this build)
+  const ins = await insertFromDatabase(guest, name);
+  const notes = [...ins.notes];
+  const results = { ...ins.results, window: null, param: null, audio: null, stop: null };
+  if (!ins.ok) return { ok: false, engineState: (await guest.state())?.state ?? null, notes, results };
   const w = await pluginWindow(guest, name);
   results.window = w ? { cls: w.cls, title: w.title } : null;
   if (!w) {
@@ -189,12 +224,12 @@ export default defineScenario({
 `;
 }
 
-/** the position scenario's source: the plugin's window is in the desktop, at the display's DPR (the random DPR is added by displays) */
+/** the position scenario's source: the plugin is put into the insert from the Plugin database, and its window lies inside the desktop at the display's DPR (the random DPR is added by displays) */
 export function positionSource({ id, name, mark, covers }) {
   const cov = covers.map((c) => `'${c}'`).join(', ');
-  return `// ${id}: the window of ${name} lies inside the desktop (the display's DPR may be random: the guest picture is the same size). A generated scenario. Do not edit by hand.
+  return `// ${id}: the window of ${name} lies inside the desktop, after the plugin is put into Mixer Insert 1 from the Plugin database (the display's DPR may be random: the guest picture is the same size). A generated scenario. Do not edit by hand.
 import { defineScenario } from '../../lib/scenario.mjs';
-import { openPluginDatabase, pluginInDesktop } from '../../lib/plugins.mjs';
+import { insertFromDatabase, pluginInDesktop } from '../../lib/plugins.mjs';
 
 export default defineScenario({
   id: '${id}',
@@ -202,10 +237,10 @@ export default defineScenario({
   displays: ['4k-dpr1', '4k-random'],
   expectFail: ${mark === null ? 'null' : `'${mark}'`},
   async run({ guest }) {
-    const db = await openPluginDatabase(guest);
-    if (!db.opened) return { ok: false, notes: [\`the picker did not open (\${db.error})\`] };
+    const ins = await insertFromDatabase(guest, ${JSON.stringify(name)});
+    if (!ins.ok) return { ok: false, engineState: (await guest.state())?.state ?? null, notes: ins.notes, results: ins.results };
     const r = await pluginInDesktop(guest, ${JSON.stringify(name)});
-    return { ok: r.inside, engineState: (await guest.state())?.state ?? null, notes: r.notes };
+    return { ok: r.inside, engineState: (await guest.state())?.state ?? null, notes: [...ins.notes, ...r.notes], results: ins.results };
   },
 });
 `;
