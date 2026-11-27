@@ -9,8 +9,8 @@ import { suppressContextMenu } from '../input/context-menu.ts';
 
 /** the mark this Issue puts on the face's iframe (tools/browser-panel/measure.mjs counts the iframes that carry it) */
 export const FACE_ATTR = 'data-fl-webview2';
-/** what the face shows where its document has no background: the colour the error page's own CSS names outside its body (a choice: FL sets no colour on the controller) */
-export const FACE_BACKGROUND = '#142028';
+/** what the face shows where its document has no background: the desktop's colour (fle_desk.h FLE_DESK_BACKGROUND, Issue #1483: the face is laid over the desktop, so it has the desktop's colour and no other until its page is loaded) */
+export const FACE_BACKGROUND = '#05070a';
 
 export interface FaceBounds { left: number; top: number; right: number; bottom: number }
 export interface FaceRect { left: number; top: number; width: number; height: number }

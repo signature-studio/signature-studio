@@ -41,6 +41,7 @@
 #include "fle_runtime.h"
 #include "fle_env.h"
 #include "fle_callback.h"
+#include "fle_desk.h"
 #include "fle_ole.h"
 #include "fle_webview2.h"
 
@@ -49,6 +50,8 @@ uint64_t fle_call_guest(uint64_t va, uint64_t rcx, uint64_t rdx, uint64_t r8, ui
 int fle_win_client_origin(uint64_t h, int32_t *ox, int32_t *oy) __attribute__((weak));
 /* Issue #1376 (fle_win.c): the windows painted over window h within [l, r) x [t, b) (screen coordinates), 4 words each into out; weak: a link without fle_win.c has none */
 unsigned fle_win_front_rects(uint64_t h, int32_t l, int32_t t, int32_t r, int32_t b, int32_t *out, unsigned cap) __attribute__((weak));
+/* Issue #1483 (fle_win.c): the zero pixels of the client rectangle of window h take the colour rgb in its top-level window's surface; the number given the colour */
+uint64_t fle_win_fill_unpainted(uint64_t h, int32_t l, int32_t t, int32_t r, int32_t b, uint32_t rgb) __attribute__((weak));
 
 #define WV_S_OK           0x00000000u
 #define WV_E_NOINTERFACE  0x80004002u
@@ -626,6 +629,11 @@ static void call_slot(unsigned iface, unsigned k)
             wlog(s->name, in, "bounds=%d,%d,%d,%d origin=%d,%d", o->bounds[0], o->bounds[1], o->bounds[2], o->bounds[3], ox, oy);
         else
             wlog(s->name, in, "bounds=%d,%d,%d,%d origin=none", o->bounds[0], o->bounds[1], o->bounds[2], o->bounds[3]);
+        /* Issue #1483: the controller draws nothing, so the area it covers is what no window painted (zero: black on the desk). That area takes the desk's colour until the page's face covers it */
+        if (fle_win_fill_unpainted) {
+            uint64_t painted = fle_win_fill_unpainted(o->hwnd, o->bounds[0], o->bounds[1], o->bounds[2], o->bounds[3], (FLE_DESK_BACKGROUND_R << 16) | (FLE_DESK_BACKGROUND_G << 8) | FLE_DESK_BACKGROUND_B);
+            wlog(s->name, in, "painted %llu pixels with the desk colour (no window painted them)", (unsigned long long)painted);
+        }
         break;
     }
     case K_GET_HWND:

@@ -55,3 +55,44 @@ export function blackTiles(pic, tile = 64) {
   }
   return n;
 }
+
+// The black regions of a picture (Issue #1483): the pixels whose R, G and B are all 0 (pure black; the desktop's own colour is #05070a, which is not counted), in 4-connected groups.
+// A group is big when its bounding box is at least `min` pixels wide and at least `min` pixels high. `pic` is decodePicture's { w, h, stride, bytes } (the rows may be longer than w x 4).
+export function blackRegions(pic, min = 100) {
+  const { w: width, h: height } = pic;
+  const n = width * height;
+  const black = new Uint8Array(n);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const i = y * pic.stride + 4 * x;
+    black[y * width + x] = pic.bytes[i] === 0 && pic.bytes[i + 1] === 0 && pic.bytes[i + 2] === 0 ? 1 : 0;
+  }
+  const seen = new Uint8Array(n);
+  const stack = new Int32Array(n);
+  let groups = 0, blackPixels = 0;
+  const big = [];
+  for (let start = 0; start < n; start++) {
+    if (!black[start] || seen[start]) continue;
+    let top = 0, count = 0;
+    let x0 = width, y0 = height, x1 = -1, y1 = -1;
+    stack[top++] = start;
+    seen[start] = 1;
+    while (top > 0) {
+      const p = stack[--top];
+      const x = p % width, y = (p - x) / width;
+      count++;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+      if (x > 0 && black[p - 1] && !seen[p - 1]) { seen[p - 1] = 1; stack[top++] = p - 1; }
+      if (x < width - 1 && black[p + 1] && !seen[p + 1]) { seen[p + 1] = 1; stack[top++] = p + 1; }
+      if (y > 0 && black[p - width] && !seen[p - width]) { seen[p - width] = 1; stack[top++] = p - width; }
+      if (y < height - 1 && black[p + width] && !seen[p + width]) { seen[p + width] = 1; stack[top++] = p + width; }
+    }
+    groups++;
+    blackPixels += count;
+    if (x1 - x0 + 1 >= min && y1 - y0 + 1 >= min) big.push({ x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1, pixels: count });
+  }
+  big.sort((a, b) => b.pixels - a.pixels);
+  return { groups, blackPixels, big: big.slice(0, 8), bigCount: big.length };
+}

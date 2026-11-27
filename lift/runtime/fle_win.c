@@ -519,6 +519,122 @@ void fle_gdc_set_paint_pieces(uint64_t h, const int32_t (*p)[4], uint32_t n) __a
 int fle_gdc_is_window_dc(uint64_t h) __attribute__((weak));   /* decision 0323 */
 void fle_imp_FillRect(void) __attribute__((weak));   /* decision 0323: DefWindowProc(WM_ERASEBKGND) fills with the class background brush */
 void fle_imp_GetClipBox(void) __attribute__((weak));
+void fle_desk_wrote(uint32_t lid, int64_t x0, int64_t y0, int64_t x1, int64_t y1) __attribute__((weak));   /* fle_desk.c; a link without it has no desk to tell */
+
+/* Issue #1483: the area of a WebView2 controller (its parent window h and the rectangle [l, t, r, b) of its client area, and the colour rgb 0xRRGGBB). A child window draws into the surface of its top-level window (fle_gdi.c: the DC of a child
+ * has the root's surface), and the Browser's controller draws nothing, so the pixels of its area that no paint wrote stay zero, which the desk draws as black. The zero pixels of the area take the colour in that surface; the
+ * written rows are told to the desk (fle_desk_wrote: the runtime's write, not the guest's, so it is not counted as a drawing). A pixel that was painted is not touched. Returns the pixels given the colour (0 when h is not a live window,
+ * or the surface of its top-level window does not exist yet, or it is not a 32-bit one). */
+static uint64_t fill_area(uint64_t h, int32_t l, int32_t t, int32_t r, int32_t b, uint32_t rgb, const fle_rrect *only)
+{
+    int64_t i = live_index(h), root, x0, y0, x1, y1, bx0, by0, bx1, by1;
+    int32_t ox, oy, rox, roy;
+    const fle_rsurf *surf;
+    uint64_t n = 0;
+
+    if (i < 0 || !fle_raster_surface_peek || !fle_r_row || !fle_r_direct) return 0;
+    root = root_of(i);
+    surf = fle_raster_surface_peek(tab[root].lid);
+    if (!surf || surf->bpp != 32 || !fle_r_direct(surf)) return 0;
+    client_origin(i, &ox, &oy);
+    client_origin(root, &rox, &roy);
+    x0 = (int64_t)ox - rox + (l > 0 ? l : 0);
+    y0 = (int64_t)oy - roy + (t > 0 ? t : 0);
+    x1 = (int64_t)ox - rox + (r < tab[i].pcx ? r : tab[i].pcx);
+    y1 = (int64_t)oy - roy + (b < tab[i].pcy ? b : tab[i].pcy);
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > (int64_t)surf->width) x1 = surf->width;
+    if (y1 > (int64_t)surf->height) y1 = surf->height;
+    if (only) {
+        if (x0 < only->x0) x0 = only->x0;
+        if (y0 < only->y0) y0 = only->y0;
+        if (x1 > only->x1) x1 = only->x1;
+        if (y1 > only->y1) y1 = only->y1;
+    }
+    if (x0 >= x1 || y0 >= y1) return 0;
+    bx0 = x1;
+    by0 = y1;
+    bx1 = x0;
+    by1 = y0;
+    for (int64_t y = y0; y < y1; y++) {
+        uint8_t *p = fle_r_row(surf, (uint32_t)y) + 4 * x0;
+
+        for (int64_t x = x0; x < x1; x++, p += 4) {
+            if (p[0] | p[1] | p[2]) continue;
+            p[0] = (uint8_t)rgb;
+            p[1] = (uint8_t)(rgb >> 8);
+            p[2] = (uint8_t)(rgb >> 16);
+            n++;
+            if (x < bx0) bx0 = x;
+            if (x + 1 > bx1) bx1 = x + 1;
+            if (y < by0) by0 = y;
+            if (y + 1 > by1) by1 = y + 1;
+        }
+    }
+    if (n && fle_desk_wrote) fle_desk_wrote(tab[root].lid, bx0, by0, bx1, by1);
+    return n;
+}
+
+/* the areas kept for the surfaces that are made later (a surface is made or made again with other sizes: its new pixels are zero) */
+#define FILL_KEEP 8u
+static struct { uint64_t h; int32_t l, t, r, b; uint32_t rgb; } fills[FILL_KEEP];
+static unsigned nfills;
+static int fill_logged_made, fill_logged_write;     /* the first area given the colour by each of the two hooks is reported once */
+
+/* Issue #1483: gives the area of the controller of window h the colour now (fill_area), and keeps it for the surfaces made later */
+uint64_t fle_win_fill_unpainted(uint64_t h, int32_t l, int32_t t, int32_t r, int32_t b, uint32_t rgb)
+{
+    unsigned k;
+
+    for (k = 0; k < nfills && fills[k].h != h; k++) {}
+    if (k == nfills && nfills < FILL_KEEP) nfills++;
+    if (k < nfills) {
+        fills[k].h = h;
+        fills[k].l = l;
+        fills[k].t = t;
+        fills[k].r = r;
+        fills[k].b = b;
+        fills[k].rgb = rgb;
+    }
+    return fill_area(h, l, t, r, b, rgb, NULL);
+}
+
+/* Issue #1483 (fle_raster.c: a surface of new pixels was made for top-level window lid): the kept areas of that window are given their colour again */
+void fle_win_surface_made(uint32_t lid)
+{
+    for (unsigned k = 0; k < nfills; k++) {
+        int64_t i = live_index(fills[k].h);
+
+        if (i >= 0 && tab[root_of(i)].lid == lid) {
+            uint64_t n = fill_area(fills[k].h, fills[k].l, fills[k].t, fills[k].r, fills[k].b, fills[k].rgb, NULL);
+
+            if (n && !fill_logged_made) {
+                fill_logged_made = 1;
+                fprintf(stderr, "fle: webview2 area: %llu pixels given the desk colour when the surface of lid %u was made (Issue #1483)\n", (unsigned long long)n, (unsigned)lid);
+            }
+        }
+    }
+}
+
+/* Issue #1483 (fle_raster.c: after a write to the surface of top-level window lid, the rectangle r of it, in surface coordinates): the zero pixels of the kept areas that r meets take their colour.
+ * A paint of the window that leaves zero pixels (or draws black) in an area the controller covers is shown as the desk's colour, as the face of the controller covers it */
+void fle_win_area_wrote(uint32_t lid, fle_rrect r)
+{
+    for (unsigned k = 0; k < nfills; k++) {
+        int64_t i = live_index(fills[k].h);
+
+        if (i >= 0 && tab[root_of(i)].lid == lid) {
+            uint64_t n = fill_area(fills[k].h, fills[k].l, fills[k].t, fills[k].r, fills[k].b, fills[k].rgb, &r);
+
+            if (n && !fill_logged_write) {
+                fill_logged_write = 1;
+                fprintf(stderr, "fle: webview2 area: %llu pixels given the desk colour after a write to lid %u (Issue #1483)\n", (unsigned long long)n, (unsigned)lid);
+            }
+        }
+    }
+}
+
 static void upd_clear_rect(int64_t i);   /* decision 0247 (alpha3): the update region as a set of rectangles; see upd_add */
 static void upd_set_full(int64_t i);
 
