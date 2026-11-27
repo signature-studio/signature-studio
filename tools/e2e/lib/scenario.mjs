@@ -67,10 +67,13 @@ export function defineScenario(s) {
   return { kind: 'scenario', id: s.id, name: s.id, area: m[1], covers: [...covers], displays: [...displays], expectFail: checkMark(s.expectFail), run: s.run };
 }
 
-/** a scenario of the older set form ({ name, expectFail, run, beforeLoad?, expect? }; scenarios/<set>/index.mjs, set = smoke, browser-face or regression): it has no covers, and each runs in a page of its own */
+/** a scenario of the older set form ({ name, expectFail, run, beforeLoad?, expect?, displays? }; scenarios/<set>/index.mjs, set = smoke, browser-face or regression):
+ *  it has no covers, and each runs in a page of its own. displays: the names it declares (default: the three of the older form) */
 export function legacyScenario(s, set = 'smoke') {
+  const displays = s.displays ?? ['4k-dpr1', '4k-dpr2', '4k-random'];
+  if (!Array.isArray(displays) || displays.length === 0) throw new Error(`scenario ${s.name}: displays is a non-empty array`);
   return {
-    kind: 'legacy', id: s.name, name: s.name, area: set, covers: [], displays: ['4k-dpr1', '4k-dpr2', '4k-random'], expectFail: checkMark(s.expectFail ?? null),
+    kind: 'legacy', id: s.name, name: s.name, area: set, covers: [], displays: [...displays], expectFail: checkMark(s.expectFail ?? null),
     expect: s.expect ?? null, beforeLoad: s.beforeLoad, run: s.run,
   };
 }

@@ -97,7 +97,7 @@ struct Run {
     signal: Option<i32>,
 }
 
-/// The scenarios run with FLE_AUDIO_LEAD_MS=15, the lead that the hand computations of these tests (Learn: "typically about 15 milliseconds") use; the default of the runtime is 60 ms (S-audio-lead): `the_default_lead_is_60_ms...`.
+/// The scenarios run with FLE_AUDIO_LEAD_MS=15, the lead that the hand computations of these tests (Learn: "typically about 15 milliseconds") use; the default of the runtime is 300 ms (S-audio-lead, #1432): `the_default_lead_is_300_ms...`.
 fn run(args: &[&str]) -> Run {
     run_lead(args, Some("15"))
 }
@@ -331,9 +331,9 @@ fn play_moves_the_play_cursor_with_the_virtual_clock_and_the_write_cursor_leads_
 }
 
 #[test]
-/* S-audio-lead (the PM's decision on decision 0139): the default lead of the write cursor over the play cursor is 60 ms = floor(44100 * 60 / 1000) = 2646 frames; FLE_AUDIO_LEAD_MS changes it (30 ms = 1323 frames; a value outside 1..1000 is the default). */
-fn the_default_lead_is_60_ms_and_the_environment_changes_it() {
-    for (env, frames) in [(None, 2646u64), (Some("30"), 1323), (Some("15"), 661), (Some("0"), 2646), (Some("5000"), 2646), (Some("abc"), 2646)] {
+/* S-audio-lead (the PM's decision on decision 0139, raised by #1432): the default lead of the write cursor over the play cursor is 300 ms = floor(44100 * 300 / 1000) = 13230 frames; FLE_AUDIO_LEAD_MS changes it (30 ms = 1323 frames; a value outside 1..1000 is the default). */
+fn the_default_lead_is_300_ms_and_the_environment_changes_it() {
+    for (env, frames) in [(None, 13230u64), (Some("30"), 1323), (Some("15"), 661), (Some("0"), 13230), (Some("5000"), 13230), (Some("abc"), 13230)] {
         let r = run_lead(&["play"], env);
         assert_eq!(r.code, Some(0), "{env:?}: signal {:?} stderr {}", r.signal, r.err);
         let l = r.out.iter().find(|l| l.starts_with("ring after Play:")).unwrap_or_else(|| panic!("{env:?}: no ring line in {:?}", r.out));
@@ -345,8 +345,8 @@ fn the_default_lead_is_60_ms_and_the_environment_changes_it() {
 #[test]
 fn the_write_cursor_that_the_guest_sees_leads_the_play_cursor_by_15_ms_whatever_the_hand_over_lead() {
     // S-ds-write-cursor (0295): Learn GetCurrentPosition: "The write cursor always leads the play cursor, typically by about 15 milliseconds' worth of audio data". The write cursor that GetCurrentPosition returns is the play cursor + 661 frames (floor(44100 * 15 / 1000)),
-    // while the output is handed over up to consumed + the hand-over lead (S-audio-lead: 60 ms = 2646 frames by default, FLE_AUDIO_LEAD_MS): the two are separate quantities. The scenario and the hand computation of play_moves_the_play_cursor_... with the default lead and with 120 ms (5292 frames).
-    for (env, lead) in [(None, 2646u64), (Some("120"), 5292)] {
+    // while the output is handed over up to consumed + the hand-over lead (S-audio-lead: 300 ms = 13230 frames by default, FLE_AUDIO_LEAD_MS): the two are separate quantities. The scenario and the hand computation of play_moves_the_play_cursor_... with the default lead and with 120 ms (5292 frames).
+    for (env, lead) in [(None, 13230u64), (Some("120"), 5292)] {
         let r = run_lead(&["play"], env);
         assert_eq!(r.code, Some(0), "{env:?}: signal {:?} stderr {}", r.signal, r.err);
         let mut seen = 0;

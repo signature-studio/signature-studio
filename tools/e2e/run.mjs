@@ -150,6 +150,7 @@ async function runLegacy(sc, d, env) {
     const t = pg ? await toastState(pg.page).catch(() => ({ stuck: 0, ids: [] })) : { stuck: 0, ids: [] };
     out.stuckToasts = t.stuck;
     out.stuckIds = t.ids;
+    if (t.info && t.info.length > 0) out.stuckInfo = t.info;
     out.pageErrors = det ? det.pageErrors : 0;
     out.consoleErrors = det ? det.consoleErrors : 0;
     out.failedRequests = det ? det.failedRequests : 0;
@@ -239,6 +240,7 @@ async function runShared(sc, repeat, d, env, sh, index) {
   const t = await toastState(sh.pg.page).catch(() => ({ stuck: 0, ids: [] }));
   out.stuckToasts = t.stuck;
   out.stuckIds = t.ids;
+  if (t.info && t.info.length > 0) out.stuckInfo = t.info;
   out.details = sh.det.details.slice(-12);
   const stopped = out.engineStops > 0 || out.engineState === 'error' || out.engineState === 'exited';
   if (stopped) out.engineStop = await engineStopOf(sh.pg.page, sh.pg.cdp, env.delivery.origin).catch((e) => ({ error: String(e?.message ?? e).slice(0, 300), report: [] }));

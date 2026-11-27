@@ -20,8 +20,8 @@
 #define FLE_AUDIO_RING_FRAMES     32768u        /* capacity in frames (a power of two): 0.74 s at 44.1 kHz. A limit of this environment. */
 #define FLE_AUDIO_RING_CHANNELS   2u            /* interleaved L R; a mono buffer is copied to both */
 #define FLE_AUDIO_BLOCK_LOG       256u          /* the last 256 appends */
-#define FLE_AUDIO_LEAD_MS         60u           /* S-audio-lead (PM decision on decision 0139): the DEFAULT lead of the write cursor over the play cursor, in ms. Learn gives "typically about 15 milliseconds' worth of audio data" (GetCurrentPosition; the value 15 is still
-                                                 * selectable); 60 ms rides out a 60 ms stall of the engine (0.2% of the output quanta missing in the S2 test where 15 ms loses 8.4%). Adjustable: FLE_AUDIO_LEAD_MS (native environment), leadMs of fleAudioSab (page), 1..1000 */
+#define FLE_AUDIO_LEAD_MS         300u          /* S-audio-lead (PM decision on decision 0139, raised by #1432): the DEFAULT lead of the write cursor over the play cursor, in ms. Learn gives "typically about 15 milliseconds' worth of audio data" (GetCurrentPosition; the value 15 is still
+                                                 * selectable); 300 ms rides out the stalls of the engine after its first idle (#1432: under load 150 to 280 ms with no audio refill; 60 ms let a 60 ms stall through as an underrun). Adjustable: FLE_AUDIO_LEAD_MS (native environment), leadMs of fleAudioSab (page), 1..1000 */
 
 /* state */
 #define FLE_AUDIO_CLOSED  0u   /* no device object yet */

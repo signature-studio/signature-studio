@@ -13,6 +13,35 @@ const SCENARIO = {
 };
 const WINDOW_MS = 10000;
 
+// the record of the window for the report (Issue #1432): the page's output history and the engine's reports and pulses from the first idle, times in ms from the first idle
+const recordOf = (guest) => guest.ev(`(() => {
+  const a = window.__app.audio;
+  const f = a.marks['first-idle'];
+  const t0 = f ? f.page : 0;
+  const rel = (p) => Math.round(p - t0);
+  return {
+    t0: Math.round(t0),
+    hist: a.history.filter((h) => h.page >= t0 - 200).map((h) => [rel(h.page), h.ur]),
+    reports: a.reports.filter((r) => r.page >= t0 - 2000).map((r) => ({ at: rel(r.page), pubs: r.publishes, gap: r.gapFrames, skip: r.skipped, stretchMax: r.pace ? r.pace.stretchMaxMs : null, over50: r.pace ? r.pace.stretchOver50 : null, over78: r.pace ? r.pace.stretchOver78 : null, lateMax: r.pace ? r.pace.lateMaxMs : null, waits: r.waits })),
+    pulses: a.pulses.filter((p) => p.page >= t0 - 2000).map((p) => ({ at: rel(p.page), mixer: p.mixer, threads: p.threads.map((t) => [Math.round(t[0]), Math.round(t[1]), t[2]]) })),
+    unlocks: a.workerUnlocks.filter((u) => u.t - performance.timeOrigin >= t0 - 1000).map((u) => [Math.round(u.t - performance.timeOrigin - t0), u.n]),
+  };
+})()`);
+
+// the underrun spans of the record: the step (ms from the first idle), the quanta, the engine's last report and pulse before the step
+function spansOf(rec) {
+  const out = [];
+  for (let i = 1; i < rec.hist.length; i++) {
+    const [at, ur] = rec.hist[i], prev = rec.hist[i - 1][1];
+    if (ur <= prev) continue;
+    const rep = [...rec.reports].reverse().find((r) => r.at <= at) ?? null;
+    const pul = [...rec.pulses].reverse().find((p) => p.at <= at) ?? null;
+    const unl = [...rec.unlocks].reverse().find((u) => u[0] <= at) ?? null;
+    out.push({ at, dq: ur - prev, report: rep, pulseAt: pul ? pul.at : null, mixerThread: pul ? pul.mixer : null, lastUnlockAt: unl ? unl[0] : null, sinceLastUnlock: unl ? at - unl[0] : null });
+  }
+  return out;
+}
+
 export default {
   ...SCENARIO,
   async run({ guest, log }) {
@@ -33,8 +62,12 @@ export default {
     const a1 = await audioNow(guest);
     const since = sinceOf(a1);
     const running = a1.status === 'running';
+    const rec = await recordOf(guest);
+    const spans = spansOf(rec);
     const notes = [`first idle, then ${WINDOW_MS / 1000} s with no input: underrun quanta ${since}; the output: status ${a1.status}, context ${a1.ctx}, error ${a1.err ?? 'none'}; the count reached at: ${steps.length ? steps.join(', ') : 'none'}`];
+    notes.push(`the record (ms from the first idle at ${rec.t0} ms of the page): spans ${JSON.stringify(spans.map((s) => ({ at: s.at, dq: s.dq, stretchMax: s.report?.stretchMax ?? null, over50: s.report?.over50 ?? null, over78: s.report?.over78 ?? null, lateMax: s.report?.lateMax ?? null, pubs: s.report?.pubs ?? null, gap: s.report?.gap ?? null, pulseAt: s.pulseAt, mixerThread: s.mixerThread, sinceLastUnlock: s.sinceLastUnlock })))}`);
     log(notes[0]);
-    return result(since === 0 && running, (await guest.state())?.state ?? null, notes, { underrunQuanta: since, status: a1.status });
+    log(notes[1]);
+    return result(since === 0 && running, (await guest.state())?.state ?? null, notes, { underrunQuanta: since, status: a1.status, spans, record: rec });
   },
 };
