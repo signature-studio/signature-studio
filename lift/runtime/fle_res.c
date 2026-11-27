@@ -817,11 +817,17 @@ int fle_cursor_picture(uint64_t hnd, fle_cursor_pic *out, const char **why)
  * the first of the first name: the PE of FLEngine has exactly one (name 1, language 1033), measured with pefile; several names or languages stop, as find_leaf does for several languages). */
 int fle_res_version_block(const char *api, uint64_t *va, uint32_t *size)
 {
+    return fle_res_version_block_of(api, FLE_EXE_HANDLE, va, size);
+}
+
+/* Issue #1501 (段 B, S-version-info-program-resource): the same for the image mapped at base (a program of the table, PluginManager.exe, has its own RT_VERSION). */
+int fle_res_version_block_of(const char *api, uint64_t base, uint64_t *va, uint32_t *size)
+{
     res_img im;
     res_key type;
     uint32_t e, f, off, n;
 
-    img_open(api, &im, FLE_EXE_HANDLE);
+    img_open(api, &im, base);
     if (im.dir_rva == 0) return 0;
     type.is_id = 1;
     type.id = 16u;   /* RT_VERSION: Learn "Resource Types" (the number 16 is winuser.h = UNOFFICIAL; the page names RT_VERSION only) */

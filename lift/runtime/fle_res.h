@@ -59,5 +59,7 @@ int fle_cursor_picture(uint64_t h, fle_cursor_pic *out, const char **why);
 
 /* Decision 0129 (PROVISIONAL, S-version-info-real-resource): the RT_VERSION resource of the image mapped at FLE_EXE_HANDLE: 1 with its VA and size, or 0 when there is none. See fle_res.c. */
 int fle_res_version_block(const char *api, uint64_t *va, uint32_t *size);
+/* Issue #1501 (段 B): the same for the image mapped at base (a program of the table). */
+int fle_res_version_block_of(const char *api, uint64_t base, uint64_t *va, uint32_t *size);
 
 #endif

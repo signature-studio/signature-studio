@@ -11,7 +11,7 @@ import clipboardLoad from './clipboard-load-permission.mjs';
 import clipboardNoToast from './clipboard-no-toast.mjs';
 import firstPaint from './first-paint-complete.mjs';
 
-// the marks the smoke set carries (run.mjs refuses any other mark): #1499 (plugin-manager-opens) is open
-export const ALLOWED_MARKS = ['#1499'];
+// the marks the smoke set carries (run.mjs refuses any other mark): none (#1499 is done: plugin-manager-opens has no mark)
+export const ALLOWED_MARKS = [];
 
 export default [start, knob, fileOpen, cursorSize, pluginManager, pluginDatabase, pageChrome, contextMenuNone, clipboardLoad, clipboardNoToast, firstPaint];

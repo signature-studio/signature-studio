@@ -7,6 +7,7 @@
 #include "fle_imports.h"
 #include "fle_env.h"
 #include "fle_callback.h"
+#include "fle_realmod.h"
 
 /* ---- calls that are answered without a model (Issue #1418) ----
  * The table holds the APIs in the order they were first warned about; a name beyond FLE_WARN_NAMES_MAX is counted in warn_total only. */
@@ -402,6 +403,17 @@ void fle_imp_ExpandEnvironmentStringsW(void)
 const uint16_t *fle_appfile_cmdline_w(void) __attribute__((weak));
 const char *fle_appfile_cmdline_a(void) __attribute__((weak));
 
+/* ucrtbase / api-ms-win-crt-string!memset (Issue #1501,段 B: the Plugin Manager's own code calls it through the import). void *memset(void *dest rcx, int c rdx, size_t count r8):
+ * fills count bytes at dest with the byte (c as unsigned char) and returns dest. The C standard gives it; no Windows page is needed. A count of 0 changes nothing. */
+void fle_imp_memset(void)
+{
+    uint64_t dst = R[1], n = R[8];
+    uint8_t c = (uint8_t)R[2];
+
+    if (n != 0) memset((void *)fle_addr(dst, (unsigned)n, 1), c, (size_t)n);
+    R[0] = dst;
+}
+
 /* kernel32!GetCommandLineW (MSDN: GetCommandLineW): a pointer to the process command line, owned by the system
  * (the guest must not free or modify it). The process here is the lifted DLL (GetModuleHandleW(NULL) returns it,
  * decision 0015), so the command line is its virtual path in quotes, no arguments. The page says the OS may
@@ -410,6 +422,12 @@ const char *fle_appfile_cmdline_a(void) __attribute__((weak));
 void fle_imp_GetCommandLineW(void)
 {
     static uint16_t *cmd;
+    /* Issue #1499 (段 B): the thread of a program started by ShellExecute has the program's command line (fle_realmod.c) */
+    const uint16_t *own = FLE_REALMOD_PRESENT() ? fle_realmod_running_cmdline_w() : NULL;
+    if (own != NULL) {
+        R[0] = (uint64_t)(uintptr_t)own;
+        return;
+    }
     if (cmd == NULL && fle_appfile_cmdline_w) cmd = (uint16_t *)(uintptr_t)fle_appfile_cmdline_w();
     if (cmd == NULL) {
         static const char q[] = "\"" FLE_VIRTUAL_DLL_PATH "\"";
@@ -425,6 +443,12 @@ void fle_imp_GetCommandLineW(void)
 void fle_imp_GetCommandLineA(void)
 {
     static char *cmd;
+    /* Issue #1499 (段 B): the thread of a program started by ShellExecute has the program's command line (fle_realmod.c) */
+    const char *own = FLE_REALMOD_PRESENT() ? fle_realmod_running_cmdline_a() : NULL;
+    if (own != NULL) {
+        R[0] = (uint64_t)(uintptr_t)own;
+        return;
+    }
     if (cmd == NULL && fle_appfile_cmdline_a) {
         const char *t = fle_appfile_cmdline_a();
         if (t) {
