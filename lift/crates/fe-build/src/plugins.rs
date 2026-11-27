@@ -324,6 +324,10 @@ fn vas_text(vas: &[u64]) -> String {
     vas.iter().map(|v| format!("0x{v:x}")).collect::<Vec<String>>().join(",")
 }
 
+/// The longest key (Issue #1523): the real module's name in main_two.c is held in a 256 byte buffer (`want`) with its NUL, so a key of 255
+/// characters is the longest name the harness matches. A longer one is stopped here, before the engine's start.
+const KEY_MAX: usize = 255;
+
 fn valid_key(key: &str) -> bool {
     !key.is_empty() && key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '-' | '_'))
 }
@@ -336,6 +340,9 @@ pub fn validate(dlls: &[Dll]) -> Result<(), String> {
         let at = |m: &str| format!("plugin {} ({}): {m}", d.plugin, d.key);
         if !valid_key(&d.key) {
             return Err(at("the key is lower case letters, digits, '.', '-' and '_' only"));
+        }
+        if d.key.len() > KEY_MAX {
+            return Err(at(&format!("the key is {KEY_MAX} characters at most (the real module name is held in a {} byte buffer of main_two.c)", KEY_MAX + 1)));
         }
         if !d.key.ends_with(".dll") {
             return Err(at("the key ends with .dll (it is the realmod name and the stem of the rebased file)"));
@@ -948,6 +955,23 @@ mod tests {
 
     fn balance() -> Dll {
         parse_plugin("fruity-balance", BALANCE).unwrap().remove(0)
+    }
+
+    /// The key is 255 characters at most (Issue #1523): main_two.c holds the real module's name with its NUL in a 256 byte buffer, and a 100
+    /// character key is a name the engine has (the Formula Controller's stem is 63 characters, the Multiband Compressor's 67).
+    #[test]
+    fn a_key_of_255_characters_at_most_is_a_realmod_name() {
+        let row = |key: &str| format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\n{key}\tPlugins\\Fruity\\Effects\\X\\X_x64.dll\t本体\t{}\t10\tnone\t\t-\n", "a".repeat(64));
+        let key = |len: usize| {
+            let stem = "effects.fruity-formula-controller.";
+            format!("{stem}{}.dll", "f".repeat(len - stem.len() - 4))
+        };
+        assert_eq!(key(100).len(), 100);
+        for len in [100, 255] {
+            assert!(validate(&parse_plugin("x", &row(&key(len))).unwrap()).is_ok(), "a key of {len} characters");
+        }
+        let err = validate(&parse_plugin("x", &row(&key(256))).unwrap()).unwrap_err();
+        assert!(err.contains("the key is 255 characters at most"), "{err}");
     }
 
     #[test]

@@ -3,6 +3,7 @@
 //   Open  -> the chosen File objects (read from the OPFS) with the guest paths they get on the engine's virtual volume; a project (.flp) brings the files next to it
 //   Save  -> the guest path of the target; when the engine has finished writing it, the bytes are copied back to the chosen OPFS path (the 'saved-file' message of decision 0193)
 // A transient user activation is not needed anywhere here: nothing opens a browser chooser.
+import './files.css';
 import { OpfsFs, describeError, memoryNotice } from './opfs.ts';
 import { baseName, joinPath, normalizePath, parentOf, uniqueName } from './paths.ts';
 import { Explorer } from './explorer.ts';

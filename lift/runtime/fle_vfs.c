@@ -1859,6 +1859,60 @@ static uint32_t fit(const char *api, const uint16_t *s, size_t len, uint32_t nbu
     return (uint32_t)(len + 1);
 }
 
+/* shlwapi!PathCanonicalizeW (Issue #1501,段 B: the Plugin Manager's start calls it). BOOL f(LPWSTR pszBuf rcx, LPCWSTR pszPath rdx). Learn (PathCanonicalizeW): the function "removes navigation
+ * elements such as "." and ".." to produce a direct, well-formed path"; ".." removes the segment before it, "." skips the segment that follows it, "The root segment of the path cannot be removed", and more ".."
+ * than segments gives the root alone (examples: "A:\name_1\.\name_2\..\name_3" gives "A:\name_1\name_3"; "C:\.." gives "C:\"). The return value is TRUE when a result is computed. A buffer of MAX_PATH units is
+ * the page's rule; the input is at most MAX_PATH - 1 units (the page's "maximum length MAX_PATH"; a longer one stops by fle_w_read_alloc). The root is "X:\" or "\" (a backslash alone). The kept
+ * trailing backslash of a path that ends with a segment and a backslash is a READING (the page's examples have none). Not modelled, stop by name: a UNC path ("\\"), a drive-relative path ("X:name"),
+ * a "/" separator (the page's rules give none of these). An empty path gives an empty result with TRUE (a reading: nothing to remove). */
+void fle_imp_PathCanonicalizeW(void)
+{
+    static const char api[] = "PathCanonicalizeW";
+    uint64_t dst = R[1], src = R[2];
+    uint16_t *s, *o;
+    size_t n, root, p, q, olen = 0, nseg = 0, k;
+    size_t *pos;
+
+    if (dst == 0) fle_stop(api, "pszBuf is NULL: the page does not define it");
+    if (src == 0) fle_stop(api, "pszPath is NULL: the page does not define it");
+    s = fle_w_read_alloc(api, src, MAX_PATH_UNITS, &n);
+    for (k = 0; k < n; k++)
+        if (s[k] == '/') fle_stop(api, "a path with a '/' separator: the page's rules give none for it (not modelled)");
+    root = 0;
+    if (n >= 3 && ((s[0] | 0x20) >= 'a' && (s[0] | 0x20) <= 'z') && s[1] == ':' && s[2] == '\\') root = 3;
+    else if (n >= 2 && s[0] == '\\' && s[1] == '\\') fle_stop(api, "a UNC path: the page's rules for it are not modelled");
+    else if (n >= 2 && s[1] == ':') fle_stop(api, "a drive-relative path (X:name): the page's rules for it are not modelled");
+    else if (n >= 1 && s[0] == '\\') root = 1;
+    o = malloc((n + 2) * sizeof *o);
+    pos = malloc((n + 2) * sizeof *pos);
+    if (!o || !pos) fle_stop(api, "out of memory");
+    for (k = 0; k < root; k++) o[olen++] = s[k];
+    for (p = root; p < n;) {
+        if (s[p] == '\\') {
+            p++;
+            continue;
+        }
+        for (q = p; q < n && s[q] != '\\'; q++) {}
+        if (q - p == 1 && s[p] == '.') {
+            /* "." : the segment is skipped */
+        } else if (q - p == 2 && s[p] == '.' && s[p + 1] == '.') {
+            if (nseg > 0) olen = pos[--nseg];
+        } else {
+            pos[nseg++] = olen;
+            if (olen > 0 && o[olen - 1] != '\\') o[olen++] = '\\';
+            for (k = p; k < q; k++) o[olen++] = s[k];
+        }
+        p = q;
+    }
+    if (n > 0 && s[n - 1] == '\\' && nseg > 0 && o[olen - 1] != '\\') o[olen++] = '\\';
+    o[olen] = 0;
+    fle_w_write(dst, o, olen + 1);
+    R[0] = 1;
+    free(o);
+    free(pos);
+    free(s);
+}
+
 /* kernel32!GetFullPathNameW (MSDN: GetFullPathNameW). lpFileName rcx, nBufferLength edx, lpBuffer r8,
  * lpFilePart r9. Joins the current directory, resolves "." and "..", keeps a trailing backslash, and does not
  * check that the path exists (page). The return value is the length without the NUL, or the required size
@@ -2052,6 +2106,8 @@ static const char *module_path(const char *api, uint64_t h, char *buf, size_t ca
     if (h == 0) return FLE_VIRTUAL_EXE_PATH;
     if (h == FLE_EXE_HANDLE) return FLE_VIRTUAL_DLL_PATH;
     rm = FLE_REALMOD_PRESENT() ? fle_realmod_find_handle(h) : -1;
+    /* Issue #1499 (段 B): a program started by ShellExecute is the file it was started from */
+    if (rm >= 0 && fle_realmod_program_file(rm, buf, (unsigned)cap) >= 0) return buf;
     if (rm < 0 || fle_realmod_file_name(api, rm, nm, sizeof nm) <= 0)
         fle_stop(api, "only the lifted DLL has a path (hModule is not NULL or 0x400000)");
     snprintf(buf, cap, "%s%s", FLE_VIRTUAL_SHARED_DIR, nm);
@@ -2158,6 +2214,8 @@ void fle_imp_GetSystemDirectoryW(void)
 extern int fle_res_version_block(const char *api, uint64_t *va, uint32_t *size) __attribute__((weak));
 /* #1415: the search of a name with no directory part (fle_load.c, the LoadLibrary order). Weak, as fle_res_version_block: a link without fle_load.c stops by name for such a name. */
 extern uint16_t *fle_load_find_file(const char *api, const uint16_t *u, size_t n) __attribute__((weak));
+/* Issue #1501 (段 B): the RT_VERSION of the image mapped at base (fle_res.c), for a program of the table (fle_realmod.c). */
+extern int fle_res_version_block_of(const char *api, uint64_t base, uint64_t *va, uint32_t *size) __attribute__((weak));
 
 static int is_engine_path(const uint16_t *s, size_t len)
 {
@@ -2239,7 +2297,7 @@ static void version_volume(const char *api, uint16_t *p, size_t plen)
 void fle_imp_GetFileVersionInfoSizeW(void)
 {
     static const char api[] = "GetFileVersionInfoSizeW";
-    uint64_t name = R[1], handle = R[2];
+    uint64_t name = R[1], handle = R[2], prog;
     uint16_t *p;
     size_t plen;
     uint32_t err;
@@ -2264,6 +2322,20 @@ void fle_imp_GetFileVersionInfoSizeW(void)
         fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);   /* a PE without a version resource: the page names no code; the file-system error that a missing file gives */
         return;
     }
+    /* Issue #1501 (段 B, S-version-info-program-resource): a program of the table that was started answers with its own RT_VERSION, as the engine's own file does */
+    if (FLE_REALMOD_PRESENT() && (prog = fle_realmod_program_image_base(p, plen)) != 0) {
+        uint64_t va;
+        uint32_t sz;
+
+        free(p);
+        if (!fle_res_version_block_of) fle_stop(api, "the path is a program's and no resource reader is linked (fle_res.c): S-version-info-program-resource");
+        if (fle_res_version_block_of(api, prog, &va, &sz)) {
+            R[0] = sz;
+            return;
+        }
+        fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);
+        return;
+    }
     version_volume(api, p, plen);
 }
 
@@ -2281,7 +2353,7 @@ void fle_imp_GetFileVersionInfoSizeW(void)
 void fle_imp_GetFileVersionInfoW(void)
 {
     static const char api[] = "GetFileVersionInfoW";
-    uint64_t name = R[1], data = R[9];
+    uint64_t name = R[1], data = R[9], prog;
     uint32_t len32 = (uint32_t)R[8];
     uint16_t *p;
     size_t plen;
@@ -2300,6 +2372,23 @@ void fle_imp_GetFileVersionInfoW(void)
         free(p);
         if (!fle_res_version_block) fle_stop(api, "the path is the engine's own and no resource reader is linked (fle_res.c): decision 0129");
         if (!fle_res_version_block(api, &va, &sz)) {
+            fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);
+            return;
+        }
+        if (data == 0 || len32 == 0) fle_stop(api, "lpData is NULL or dwLen is 0: the page does not say what the call does (decision 0129)");
+        cnt = len32 < sz ? len32 : sz;
+        for (k = 0; k < cnt; k++) fle_st(data + k, 1, (uint8_t)fle_ld(va + k, 1));
+        R[0] = 1;
+        return;
+    }
+    /* Issue #1501 (段 B, S-version-info-program-resource): the bytes of a started program's RT_VERSION, as for the engine's own file */
+    if (FLE_REALMOD_PRESENT() && (prog = fle_realmod_program_image_base(p, plen)) != 0) {
+        uint64_t va;
+        uint32_t sz, k, cnt;
+
+        free(p);
+        if (!fle_res_version_block_of) fle_stop(api, "the path is a program's and no resource reader is linked (fle_res.c): S-version-info-program-resource");
+        if (!fle_res_version_block_of(api, prog, &va, &sz)) {
             fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);
             return;
         }
