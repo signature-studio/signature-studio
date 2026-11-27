@@ -1,7 +1,7 @@
 // The registry of scenarios (lib/scenario.mjs) and the run's plan (lib/plan.mjs): what a scenario must declare, the shards, the budget, the displays and the acceptance.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AREAS, areaOf, checkMark, checkMarks, defineScenario, legacyScenario, marksOf, shardOf } from '../lib/scenario.mjs';
+import { AREAS, areaOf, checkMark, checkMarks, defineScenario, legacyScenario, marksOf, runOrder, shardOf, sortById, startOf } from '../lib/scenario.mjs';
 import { budgetClock, displayRows, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowPasses } from '../lib/plan.mjs';
 
 const ok = { kind: 'scenario', run: () => ({ ok: true }) };
@@ -97,6 +97,18 @@ test('planScenarios sorts, shards, repeats and filters by ID or name', () => {
   const rep = planScenarios(all, { shard: { i: 1, n: 1 }, repeat: 2 });
   assert.deepEqual(rep.map((p) => `${p.sc.id}#${p.repeat}`), ['old-name#1', 'page/a#1', 'page/b#1', 'old-name#2', 'page/a#2', 'page/b#2']);
   assert.throws(() => planScenarios(all, { only: ['nope'] }), /--only/);
+});
+
+test('the run order: the visual scenarios that start in the same theme and language run one after another; the others keep their order', () => {
+  assert.deepEqual(startOf('visual/theme-ash-golden'), { theme: 'ash', language: '' });
+  assert.deepEqual(startOf('visual/theme-light-cherry-black'), { theme: 'light-cherry', language: '' });
+  assert.deepEqual(startOf('visual/text-language-fr'), { theme: '', language: 'fr' });
+  assert.deepEqual(startOf('visual/language-zh-topbar'), { theme: '', language: 'zh' });
+  assert.deepEqual(startOf('page/canvas-fills-viewport'), { theme: '', language: '' });
+  const list = sortById(['visual/theme-dark-text', 'visual/language-fr-topbar', 'visual/window-tmidiform-golden', 'visual/theme-dark-edge', 'visual/theme-ash-golden'].map((id) => ({ id })));
+  assert.deepEqual(runOrder(list).map((s) => s.id), ['visual/window-tmidiform-golden', 'visual/language-fr-topbar', 'visual/theme-ash-golden', 'visual/theme-dark-edge', 'visual/theme-dark-text']);
+  const page = ['page/b', 'page/a'].map((id) => ({ id }));
+  assert.deepEqual(runOrder(page).map((s) => s.id), ['page/b', 'page/a']);
 });
 
 test('arguments: pairs, the list flag, and the errors', () => {

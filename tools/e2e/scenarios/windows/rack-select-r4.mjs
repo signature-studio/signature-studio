@@ -5,6 +5,7 @@ import { selectChannel } from '../../lib/windows.mjs';
 export default defineScenario({
   id: 'windows/rack-select-r4',
   covers: ['windows/rack/select'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return selectChannel(guest, 3);
   },

@@ -1,0 +1,2 @@
+key	guest	role	sha256	size	hook	args	omit
+effects.fruity-parametric-eq.fruity_parametric_eq_x64.dll	Plugins\Fruity\Effects\Fruity Parametric EQ\Fruity Parametric EQ_x64.dll	本体	71aa9bd2cb259673d40ef31f0ab2d081569680cce83589dadc6d883a9893640e	3816960	rva:0x17e90,0x32040,0x32060	--pdata	-

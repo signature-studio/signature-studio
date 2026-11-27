@@ -1,15 +1,16 @@
 id	kind	name	source	how	nameSource
 menus/menu/file	menu	File	TNewMenu lid 81 (bar 4,4 293x33)	label place: bar fraction x 0.051 y 0.45; drop-down lid 162 at 4,36 208x298	index
-menus/item/file-1	item	File > #1	drop-down lid 162	Down x 1 from the label; 10 items	index
-menus/item/file-2	item	File > #2	drop-down lid 162	Down x 2 from the label; 10 items	index
-menus/item/file-3	item	File > #3	drop-down lid 162	Down x 3 from the label; 10 items	index
-menus/item/file-4	item	File > #4	drop-down lid 162	Down x 4 from the label; 10 items	index
-menus/item/file-5	item	File > #5	drop-down lid 162	Down x 5 from the label; 10 items	index
-menus/item/file-6	item	File > #6	drop-down lid 162	Down x 6 from the label; 10 items	index
-menus/item/file-7	item	File > #7	drop-down lid 162	Down x 7 from the label; 10 items	index
-menus/item/file-8	item	File > #8	drop-down lid 162	Down x 8 from the label; 10 items	index
-menus/item/file-9	item	File > #9	drop-down lid 162	Down x 9 from the label; 10 items	index
-menus/item/file-10	item	File > #10	drop-down lid 162	Down x 10 from the label; 10 items	index
+menus/item/file-1	item	File > #1	drop-down lid 162	Down x 1 from the label; 11 items	index
+menus/item/file-2	item	File > #2	drop-down lid 162	Down x 2 from the label; 11 items	index
+menus/item/file-3	item	File > #3	drop-down lid 162	Down x 3 from the label; 11 items	index
+menus/item/file-4	item	File > #4	drop-down lid 162	Down x 4 from the label; 11 items	index
+menus/item/file-5	item	File > #5	drop-down lid 162	Down x 5 from the label; 11 items	index
+menus/item/file-6	item	File > #6	drop-down lid 162	Down x 6 from the label; 11 items	index
+menus/item/file-7	item	File > #7	drop-down lid 162	Down x 7 from the label; 11 items	index
+menus/item/file-8	item	File > #8	drop-down lid 162	Down x 8 from the label; 11 items	index
+menus/item/file-9	item	File > #9	drop-down lid 162	Down x 9 from the label; 11 items	index
+menus/item/file-10	item	File > #10	drop-down lid 162	Down x 10 from the label; 11 items	index
+menus/item/file-11	item	File > #11	drop-down lid 162	Down x 11 from the label; 11 items	index
 menus/menu/edit	menu	Edit	TNewMenu lid 81 (bar 4,4 293x33)	label place: bar fraction x 0.147 y 0.45; drop-down lid 163 at 34,36 116x87	index
 menus/item/edit-1	item	Edit > #1	drop-down lid 163	Down x 1 from the label; 4 items	index
 menus/item/edit-2	item	Edit > #2	drop-down lid 163	Down x 2 from the label; 4 items	index

@@ -5,6 +5,7 @@ import * as S from '../../lib/settings.mjs';
 export default defineScenario({
   id: 'settings/section-midi-external-sync-geometry',
   covers: ["settings/section/external-sync"],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   expectFail: null,
   run(ctx) {
     return S.sectionRun(ctx, "MIDI", "External sync", 'geometry');

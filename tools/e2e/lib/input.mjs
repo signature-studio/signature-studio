@@ -263,6 +263,12 @@ export async function press(guest, gx, gy, button = 'left', clicks = 1) {
   }
 }
 
+/** the element the page's hit test finds at a guest point (its tag, id and title): what takes a press there when it is not the desk */
+export const elementAtGuest = async (guest, page, gx, gy) => {
+  const c = await guest.pointAt(gx, gy);
+  return page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? `${e.tagName}${e.id ? `#${e.id}` : ''}${e.title ? ` title="${e.title}"` : ''}` : 'none'; }, [c.x, c.y]);
+};
+
 /** the centre of a menu label in guest px (the bar is read from the window table) */
 export async function labelPoint(guest, label) {
   const bar = menuBarRect(await windowTable(guest));
@@ -437,7 +443,8 @@ export async function clickTrace({ guest, page }, button, where) {
   const down = hasDesc(recs, btnDesc(button, 'down', p.x, p.y));
   const up = hasDesc(recs, btnDesc(button, 'up', p.x, p.y));
   const hit = hits.find((h) => h.what === 'down' && h.btn === BUTTONS[button].engine && h.x === p.x && h.y === p.y) ?? null;
-  return { ok: down && up && hit !== null && hitWindowed(hit), engineState: await stateOf(guest), notes: [`${button} at ${p.x},${p.y} (${where}): records down ${down}, up ${up}; the engine's hit line ${hit ? `final ${hit.final} ht ${hit.ht}` : 'none'}`] };
+  const el = await elementAtGuest(guest, page, p.x, p.y);
+  return { ok: down && up && hit !== null && hitWindowed(hit), engineState: await stateOf(guest), notes: [`${button} at ${p.x},${p.y} (${where}): records down ${down}, up ${up}; the engine's hit line ${hit ? `final ${hit.final} ht ${hit.ht}` : 'none'}; the element under the point ${el}`] };
 }
 
 /** a press of the right button on a shown window (20, 60 inside its rectangle, held for `hold` ms): the window's drop-down opens; Escape closes it */
@@ -467,7 +474,8 @@ export async function doubleClick({ guest, page }, trace) {
   const downs = countDesc(recs, btnDesc('left', 'down', p.x, p.y));
   const ups = countDesc(recs, btnDesc('left', 'up', p.x, p.y));
   const hits = trace ? (await hitsSince(guest, lmark)).filter((h) => h.what === 'down' && h.btn === 0 && h.x === p.x && h.y === p.y).length : null;
-  return { ok: downs === 2 && ups === 2 && (hits === null || hits >= 2), engineState: await stateOf(guest), notes: [`double click at ${p.x},${p.y}: records down ${downs}, up ${ups}${trace ? `; hit lines down ${hits}` : ''}`] };
+  const el = await elementAtGuest(guest, page, p.x, p.y);
+  return { ok: downs === 2 && ups === 2 && (hits === null || hits >= 2), engineState: await stateOf(guest), notes: [`double click at ${p.x},${p.y}: records down ${downs}, up ${ups}${trace ? `; hit lines down ${hits}` : ''}; the element under the point ${el}`] };
 }
 
 /** the left button from one place to another (12 moves): the press at the start, the moves while it is held, the release at the end */
@@ -493,6 +501,10 @@ export async function dragCase({ guest, page }, mode) {
 export async function wheelCase({ guest, page }, deltaY) {
   const pr = await pianoRollCentre(guest);
   if (!pr) return fail(guest, ['no Piano roll window (F7)']);
+  // the Piano roll may be left at the end of its range by an earlier scenario (the window is kept): the wheel goes to the other end first (15 notches), so the notches have room to scroll
+  await wheelAt(guest, pr.x, pr.y, 15, 0, -deltaY);
+  await settle(page, 8000);
+  await sleep(800);
   const before = await snap(guest, pr.rect);
   const mark = await markSeq(page);
   await wheelAt(guest, pr.x, pr.y, 3, 0, deltaY);
@@ -502,7 +514,7 @@ export async function wheelCase({ guest, page }, deltaY) {
   const recs = await recordsSince(page, mark);
   const delta = deltaY > 0 ? -120 : 120;
   const n = countDesc(recs, `wheel ${delta} at screen (${pr.x}, ${pr.y})`);
-  return { ok: n >= 3 && before.hash !== after.hash, engineState: await stateOf(guest), notes: [`wheel deltaY ${deltaY} x3 over the Piano roll at ${pr.x},${pr.y}: records wheel ${delta} processed ${n}; the Piano roll's picture ${before.hash === after.hash ? 'unchanged' : 'changed'}`] };
+  return { ok: n >= 3 && before.hash !== after.hash, engineState: await stateOf(guest), notes: [`wheel deltaY ${deltaY} x3 over the Piano roll at ${pr.x},${pr.y} (from the other end of its range): records wheel ${delta} processed ${n}; the Piano roll's picture ${before.hash === after.hash ? 'unchanged' : 'changed'}`] };
 }
 
 /** a horizontal wheel (deltaX) over the Piano roll: the engine should be given it and the view moves; the page sends no horizontal wheel (keymap and pointer.ts read deltaY only) */
@@ -591,7 +603,8 @@ export async function focusClick({ guest, page }) {
   await press(guest, Math.floor(d.gw * 0.5), Math.floor(d.gh * 0.5));
   await sleep(300);
   const after = await activeId(page);
-  return { ok: after === 'desktop' && before !== 'desktop', engineState: await stateOf(guest), notes: [`focus before the click "${before}", after it "${after}"`] };
+  const el = await elementAtGuest(guest, page, Math.floor(d.gw * 0.5), Math.floor(d.gh * 0.5));
+  return { ok: after === 'desktop' && before !== 'desktop', engineState: await stateOf(guest), notes: [`focus before the click "${before}", after it "${after}"; the element under the desk's centre ${el}`] };
 }
 
 /** types text in the channel name box (F2) and checks the text is in the guest's memory; `commit` 'enter' also checks that Enter closes the box */
@@ -731,7 +744,10 @@ export async function escapeWindow({ guest }, n, cls) {
   return { ok: before && !after, engineState: await stateOf(guest), notes: [`F${n}: ${cls} shown ${before}; after Escape shown ${after}`] };
 }
 
-/** a function key that shows or hides the desk's picture (F5 the Playlist, F6 the Browser, F9 the Mixer): one press changes the picture; a second press brings it back (`mode` 'toggle') */
+/** the window each function key shows or hides on the desk (F5 the Playlist, F6 the Channel rack, F9 the Mixer) */
+const KEY_WINDOW = { 5: (w) => w.cls === 'TEventEditForm' && /^Playlist/.test(w.label ?? ''), 6: (w) => w.cls === 'TStepSeqForm', 9: (w) => w.cls === 'TFXForm' };
+
+/** a function key that shows or hides the desk's picture (F5 the Playlist, F6 the Channel rack, F9 the Mixer): one press changes the picture (`mode` 'once'); 'toggle': the first press changes the picture, then the second and the third press flip the window's visibility (each changes the picture) */
 export async function fkeyToggle({ guest, page }, n, mode) {
   await guest.focusDesktop();
   const set0 = await shownSet(guest);
@@ -746,13 +762,23 @@ export async function fkeyToggle({ guest, page }, n, mode) {
     await settle(page, 8000);
     return r;
   }
+  // the measured run (Issue #1532): the first press changes the picture but not the window's visibility; the second and the third press each flip the window
+  const pick = KEY_WINDOW[n];
+  const shownOf = async () => windowsOf(await windowTable(guest)).some((w) => w.vis !== false && pick(w));
+  const s1 = await shownOf();
   await fkeyPress(guest, n);
   await settle(page, 8000);
   const h2 = await pictureSettled(guest);
-  const set2 = await shownSet(guest);
-  const lost = [...set0].filter((k) => !set2.has(k)), extra = [...set2].filter((k) => !set0.has(k));
-  const diff = lost.length || extra.length ? `; not restored: ${lost.slice(0, 3).join(' | ') || '-'}; extra: ${extra.slice(0, 3).join(' | ') || '-'}` : '';
-  return { ok: h1 !== h0 && h2 === h0, engineState: await stateOf(guest), notes: [`F${n}: the picture changed by one press ${h1 !== h0}; the same as before after the second press ${h2 === h0}; shown windows ${set0.size} -> ${set1.size} -> ${set2.size}${diff}`] };
+  const s2 = await shownOf();
+  await fkeyPress(guest, n);
+  await settle(page, 8000);
+  const h3 = await pictureSettled(guest);
+  const s3 = await shownOf();
+  const set3 = await shownSet(guest);
+  const lost = [...set0].filter((k) => !set3.has(k)), extra = [...set3].filter((k) => !set0.has(k));
+  const diff = lost.length || extra.length ? `; not the same as before: lost ${lost.slice(0, 3).join(' | ') || '-'}; extra ${extra.slice(0, 3).join(' | ') || '-'}` : '';
+  const ok = h1 !== h0 && s2 !== s1 && s3 === s1 && h2 !== h1 && h3 !== h2;
+  return { ok, engineState: await stateOf(guest), notes: [`F${n}: the picture changed by one press ${h1 !== h0} (the window shown ${s1}); the second press ${s2 ? 'shows' : 'hides'} the window (the picture changed ${h2 !== h1}); the third ${s3 ? 'shows' : 'hides'} it (the picture changed ${h3 !== h2}); shown windows ${set0.size} -> ${set1.size} -> ${set3.size}${diff}`] };
 }
 
 /** the Down key moves the highlight of the File drop-down: `down` (one press changes it), `down2` (two presses), `up` (Down, Down, Up: the highlight is back on the first item) */
@@ -784,15 +810,13 @@ export async function arrowMenu({ guest }, mode) {
     ok = h1 !== h0 && h2 !== h1;
     notes = [`Down, Down: each changes the picture (${h1 !== h0}, ${h2 !== h1})`];
   } else {
+    // the three pictures are read once they have settled (a read 500 ms after a key can catch the drop-down in the middle of its redraw)
     await pressNamed(guest, 'ArrowDown');
-    await sleep(500);
-    const h1 = await hash();
+    const h1 = await pictureSettled(guest, r, 3000);
     await pressNamed(guest, 'ArrowDown');
-    await sleep(500);
-    const h2 = await hash();
+    const h2 = await pictureSettled(guest, r, 3000);
     await pressNamed(guest, 'ArrowUp');
-    await sleep(500);
-    const h3 = await hash();
+    const h3 = await pictureSettled(guest, r, 3000);
     ok = h2 !== h1 && h3 === h1;
     notes = [`Down, Down, Up: the picture after Up is the one after the first Down (${h3 === h1}); after the second Down it differs (${h2 !== h1}); after Up it differs from the second Down (${h3 !== h2})`];
   }
@@ -1257,21 +1281,31 @@ export async function hintCase({ guest, page }, mode, side = 'left') {
   await guest.move(await guest.pointAt(away.x, away.y));
   await sleep(1500);
   const base = (await snap(guest, r)).hash;
-  const fracs = side === 'right' ? [0.92, 0.8, 0.7, 0.6] : [0.08, 0.2, 0.35, 0.5, 0.65];
-  let shownAt = null;
-  for (const f of fracs) {
-    await guest.move(await guest.pointAt(Math.floor(r.x + f * r.w), Math.floor(r.y + r.h * 0.5)));
+  // the hint is for a control of the bar: the points are the centres of its toolbar panels (the window table's), on the side asked (not the gaps between them)
+  const t = await windowTable(guest);
+  const points = t.children.filter((c) => c.vis && c.cls === 'TQuickEditToolbarPanel')
+    .map((c) => absoluteRect(t, c.lid))
+    .filter((q) => q && q.w > 0 && q.y >= r.y && q.y + q.h <= r.y + r.h)
+    .map((q) => ({ x: Math.floor(q.x + q.w / 2), y: Math.floor(q.y + q.h / 2) }))
+    .filter((p) => (side === 'right' ? p.x >= r.x + 0.6 * r.w : p.x < r.x + 0.5 * r.w))
+    .sort((a, b) => (side === 'right' ? b.x - a.x : a.x - b.x))
+    .slice(0, 8);
+  let shownAt = null, rested = 0;
+  for (const p of points) {
+    rested++;
+    await guest.move(await guest.pointAt(p.x, p.y));
     await sleep(1600);
-    if ((await snap(guest, r)).hash !== base) { shownAt = f; break; }
+    if ((await snap(guest, r)).hash !== base) { shownAt = p; break; }
   }
   let restored = null;
   if (shownAt !== null) {
-    await guest.move(await guest.pointAt(away.x, away.y));
+    // the pointer leaves in steps, as a hand does: the engine clears the hint on the move after the one that leaves the bar (one jump does not clear it)
+    for (const f of [0.25, 0.5, 0.75, 1]) await guest.move(await guest.pointAt(Math.round(shownAt.x + (away.x - shownAt.x) * f), Math.round(shownAt.y + (away.y - shownAt.y) * f)));
     await sleep(1600);
     restored = (await snap(guest, r)).hash === base;
   }
   const ok = mode === 'shows' ? shownAt !== null : shownAt !== null && restored === true;
-  return { ok, engineState: await stateOf(guest), notes: [`top bar ${r.w}x${r.h}: ${shownAt === null ? 'no pixel of the bar changed while the pointer rested on it' : `the pointer at ${shownAt} of its width changed the bar's picture`}; after the pointer left: ${restored === null ? 'not checked' : restored ? 'the picture is as before' : 'the picture differs'}`] };
+  return { ok, engineState: await stateOf(guest), notes: [`top bar ${r.w}x${r.h}: ${shownAt === null ? `no pixel of the bar changed while the pointer rested on ${rested} of its control panels (${side})` : `the pointer on a control at ${shownAt.x},${shownAt.y} (${side}) changed the bar's picture`}; after the pointer left: ${restored === null ? 'not checked' : restored ? 'the picture is as before' : 'the picture differs'}`] };
 }
 
 // ---- the cursor ----------------------------------------------------------------------------------------------------
@@ -1279,12 +1313,33 @@ export async function hintCase({ guest, page }, mode, side = 'left') {
 /** the pointer over the rename box (a text field): the cursor is the I-beam ('text') */
 export async function cursorText({ guest, page }) {
   const r = await openRename(guest);
-  const box = r.fresh.find((w) => w.rect && w.rect.w > 20 && w.rect.h > 8);
-  if (!box) { await closeFresh(guest, r.base); return fail(guest, ['no box after F2']); }
-  const x = Math.floor(box.rect.x + box.rect.w / 2), y = Math.floor(box.rect.y + box.rect.h / 2);
-  const css = await cursorAt(guest, page, x, y);
+  const cands = r.fresh.filter((w) => w.rect && w.rect.w > 20 && w.rect.h > 8);
+  if (cands.length === 0) { await closeFresh(guest, r.base); return fail(guest, ['no box after F2']); }
+  // the box must be the window on top at the point (a box under another window gets that window's cursor): the point is one where the table has the box on top
+  const t = await windowTable(guest);
+  const spots = (b) => [[0.5, 0.5], [0.25, 0.5], [0.75, 0.5], [0.5, 0.25], [0.5, 0.75]].map(([fx, fy]) => ({ x: Math.floor(b.rect.x + b.rect.w * fx), y: Math.floor(b.rect.y + b.rect.h * fy) }));
+  let box = null, pt = null;
+  for (const b of cands) {
+    const on = spots(b).find((p) => topmostAt(t, p.x, p.y) === b.lid);
+    if (on) { box = b; pt = on; break; }
+  }
+  if (!box) { box = cands[0]; pt = spots(box)[0]; }
+  const top = topmostAt(t, pt.x, pt.y);
+  const css = await cursorAt(guest, page, pt.x, pt.y);
   await closeFresh(guest, r.base);
-  return { ok: css === 'text', engineState: await stateOf(guest), notes: [`the pointer over the box (${box.cls}, ${box.rect.w}x${box.rect.h}) at ${x},${y}: cursor ${css}`] };
+  return { ok: css === 'text', engineState: await stateOf(guest), notes: [`the pointer over the box (${box.cls}, ${box.rect.w}x${box.rect.h}) at ${pt.x},${pt.y}${top === box.lid ? ' (the box is on top there)' : ` (the box is not on top there: window ${top} is)`}: cursor ${css}`] };
+}
+
+/** the window the table has on top at a guest point: a top-level window other than the main form (the last listed), else the last visible child that holds the point, else the main form (0: none) */
+function topmostAt(t, x, y) {
+  const holds = (q) => q && x >= q.x && x < q.x + q.w && y >= q.y && y < q.y + q.h;
+  const tops = t.top.filter((w) => w.cls !== MAIN_FORM && holds(w));
+  if (tops.length > 0) return tops[tops.length - 1].lid;
+  let hit = null;
+  for (const c of t.children) if (c.vis && holds(absoluteRect(t, c.lid))) hit = c.lid;
+  if (hit !== null) return hit;
+  const main = t.top.find((w) => w.cls === MAIN_FORM && holds(w));
+  return main ? main.lid : 0;
 }
 
 /** the window edges of a sizable window: the cursor over each edge (2 px inside) is the resize cursor of its direction (the window must be on top there) */
@@ -1384,8 +1439,9 @@ export async function touchTap({ guest, page }, where) {
     const recs = await recordsSince(page, mark);
     const down = hasDesc(recs, btnDesc('left', 'down', p.x, p.y)), up = hasDesc(recs, btnDesc('left', 'up', p.x, p.y));
     const pop = where === 'desk' ? null : dropDown(await windowTable(guest), base);
+    const el = await elementAtGuest(guest, page, p.x, p.y);
     const left = await closeFresh(guest, base);
-    return { ok: down && up && (where === 'desk' || pop !== null), engineState: await stateOf(guest), notes: [`tap at ${p.x},${p.y} (${where}): button down ${down}, up ${up}; drop-down ${pop ? 'opened' : 'none'}; shown after cleanup ${left.length}`] };
+    return { ok: down && up && (where === 'desk' || pop !== null), engineState: await stateOf(guest), notes: [`tap at ${p.x},${p.y} (${where}): button down ${down}, up ${up}; drop-down ${pop ? 'opened' : 'none'}; the element under the point ${el}; shown after cleanup ${left.length}`] };
   } finally {
     await touchOn(guest, false);
   }
@@ -1417,8 +1473,9 @@ export async function touchLong({ guest, page }, where) {
     const recs = await recordsSince(page, mark);
     const down = hasDesc(recs, btnDesc('left', 'down', p.x, p.y)), up = hasDesc(recs, btnDesc('left', 'up', p.x, p.y));
     const notCancelled = (after.seen - before.seen) - (after.prevented - before.prevented);
+    const el = await elementAtGuest(guest, page, p.x, p.y);
     const left = await closeFresh(guest, base);
-    return { ok: down && up && notCancelled === 0, engineState: await stateOf(guest), notes: [`long press at ${p.x},${p.y} (${where}): button down ${down}, up ${up}; contextmenu events ${after.seen - before.seen}, not cancelled ${notCancelled}; shown after cleanup ${left.length}`] };
+    return { ok: down && up && notCancelled === 0, engineState: await stateOf(guest), notes: [`long press at ${p.x},${p.y} (${where}): button down ${down}, up ${up}; contextmenu events ${after.seen - before.seen}, not cancelled ${notCancelled}; the element under the point ${el}; shown after cleanup ${left.length}`] };
   } finally {
     await touchOn(guest, false);
   }

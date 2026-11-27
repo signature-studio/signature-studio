@@ -1,7 +1,7 @@
 // The plan of a run (Issue #1485, #1506): the arguments, the displays and their rows, the budget of a row, the shard, the result of a scenario and the acceptance
 // of a scenario and of a row. Pure (no browser), so the tests can use it.
 // The display names: 4k-dpr1, 4k-dpr2, 4k-random (as before) and dpr:<number> (e.g. dpr:1.25): the CSS size is 3840 / DPR by 2160 / DPR.
-import { areaOf, shardOf, sortById } from './scenario.mjs';
+import { areaOf, runOrder, shardOf, sortById } from './scenario.mjs';
 
 export const DISPLAY = { width: 3840, height: 2160, refreshHzTarget: 120 };
 export const FAIL_LOG_LINES = 200;
@@ -104,24 +104,29 @@ export function stopped(s) {
   return s.engineStops > 0 || s.engineStuckRunning === true;
 }
 
+/** the scenario's run threw (its error is not null: the page's evaluate failed, e.g. Target crashed); such a result is never accepted (Issue #1528) */
+export const errored = (s) => (s.error ?? null) !== null;
+
 /**
- * the acceptance of one scenario result. A skipped scenario fails; a page whose DPR is not the declared one fails (dprOk false), marked or not.
- * An unmarked scenario (expectFail null) is ok with no counter. A marked one (a known defect) is judged by its counters only: 0 pageErrors, consoleErrors and
- * failedRequests (its ok and its stuckToasts are not judged), and no engine stop unless it declares the stop (expectStop: '#<Issue>' or 'new').
+ * the acceptance of one scenario result. A skipped scenario fails; an errored one fails (marked or not: a mark does not hide an error); a page whose DPR is not
+ * the declared one fails (dprOk false), marked or not. An unmarked scenario (expectFail null) is ok with no counter. A marked one (a known defect) is judged by
+ * its counters only: 0 pageErrors, consoleErrors and failedRequests (its ok and its stuckToasts are not judged), and no engine stop unless it declares the stop
+ * (expectStop: '#<Issue>' or 'new').
  */
 export function scenarioPasses(s) {
-  if (s.skipped === true || s.dprOk === false) return false;
+  if (s.skipped === true || s.dprOk === false || errored(s)) return false;
   const quiet = s.pageErrors === 0 && s.consoleErrors === 0 && s.failedRequests === 0;
   if ((s.expectFail ?? null) !== null) return quiet && ((s.expectStop ?? null) !== null || !stopped(s));
   return s.ok === true && quiet && s.stuckToasts === 0;
 }
 
 /**
- * a scenario result that gets the engine log's tail (failLog): an unmarked one that fails the acceptance, or a marked one whose engine stopped (a known failure
- * without a stop has no log, so the JSON stays small). A skipped one is not run, so it has no log.
+ * a scenario result that gets the engine log's tail (failLog): an errored one, an unmarked one that fails the acceptance, or a marked one whose engine stopped (a known
+ * failure without a stop has no log, so the JSON stays small). A skipped one is not run, so it has no log.
  */
 export function needsFailLog(s) {
   if (s.skipped === true) return false;
+  if (errored(s)) return true;
   if ((s.expectFail ?? null) === null) return !scenarioPasses(s);
   return stopped(s);
 }
@@ -129,6 +134,21 @@ export function needsFailLog(s) {
 /** the last FAIL_LOG_LINES lines of a log (the lines since the scenario started, in the order the page keeps them) */
 export function tailLines(lines, n = FAIL_LOG_LINES) {
   return lines.slice(Math.max(0, lines.length - n));
+}
+
+const PAGE_GONE = /Target crashed|Page crashed|Session closed|has been closed/;
+
+/**
+ * the page of a shard is gone after a scenario (Issue #1528): its renderer stopped (the page's crash event, or Target crashed in the scenario's error), or the page
+ * is closed. The page is then made again for the next scenario; an error that is only the scenario's own (a timeout, a missing window) leaves the page as it is.
+ */
+export function pageGone({ crashed = false, closed = false, error = null } = {}) {
+  return crashed === true || closed === true || (error !== null && PAGE_GONE.test(String(error)));
+}
+
+/** a scenario that did not run (its page did not start): an error, not ok, its counts 0; it fails the acceptance whether marked or not */
+export function erroredScenario(sc, repeat, d, error, ms = 0) {
+  return { ...scenarioResult(sc, repeat, d), ok: false, error: String(error).slice(0, 800), ms };
 }
 
 /** the result of one scenario in a row, before it runs: the fields of the JSON (the counts are 0, ok is false until the scenario has run) */
@@ -164,7 +184,7 @@ export function planScenarios(all, { only = null, shard = null, repeat = 1 } = {
     }
     list = all.filter((s) => only.includes(s.id) || only.includes(s.name));
   }
-  list = shard === null ? sortById(list) : shardOf(list, shard.i, shard.n);
+  list = runOrder(shard === null ? sortById(list) : shardOf(list, shard.i, shard.n));
   const out = [];
   for (let r = 1; r <= repeat; r++) for (const sc of list) out.push({ sc, repeat: r });
   return out;

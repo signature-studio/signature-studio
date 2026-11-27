@@ -279,6 +279,25 @@ fn initialize_critical_section_and_spin_count_on_a_live_section_stops() {
 }
 
 #[test]
+fn critical_sections_are_not_limited_to_32768_live_ones() {
+    // Learn (InitializeCriticalSection): the caller owns the object and deletes it; the page sets no count of the sections a process holds. The runtime's table grows (fle_sys.c), so
+    // 40000 live sections, each entered and left, then deleted in the reverse order, all work (the Sytrus demos of the E2E stopped at 32768: "more than 32768 live critical sections").
+    // The addresses are plain numbers: the runtime keeps the state outside the object and does not read the object.
+    let o = run(
+        "cs-many",
+        r#"
+    enum { N = 40000 };
+    int i;
+    for (i = 0; i < N; i++) { R[1] = 0x200000ull + 16u * (uint64_t)i; fle_imp_InitializeCriticalSection(); }
+    for (i = 0; i < N; i++) { R[1] = 0x200000ull + 16u * (uint64_t)i; fle_imp_EnterCriticalSection(); R[1] = 0x200000ull + 16u * (uint64_t)i; fle_imp_LeaveCriticalSection(); }
+    for (i = N - 1; i >= 0; i--) { R[1] = 0x200000ull + 16u * (uint64_t)i; fle_imp_DeleteCriticalSection(); }
+    printf("done %d\n", 1);
+"#,
+    );
+    assert_eq!(lines(&o), ["done 1"]);
+}
+
+#[test]
 fn slist_head_is_kept_outside_the_object_and_flushes_empty() {
     // Learn (InitializeSListHead): the structure "is for system use only"; (InterlockedFlushSList): "If the list is empty, the
     // return value is NULL". Nothing can push, so an initialized head is empty. The object's bytes are never touched.

@@ -24,6 +24,7 @@ import { stopLines } from './ui/stop-message.ts';
 import { EngineLogView, renderThreads, renderWindows } from './ui/panels.ts';
 import { stageRows, Timeline, type StageId } from './ui/phases.ts';
 import { ProgressView } from './ui/progress.ts';
+import { LoadingModal } from './ui/loading-modal.ts';
 import { chooseGuestScreen, drawScale, restartNeeded, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
 import { collectBrowserInfo, collectClientInfo, webglRenderer, type BrowserInfo } from './perf/browser-info.ts';
 import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, type FailureKind } from './perf/failure-beacon.ts';
@@ -169,7 +170,9 @@ const addLog = (level: string, text: string): void => {
   logEl.scrollTop = logEl.scrollHeight;
 };
 const timeline = new Timeline();
-const progress = new ProgressView($('progress'));
+// Issue #1520: the start's downloads, in the modal that is in the page from the first paint and is removed just before the engine starts
+const START_ASSETS = ['engine wasm', 'seed pack', 'DLL pack', 'engine glue'];
+const loading = new LoadingModal($('loading-modal'), new ProgressView($('progress'), START_ASSETS));
 const engineLog = new EngineLogView($('engine-log'), $('log-count'));
 let hintFirstPixelS: number | undefined;
 let failedStage: StageId | null = null;
@@ -277,6 +280,7 @@ function showError(what: string, where: string, stage: StageId | null = null, ki
   failedStage = stage ?? failedStage ?? 'download';
   stamp('error');
   setState('error', 'failed');
+  loading.close();   // the error note is the one to see: the modal of the downloads does not cover it
   const el = $('error');
   el.hidden = false;
   $('exit').hidden = true;   // one note at a time: the error is the one shown (Issue #1481)
@@ -856,11 +860,11 @@ async function boot(): Promise<void> {
     if (typeof SharedArrayBuffer === 'undefined') { showError('the engine takes its input through a SharedArrayBuffer (a cross-origin isolated page): this browser or page lacks it', 'feature check (before any download)', 'download', 'no-shared-memory'); return; }
 
     setState('loading', 'downloading engine and data');
-    const expected = ['engine wasm', 'seed pack', 'DLL pack', 'engine glue'];
+    const expected = START_ASSETS;
     const assetsDone = new Set<string>();
     const onProgress = (p: Progress): void => {
       stamp('download_start', p.at);
-      progress.update(p, p.label === 'engine wasm' && !p.done ? ' · compiling as it arrives' : '');
+      loading.update(p, p.label === 'engine wasm' && !p.done ? ' · compiling as it arrives' : '');
       if (p.done) { assetsDone.add(p.label); if (expected.every((l) => assetsDone.has(l))) stamp('download_done', p.at); }
     };
     // decision 0220: the stored copy lives in OPFS; a browser without it loads from the network every time
@@ -888,6 +892,11 @@ async function boot(): Promise<void> {
     applyHzParam(manifest, await hzMeasuring);
     applyScreenParam(manifest);
     setState('loaded', 'starting engine');
+    // Issue #1520: the bars are painted at 100 % before the modal leaves (the last asset can finish in the same task as the rest: without a frame, 100 % is never on the screen).
+    // Two frames: the one that paints the bars, and the one after it. A hidden tab has no frame: the wait then ends after 100 ms.
+    await new Promise<void>((done) => { requestAnimationFrame(() => requestAnimationFrame(() => done())); setTimeout(done, 100); });
+    loading.close();   // the downloads are done and the engine is about to start; the modal leaves the page, then the engine's own first drawing comes
+    stamp('modal_removed');
     await client.init(manifest, { module, seed: seed.bytes, glue, dll: dll.bytes, lazy: lazyShared });
     stamp('worker_ready');
     setState('running', 'engine starting');

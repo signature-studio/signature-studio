@@ -30,7 +30,7 @@
       <div id="check" class="muted" hidden></div>
     </section>
     <aside hidden>
-      <section><h2>Start-up</h2><ol id="phases"></ol><ul id="progress"></ul></section>
+      <section><h2>Start-up</h2><ol id="phases"></ol></section>
       <details id="windows-panel"><summary>Guest top-level windows, top first (<span id="win-count">0</span>)</summary><div class="scroll"><table id="windows"><thead><tr><th>lid</th><th>class</th><th>title</th><th>x,y</th><th>size</th><th>vis</th><th>en</th><th>z</th></tr></thead><tbody></tbody></table></div></details>
       <details id="threads-panel"><summary>Guest threads (<span id="thr-count">0</span>)</summary><pre id="threads"></pre></details>
       <details id="engine-log-panel"><summary>Engine log (<span id="log-count">0</span> lines)</summary><pre id="engine-log"></pre></details>
@@ -38,6 +38,16 @@
       <details id="log-panel" open><summary>Page log</summary><pre id="log"></pre></details>
     </aside>
   </main>
+  <!-- Issue #1520: the start's modal, in the middle of the window on the black canvas, from the first paint until the engine starts (ui/loading-modal.ts removes it from the DOM). Its rows are the start-up's downloads. -->
+  <div id="loading-modal" role="dialog" aria-modal="true" aria-labelledby="loading-title">
+    <h2 id="loading-title">Starting FL Studio web</h2>
+    <ul id="progress">
+      <li data-label="engine wasm"><span>engine wasm</span><progress role="progressbar" aria-label="engine wasm" max="1" value="0"></progress></li>
+      <li data-label="seed pack"><span>seed pack</span><progress role="progressbar" aria-label="seed pack" max="1" value="0"></progress></li>
+      <li data-label="DLL pack"><span>DLL pack</span><progress role="progressbar" aria-label="DLL pack" max="1" value="0"></progress></li>
+      <li data-label="engine glue"><span>engine glue</span><progress role="progressbar" aria-label="engine glue" max="1" value="0"></progress></li>
+    </ul>
+  </div>
   <!-- the engine's file dialogs (Open, Save): the page's file manager window is built here (ui/filedlg.ts, files/engine-dialog.ts); no browser chooser is opened -->
   <div id="filedlg"></div>
   <script type="module" src="/src/main.ts"></script>

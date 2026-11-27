@@ -6,6 +6,7 @@
 import { sleep } from './flow.mjs';
 import { picture, openMenu, closeNew, newWindows, windowTable } from './common.mjs';
 import { regionHash } from './picture.mjs';
+import { absoluteRect, childrenOfClass } from './dump.mjs';
 
 export const CANVAS = '#desktop canvas[data-desk="1"]';
 export const SCREEN_LIMIT = { min: [640, 480], max: [7680, 4320] };
@@ -178,18 +179,25 @@ export async function crispNow(guest, page) {
   return { ok: c.noResample && c.matchesRoom && c.sameAsPicture && c.onDeviceGrid, c, d };
 }
 
-/** the black 64 x 64 tiles (all pixels black) whose centre lies in a top-level window of the window table, and the picture's tiles: { black, total } */
+/**
+ * the black 64 x 64 tiles (all pixels black) whose centre lies in a top-level window of the window table, and the tiles whose centre lies in a window: { black, total }.
+ * The denominator is the window tiles (Issue #1507). The Browser's web content (a TEdgeBrowser child) is a WebView2 face drawn over the canvas: its pixels are not the
+ * engine's picture (they are black there), so its tiles are left out of both counts (as pictureMatchesScreen leaves the faces out).
+ */
 export async function blackInWindows(guest) {
   const p = await picture(guest);
   const t = await windowTable(guest);
   const wins = t.top.filter((w) => w.w > 0 && w.h > 0);
+  const faces = childrenOfClass(t, ['TEdgeBrowser']).filter((c) => c.vis).map((c) => absoluteRect(t, c.lid)).filter((r) => r !== null);
+  const within = (r, cx, cy) => cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h;
   let n = 0, total = 0;
   for (let ty = 0; ty < p.h; ty += 64) {
     for (let tx = 0; tx < p.w; tx += 64) {
       const x1 = Math.min(p.w, tx + 64), y1 = Math.min(p.h, ty + 64);
-      total++;
       const cx = (tx + x1) / 2, cy = (ty + y1) / 2;
-      if (!wins.some((w) => cx >= w.x && cx < w.x + w.w && cy >= w.y && cy < w.y + w.h)) continue;
+      if (!wins.some((w) => within(w, cx, cy))) continue;
+      if (faces.some((f) => within(f, cx, cy))) continue;
+      total++;
       let black = true;
       scan: for (let y = ty; y < y1; y++) for (let x = tx; x < x1; x++) { const i = y * p.stride + 4 * x; if (p.bytes[i] | p.bytes[i + 1] | p.bytes[i + 2]) { black = false; break scan; } }
       if (black) n++;

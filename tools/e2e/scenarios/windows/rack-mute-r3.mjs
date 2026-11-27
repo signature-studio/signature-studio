@@ -5,6 +5,7 @@ import { muteToggle } from '../../lib/windows.mjs';
 export default defineScenario({
   id: 'windows/rack-mute-r3',
   covers: ['windows/rack/mute'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return muteToggle(guest, 2);
   },

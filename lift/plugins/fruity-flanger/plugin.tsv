@@ -1,0 +1,2 @@
+key	guest	role	sha256	size	hook	args	omit
+effects.fruity-flanger.fruity_flanger_x64.dll	Plugins\Fruity\Effects\Fruity Flanger\Fruity Flanger_x64.dll	本体	c4d8124ef112e01be7c8be0b005538e516404449c8050237caecb75727fe49dc	3716608	rva:0x17bc0,0x31d70,0x31d90	--pdata	-

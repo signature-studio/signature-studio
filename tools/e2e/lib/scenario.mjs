@@ -112,3 +112,22 @@ export function sortById(list) {
 export function shardOf(list, i, n) {
   return sortById(list).filter((_, k) => k % n === i - 1);
 }
+
+/**
+ * the theme and the language a visual scenario starts in, read from its ID (visual/theme-<slug>-<kind>, visual/(text-)language-<code>…); '' for the others.
+ * It orders the run only: each scenario sets its own state (lib/visual.mjs `ensure`). The ones that start in the same state run one after another, so that
+ * the theme and the language are changed once per group (a change is about 30 s on the Settings window).
+ */
+export function startOf(id) {
+  const t = /^visual\/theme-(.+)-(?:golden|edge|text|black)$/.exec(String(id));
+  const l = /^visual\/(?:text-)?language-([a-z]{2})(?:-|$)/.exec(String(id));
+  return { theme: t ? t[1] : '', language: l ? l[1] : '' };
+}
+
+/** the list in the order it runs: by the start state (the theme, then the language), stable; the scenarios of the other areas keep their order */
+export function runOrder(list) {
+  return list
+    .map((sc, i) => ({ sc, i, s: startOf(sc.id) }))
+    .sort((a, b) => a.s.theme.localeCompare(b.s.theme) || a.s.language.localeCompare(b.s.language) || a.i - b.i)
+    .map((x) => x.sc);
+}

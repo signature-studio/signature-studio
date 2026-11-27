@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/external-ott',
   covers: ['plugins/external/ott', 'plugins/window/ott', 'plugins/param/ott', 'plugins/audio/ott', 'plugins/stop/ott'],
-  expectFail: '#1337',
+  expectFail: '#1324',
   async run({ guest }) {
     return pluginSteps(guest, { name: "OTT", kind: 'external' });
   },

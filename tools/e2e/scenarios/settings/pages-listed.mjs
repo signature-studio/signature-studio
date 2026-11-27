@@ -5,6 +5,7 @@ import { windowTable } from '../../lib/common.mjs';
 export default defineScenario({
   id: 'settings/pages-listed',
   covers: ['settings/page/midi', 'settings/page/file'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     const t = await windowTable(guest);
     const names = new Set(t.children.filter((c) => c.cls === 'TVectorSheet' && c.text).map((c) => c.text));

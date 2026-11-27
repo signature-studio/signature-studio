@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/external-serum-2',
   covers: ['plugins/external/serum-2', 'plugins/window/serum-2', 'plugins/param/serum-2', 'plugins/audio/serum-2', 'plugins/stop/serum-2'],
-  expectFail: '#1336',
+  expectFail: '#1324',
   async run({ guest }) {
     return pluginSteps(guest, { name: "Serum 2", kind: 'external' });
   },
