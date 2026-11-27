@@ -210,3 +210,4 @@
 229	#1515	分離 wasm のプラグインを含む曲を再生すると、協調スレッドが `SuspendError: trying to suspend JS frames` で失敗する(5 回中 3 回)	Task
 230	#1516	インラインフックの登録の上限を直す: `IH_MAX_MODS` が 8 で、第 2 波の DLL を 3 本足すと、engine が起動の前に止まる	Task
 231	#1517	fe-wasmgen: `movmskps`・`movmskpd`・`pmovmskb` の 64 ビット宛先で、wasm の型の検査が落ちる(`i64x2.bitmask` の結果の型)	Task
+232	#1518	関数の入口の seed を足す仕組みを入れる: `--reloc-seeds`・`--rva-tables`(fe-lift・fe-wasmgen)と、plugin の seed の複写(fe-build)	Task
