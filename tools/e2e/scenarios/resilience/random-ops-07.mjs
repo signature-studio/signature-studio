@@ -8,7 +8,7 @@ const ID = 'resilience/random-ops-07';
 
 export default defineScenario({
   id: ID,
-  expectFail: 'new',
+  expectFail: '#1529',
   covers: INPUT_FEATURES,
   displays: ['4k-dpr1', '4k-random'],
   async run({ guest, page, log }) {

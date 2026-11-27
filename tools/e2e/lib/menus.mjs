@@ -1,8 +1,9 @@
 // The menus' scenarios (Issue #1489): what a menu item does, read from the window table (the new windows, the submenus still open, the windows that changed) and the page's title.
 // The pixels are not the judge: a picture change is only written to the notes. The items are chosen by their place in the drop-down (`#n`), with real keys and mouse clicks (lib/common.mjs).
 // A scenario starts with ensureEngine: when the engine has stopped (exited or error), the page is loaded again, so that one item's stop does not fail the next scenarios of the shard.
-import { sleep, waitStable } from './flow.mjs';
-import { windowTable, closeNew, menuPath, openMenu, menuBarRect, pixelHashRegion, readMenuRows, startProject, POPUP, MENU_BAR } from './common.mjs';
+import { clickElement, sleep, waitStable } from './flow.mjs';
+import { clearMissingPlugins } from './file.mjs';
+import { windowTable, closeNew, menuPath, openMenu, menuBarRect, pixelHashRegion, readMenuRows, startProject, guestText, POPUP, MENU_BAR } from './common.mjs';
 import { rootOf } from './dump.mjs';
 
 const ESC = { code: 'Escape', key: 'Escape', vk: 27 };
@@ -388,4 +389,109 @@ export async function submenuEscape(ctx, names) {
   if (left.length) notes.push(`still open: ${left.map(winName).join(', ')}`);
   if (pre.restarted) notes.push('the engine had stopped: the page was loaded again first');
   return { ok: opened >= 2 && after === opened - 1 && state === 'engine-idle', engineState: state, notes, results: { path: names.join(' > '), opened, afterEscape: after } };
+}
+
+/** the File > Manage files item (Issue #1521). Its place in the drop-down is the one above Exit (the DFM's order: after Revert to last backup, before Exit). The
+ * drop-down's Down count is not a place: the greyed items and the recent projects change it (a run had Import at the tenth Down), so the item is chosen from the end */
+const MANAGE_FILES = 'Manage files';
+const MANAGE_WINDOW = "(() => { const i = document.getElementById('fx-input-files'); if (!i) return null; const w = i.closest('.fx-window'); return { cls: w ? w.className : null, parent: w && w.parentElement ? w.parentElement.id : null }; })()";
+
+/** File > Manage files by the keys: the drop-down opens; Up from it goes to Exit (the last item), and Up once more is Manage files (the greyed items and the separators are skipped) */
+async function chooseManageFiles(guest) {
+  await openMenu(guest, 'File');
+  await sleep(600);
+  for (let k = 0; k < 2; k++) {
+    await guest.key('ArrowUp', 'ArrowUp', 38);
+    await sleep(250);
+  }
+  await guest.key('Enter', 'Enter', 13);
+  await sleep(900);
+  return 'File > Manage files (the drop-down, ArrowUp x2, Enter)';
+}
+
+/** whether a text is in the engine's memory (ASCII or UTF-16LE, lib/common.mjs guestText) */
+async function inMemory(guest, text) {
+  return (await guestText(guest, [text])).best !== null;
+}
+
+/** the OPFS file window (#fx-input-files in its .fx-window) once it is shown, or null */
+async function manageWindow(guest) {
+  let win = null;
+  const t0 = Date.now();
+  while (!win && Date.now() - t0 < 20000) {
+    win = await guest.ev(MANAGE_WINDOW);
+    if (!win) await sleep(300);
+  }
+  return win;
+}
+
+/** what the page got from the engine: the requests it was asked (the last one's flag Manage files), and the top windows (classes) */
+async function askedAndWindows(guest) {
+  const asked = await guest.ev("(() => { const r = window.__app.fileDlg.requests; const l = r[r.length - 1]; return { n: r.length, manage: l ? (l.request.manage ?? false) : null, open: window.__app.fileDlg.open }; })()");
+  const t = await windowTable(guest);
+  return `page: ${asked.n} engine file-dialog request(s), last manage ${asked.manage}, window open ${asked.open}; top windows ${t.top.map((w) => w.cls).join(', ')}`;
+}
+
+/** closes the file window with its close button (Esc or Cancel of the page); true when it is gone */
+async function closeManageWindow(guest) {
+  if ((await guest.ev(MANAGE_WINDOW)) === null) return true;
+  await clickElement(guest, '#fx-close');
+  const t0 = Date.now();
+  while (Date.now() - t0 < 10000) {
+    if ((await guest.ev(MANAGE_WINDOW)) === null) return true;
+    await sleep(300);
+  }
+  return false;
+}
+
+/**
+ * File > Manage files, in the File drop-down (Issue #1521). ok: the caption is in the engine's memory, the drop-down opens, and the item at its place
+ * (File > #10, the item after Export and before Exit) is the Manage files item: its choice shows the OPFS file window. The window is closed again.
+ * What is not checked here: Revert to last backup is hidden without a backup, so the item's place after it is only the DFM's order, not a read of the drop-down.
+ */
+export async function manageFilesOrder(ctx) {
+  const { guest } = ctx;
+  const pre = await ensureEngine(ctx);
+  const before = await snapshot(guest);
+  const found = await inMemory(guest, MANAGE_FILES);
+  const id = await chooseManageFiles(guest);
+  const drop = observe(before, await snapshot(guest)).popups.length;
+  const win = await manageWindow(guest);
+  await sleep(1500);
+  const seen = win ?? (await guest.ev(MANAGE_WINDOW));
+  const diag = seen ? null : await askedAndWindows(guest);
+  const closed = seen ? await closeManageWindow(guest) : false;
+  const state = await engineState(guest);
+  const notes = [
+    `${id}: the drop-down opened ${drop > 0 ? 'yes' : 'no'}; ${seen ? `the file window (class ${seen.cls})` : 'no file window'}; closed ${closed}`,
+    `"${MANAGE_FILES}" in the engine's memory: ${found ? 'yes' : 'no'}`,
+  ];
+  if (diag) notes.push(diag);
+  if (pre.restarted) notes.push('the engine had stopped: the page was loaded again first');
+  return { ok: found && seen !== null && closed && state === 'engine-idle', engineState: state, notes, results: { found, drop, window: seen ? seen.cls : null, closed } };
+}
+
+/**
+ * File > Manage files opens the OPFS file window (Issue #1521): the choice of File > #10 shows the page's file window (#fx-input-files inside a .fx-window),
+ * the browser's own file chooser does not open, and the window is closed with its close button; the engine is idle again.
+ */
+export async function manageFilesOpens(ctx) {
+  const { guest } = ctx;
+  const pre = await ensureEngine(ctx);
+  await clearMissingPlugins(guest);
+  const found = await inMemory(guest, MANAGE_FILES);
+  const id = await chooseManageFiles(guest);
+  const win = await manageWindow(guest);
+  await sleep(1500);
+  const seen = win ?? (await guest.ev(MANAGE_WINDOW));
+  const diag = seen ? null : await askedAndWindows(guest);
+  const closed = seen ? await closeManageWindow(guest) : false;
+  const state = await engineState(guest);
+  const notes = [
+    `${id}: window ${seen ? `class ${seen.cls} in #${seen.parent}` : 'none (no #fx-input-files in the page)'}; closed with its close button ${closed}; state ${state}`,
+    `"${MANAGE_FILES}" in the engine's memory: ${found ? 'yes' : 'no'}`,
+  ];
+  if (diag) notes.push(diag);
+  if (pre.restarted) notes.push('the engine had stopped: the page was loaded again first');
+  return { ok: found && seen !== null && closed && state === 'engine-idle', engineState: state, notes, results: { found, window: seen ? seen.cls : null, closed } };
 }

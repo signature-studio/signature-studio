@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -144,8 +145,7 @@ void fle_imp_QueryPerformanceFrequency(void)
  * another thread to wait indefinitely"; Delete of an owned section leaves the caller responsible.
  * All of these stop the run. Enter on an owned section by the same thread counts one more entry
  * and Leave must be called once per entry. */
-#define FLE_CS_SLOTS     (1u << 16)
-#define FLE_CS_MAX_LIVE  (FLE_CS_SLOTS / 2)
+#define FLE_CS_SLOTS0    (1u << 16)   /* the first size of the table; it doubles when half of it is used */
 #define FLE_CS_EMPTY     0u
 #define FLE_CS_LIVE      1u
 #define FLE_CS_DELETED   2u
@@ -157,23 +157,53 @@ typedef struct {
     uint32_t owner;       /* decision 0122: the index of the guest thread that holds the section (meaningful while recursion > 0) */
 } fle_cs_slot;
 
-static fle_cs_slot fle_cs_table[FLE_CS_SLOTS];
+/* The sections are the guest's objects, and the page names no limit on how many sections a process holds, so the table grows instead of stopping at a count (the stop "more than
+ * 32768 live critical sections" of the Sytrus demos, E2E file/demo-product-demos-*-sytrus-*). A probe run ends at an empty entry. */
+static fle_cs_slot *fle_cs_table;
+static uint32_t fle_cs_slots;   /* the size of fle_cs_table (a power of two; 0 before the first section) */
 static uint32_t fle_cs_live;
+static uint32_t fle_cs_used;    /* the live and the deleted entries: the probe runs end at the empty ones */
 
 static uint32_t fle_cs_hash(uint64_t a)
 {
-    return (uint32_t)(((a >> 3) * UINT64_C(0x9E3779B97F4A7C15)) >> 48) & (FLE_CS_SLOTS - 1);
+    return (uint32_t)(((a >> 3) * UINT64_C(0x9E3779B97F4A7C15)) >> 48);
+}
+
+static uint32_t fle_cs_index(uint64_t a)
+{
+    return (uint32_t)(((a >> 3) * UINT64_C(0x9E3779B97F4A7C15)) >> 32) & (fle_cs_slots - 1);
 }
 
 static fle_cs_slot *fle_cs_find(uint64_t addr)
 {
-    uint32_t i = fle_cs_hash(addr), n;
+    uint32_t i, n;
 
-    for (n = 0; n < FLE_CS_SLOTS; n++, i = (i + 1) & (FLE_CS_SLOTS - 1)) {
+    if (!fle_cs_table) return NULL;
+    i = fle_cs_index(addr);
+    for (n = 0; n < fle_cs_slots; n++, i = (i + 1) & (fle_cs_slots - 1)) {
         if (fle_cs_table[i].state == FLE_CS_EMPTY) return NULL;
         if (fle_cs_table[i].state == FLE_CS_LIVE && fle_cs_table[i].addr == addr) return &fle_cs_table[i];
     }
     return NULL;
+}
+
+/* the table is made at its first use and doubled (its live entries are put again; the deleted ones are dropped) */
+static void fle_cs_grow(void)
+{
+    uint32_t old = fle_cs_slots, size = old ? old * 2u : FLE_CS_SLOTS0, i, j;
+    fle_cs_slot *t = calloc(size, sizeof *t);
+
+    if (!t) STOP("critical section table: out of memory (%u sections live)\n", fle_cs_live);
+    for (i = 0; i < old; i++) {
+        if (fle_cs_table[i].state != FLE_CS_LIVE) continue;
+        j = (uint32_t)(((fle_cs_table[i].addr >> 3) * UINT64_C(0x9E3779B97F4A7C15)) >> 32) & (size - 1);
+        while (t[j].state != FLE_CS_EMPTY) j = (j + 1) & (size - 1);
+        t[j] = fle_cs_table[i];
+    }
+    free(fle_cs_table);
+    fle_cs_table = t;
+    fle_cs_slots = size;
+    fle_cs_used = fle_cs_live;
 }
 
 static uint64_t fle_cs_arg(const char *api)
@@ -189,10 +219,11 @@ static void fle_cs_init(const char *api)
     uint32_t i, n;
 
     if (fle_cs_find(a)) STOP("%s on an initialized section %#llx is undefined\n", api, (unsigned long long)a);
-    if (fle_cs_live >= FLE_CS_MAX_LIVE) STOP("more than %u live critical sections\n", FLE_CS_MAX_LIVE);
-    i = fle_cs_hash(a);
-    for (n = 0; n < FLE_CS_SLOTS; n++, i = (i + 1) & (FLE_CS_SLOTS - 1)) {
+    if (!fle_cs_table || 2u * (fle_cs_used + 1u) > fle_cs_slots) fle_cs_grow();
+    i = fle_cs_index(a);
+    for (n = 0; n < fle_cs_slots; n++, i = (i + 1) & (fle_cs_slots - 1)) {
         if (fle_cs_table[i].state != FLE_CS_LIVE) {
+            if (fle_cs_table[i].state == FLE_CS_EMPTY) fle_cs_used++;
             fle_cs_table[i].addr = a;
             fle_cs_table[i].recursion = 0;
             fle_cs_table[i].state = FLE_CS_LIVE;

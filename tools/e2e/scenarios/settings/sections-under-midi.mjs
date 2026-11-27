@@ -6,6 +6,7 @@ import { windowTable } from '../../lib/common.mjs';
 export default defineScenario({
   id: 'settings/sections-under-midi',
   covers: ['settings/section/output', 'settings/section/input'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     const t = await windowTable(guest);
     const midi = t.children.find((c) => c.cls === 'TVectorSheet' && c.text === 'MIDI');

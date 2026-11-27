@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/builtin-effects-zgameeditor-visualizer-zgameeditor-visualizer-x64',
   covers: ['plugins/effects/zgameeditor-visualizer-zgameeditor-visualizer-x64', 'plugins/window/effects-zgameeditor-visualizer-zgameeditor-visualizer-x64', 'plugins/param/effects-zgameeditor-visualizer-zgameeditor-visualizer-x64', 'plugins/audio/effects-zgameeditor-visualizer-zgameeditor-visualizer-x64', 'plugins/stop/effects-zgameeditor-visualizer-zgameeditor-visualizer-x64'],
-  expectFail: 'new',
+  expectFail: '#1535',
   async run({ guest }) {
     return pluginSteps(guest, { name: "ZGameEditor Visualizer", kind: 'effects' });
   },
