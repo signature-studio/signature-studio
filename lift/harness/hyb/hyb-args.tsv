@@ -6,3 +6,4 @@ ft	freetype_x64.4b00000.dll	--pdata --seeds lift/harness/seeds/ft-seeds-4b00000-
 ilt	ILTools_x64.6000000.dll	--pdata --seeds lift/harness/seeds/iltools-6000000-seeds400.txt
 oggio	oggio_x64.c000000.dll	--pdata --seeds lift/harness/seeds/dec1-seeds-oggio-c000000.txt
 elastique	elastique_x64.b000000.dll	--pdata --seeds lift/harness/seeds/elastique-seeds-all3.txt
+fruity_delay2	fruity_delay2_x64.7800000.dll	--pdata

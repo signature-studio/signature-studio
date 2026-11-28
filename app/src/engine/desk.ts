@@ -40,9 +40,10 @@ export interface DeskApi {
   resync(): void;
   /** fle_desk_describe(): a line per window drawn at the last compose (diagnostics) */
   describe(): string;
-  /** decision 0240: fle_desk_scene() and fle_desk_scene_mode(), or absent when the wasm was built before them */
+  /** decision 0240: fle_desk_scene(), fle_desk_scene_mode(), and fle_desk_scene_dirty(), or absent when the wasm was built before them */
   scene?(): number;
   sceneMode?(on: number): void;
+  sceneDirty?(): number;
   /** Issue #1376: fle_webview2_front(), the windows painted over the WebView2 face (word 0: their number, then l, t, r, b each), or absent when the wasm was built before it */
   front?(): number;
 }

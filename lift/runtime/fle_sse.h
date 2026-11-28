@@ -189,7 +189,7 @@ static inline FLE_AI uint64_t fle_cvtr64(double x) {
 
 /* 128-bit loads and stores. The aligned forms abort on an address that is not
  * a multiple of 16. The unaligned forms do not check. */
-static inline FLE_AI void fle_misaligned(uint64_t a) {
+static inline __attribute__((noreturn, cold, noinline)) void fle_misaligned(uint64_t a) {
     fprintf(stderr, "fle: misaligned 16-byte access at %#llx\n", (unsigned long long)a);
     abort();
 }
@@ -201,7 +201,7 @@ static inline FLE_AI fle_xmm fle_ldx(uint64_t a) {
 }
 
 static inline FLE_AI fle_xmm fle_ldxa(uint64_t a) {
-    if (a & 15) fle_misaligned(a);
+    if (__builtin_expect((a & 15) != 0, 0)) fle_misaligned(a);
     return fle_ldx(a);
 }
 
@@ -210,33 +210,47 @@ static inline FLE_AI void fle_stx(uint64_t a, fle_xmm v) {
 }
 
 static inline FLE_AI void fle_stxa(uint64_t a, fle_xmm v) {
-    if (a & 15) fle_misaligned(a);
+    if (__builtin_expect((a & 15) != 0, 0)) fle_misaligned(a);
     fle_stx(a, v);
 }
 
+typedef uint64_t fle_sse_v2u __attribute__((vector_size(16)));
+
 /* 128-bit logic. */
 static inline FLE_AI fle_xmm fle_pand(fle_xmm a, fle_xmm b) {
-    a.u64[0] &= b.u64[0];
-    a.u64[1] &= b.u64[1];
+    fle_sse_v2u va, vb, vr;
+    memcpy(&va, &a, 16);
+    memcpy(&vb, &b, 16);
+    vr = va & vb;
+    memcpy(&a, &vr, 16);
     return a;
 }
 
 /* PANDN: (NOT dst) AND src. */
 static inline FLE_AI fle_xmm fle_pandn(fle_xmm a, fle_xmm b) {
-    a.u64[0] = ~a.u64[0] & b.u64[0];
-    a.u64[1] = ~a.u64[1] & b.u64[1];
+    fle_sse_v2u va, vb, vr;
+    memcpy(&va, &a, 16);
+    memcpy(&vb, &b, 16);
+    vr = ~va & vb;
+    memcpy(&a, &vr, 16);
     return a;
 }
 
 static inline FLE_AI fle_xmm fle_por(fle_xmm a, fle_xmm b) {
-    a.u64[0] |= b.u64[0];
-    a.u64[1] |= b.u64[1];
+    fle_sse_v2u va, vb, vr;
+    memcpy(&va, &a, 16);
+    memcpy(&vb, &b, 16);
+    vr = va | vb;
+    memcpy(&a, &vr, 16);
     return a;
 }
 
 static inline FLE_AI fle_xmm fle_pxor(fle_xmm a, fle_xmm b) {
-    a.u64[0] ^= b.u64[0];
-    a.u64[1] ^= b.u64[1];
+    fle_sse_v2u va, vb, vr;
+    memcpy(&va, &a, 16);
+    memcpy(&vb, &b, 16);
+    vr = va ^ vb;
+    memcpy(&a, &vr, 16);
     return a;
 }
 

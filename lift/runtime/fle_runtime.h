@@ -43,7 +43,7 @@ void fle_addr_fault(uint64_t a, unsigned n, int store) __attribute__((noreturn, 
 
 #if defined(FLE_CHECK_HI32)
 static inline FLE_AI uintptr_t fle_addr(uint64_t a, unsigned n, int store) {
-    if (a >> 32) fle_addr_fault(a, n, store);
+    if (__builtin_expect((a >> 32) != 0, 0)) fle_addr_fault(a, n, store);
     return (uintptr_t)a;
 }
 /* A guest pointer argument that the API may legally receive as NULL (checked after the conversion): NULL is
@@ -84,9 +84,13 @@ static inline FLE_AI void fle_st(uint64_t a, unsigned n, uint64_t v) {
 }
 
 /* Instruction outside the minimal set. Stop instead of skipping it. */
-static inline FLE_AI void fle_unsupported(uint64_t va) {
+static inline __attribute__((noreturn, cold, noinline)) void fle_unsupported_fail(uint64_t va) {
     fprintf(stderr, "fle: unsupported instruction at %#llx\n", (unsigned long long)va);
     abort();
+}
+
+static inline FLE_AI void fle_unsupported(uint64_t va) {
+    fle_unsupported_fail(va);
 }
 
 /* A call or jump through an IAT slot that no row of the import table answers (pm-work/findings/second-wave-imports.md, Issue #1538): the stop

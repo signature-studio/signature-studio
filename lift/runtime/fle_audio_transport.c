@@ -21,7 +21,7 @@ EM_JS(int, fle_js_init, (void), {
   if (globalThis.__fleAud !== undefined) return globalThis.__fleAud ? 1 : 0;
   const g = globalThis.fleAudioSab;
   if (!g) { globalThis.__fleAud = null; return 0; }
-  const A = { h: new Int32Array(g.sab, 0, 32), d: new Float32Array(g.sab, g.dataOffset, g.cap * 2), cap: g.cap, mask: g.cap - 1, rdHi: 0, rdPrev: 0, wr: 0, unlocks: [], publishes: 0, skipped: 0, gapFrames: 0,
+  const A = { h: new Int32Array(g.sab, 0, 32), d: new Float32Array(g.sab, g.dataOffset, g.cap * 2), cap: g.cap, mask: g.cap - 1, rdHi: 0, rdPrev: 0, rdAt: 0, wr: 0, unlocks: [], publishes: 0, skipped: 0, gapFrames: 0,
     resolve: null, timer: 0, waits: 0, maxWaitDrift: 0, lastPub: 0, maxPubGap: 0, rdPub: 0, runPub: false };
   globalThis.__fleAud = A;
   globalThis.fleAudioWorkerState = () => ({ unlocks: A.unlocks, waits: A.waits, publishes: A.publishes, skipped: A.skipped, gapFrames: A.gapFrames, maxWaitDrift: A.maxWaitDrift, maxPubGapMs: A.maxPubGap });
@@ -47,8 +47,15 @@ EM_JS(double, fle_js_consumed, (void), {
   if (!A) return 0;
   const lo = Atomics.load(A.h, 0) >>> 0;
   if (lo < A.rdPrev) A.rdHi += 4294967296;
+  if (lo !== A.rdPrev) A.rdAt = performance.now();
   A.rdPrev = lo;
   return A.rdHi + lo;
+});
+EM_JS(double, fle_js_rd_age_ms, (void), {
+  const A = globalThis.__fleAud;
+  if (!A || !A.rdAt) return 0;
+  const d = performance.now() - A.rdAt;
+  return d < 0 ? 0 : (d > 2.6 ? 2.6 : d);
 });
 /* n stereo float frames at p (linear memory) to the ring at index `first`: silence for a gap since the last publish, nothing for frames the output has already passed; then WR.
  * maxPubGap (fleAudioWorkerState): the longest interval between two publishes, counted only when the output read frames in both intervals (RD moved since the publish before each): a publish that the output did not need (no consumer yet) is not a stall. */
@@ -118,10 +125,14 @@ EM_ASYNC_JS(int, fle_js_wait, (double ms), {
   });
 });
 int fle_tp_can_wait(void) { return 1; }
+uint32_t fle_tp_quantum_frames(void) { return fle_audio_external() ? 128u : 1u; }
+double fle_tp_rd_age_ms(void) { return fle_audio_external() ? fle_js_rd_age_ms() : 0.0; }
 #else
 static int js_wait_unavailable(double ms) { (void)ms; return 2; }
 #define fle_js_wait js_wait_unavailable
 int fle_tp_can_wait(void) { return 0; }
+uint32_t fle_tp_quantum_frames(void) { return 1u; }
+double fle_tp_rd_age_ms(void) { return 0.0; }
 #endif
 static int ext_cached = -1;
 int fle_audio_external(void)
@@ -134,6 +145,7 @@ void fle_tp_publish(const float *lr, uint32_t n, double first, uint32_t rate) { 
 void fle_tp_state(uint32_t state, uint32_t rate) { fle_js_state(state, rate); }
 void fle_tp_rewrite(const float *lr, uint32_t n, double first, uint32_t guard) { fle_js_rewrite(lr, n, first, guard); }
 double fle_tp_now(void) { return fle_js_now(); }
+double fle_audio_now_ms(void) { return fle_audio_external() ? fle_tp_now() : -1.0; }
 int fle_tp_wait(double ms) { return fle_js_wait(ms); }
 /* per-thread run time between switches (wall ms), the compute time of the mixer's committed blocks, and the telemetry */
 #define SL_MAX 64u
@@ -160,6 +172,25 @@ void fle_audio_switch_note(unsigned from, unsigned to)
         fle_js_pulse(now, (double)fle_sys_clock_ticks(), (double)fle_audio_consumed(), (double)fle_audio_ring_get()->write_frames, SL_MAX, sl_total, sl_max, sl_n, mixer_thr, uc_n, uc_sum, uc_max, uc_over78);
     }
 }
+void fle_audio_idle_begin(unsigned from)
+{
+    double now;
+
+    if (!fle_audio_external()) return;
+    now = fle_tp_now();
+    if (sl_start >= 0.0 && from < SL_MAX) {
+        double d = now - sl_start;
+
+        sl_total[from] += d;
+        if (d > sl_max[from]) sl_max[from] = d;
+    }
+    sl_start = -1.0;
+}
+void fle_audio_idle_note(void)
+{
+    if (!fle_audio_external()) return;
+    sl_start = fle_tp_now();
+}
 void fle_audio_unlock_note(double first_frame, uint32_t frames)
 {
     if (!fle_audio_external()) return;
@@ -183,9 +214,14 @@ void fle_tp_publish(const float *lr, uint32_t n, double first, uint32_t rate) { 
 void fle_tp_state(uint32_t state, uint32_t rate) { (void)state; (void)rate; }
 void fle_tp_rewrite(const float *lr, uint32_t n, double first, uint32_t guard) { (void)lr; (void)n; (void)first; (void)guard; }
 double fle_tp_now(void) { return 0.0; }
+double fle_audio_now_ms(void) { return -1.0; }
 int fle_tp_wait(double ms) { (void)ms; return 2; }
 int fle_tp_can_wait(void) { return 0; }
+uint32_t fle_tp_quantum_frames(void) { return 1u; }
+double fle_tp_rd_age_ms(void) { return 0.0; }
 void fle_audio_unlock_note(double first_frame, uint32_t frames) { (void)first_frame; (void)frames; }
 void fle_audio_switch_note(unsigned from, unsigned to) { (void)from; (void)to; }
+void fle_audio_idle_begin(unsigned from) { (void)from; }
+void fle_audio_idle_note(void) {}
 #endif
 

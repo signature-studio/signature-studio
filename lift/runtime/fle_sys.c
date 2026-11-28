@@ -409,7 +409,10 @@ void fle_imp_LeaveCriticalSection(void)
     if (s->owner != (fle_thread_current ? fle_thread_current() : 0u))
         STOP("LeaveCriticalSection on a section %#llx that another thread owns (Learn: this may cause another thread to wait indefinitely)\n", (unsigned long long)a);
     s->recursion--;
-    if (s->recursion == 0 && fle_thread_wake_check) fle_thread_wake_check(); /* decision 0122: a thread that waits for this section may take it now */
+    if (s->recursion == 0) {
+        if (fle_thread_wake_cs) fle_thread_wake_cs(a);
+        else if (fle_thread_wake_check) fle_thread_wake_check();
+    } /* decision 0122: a thread that waits for this section may take it now */
 }
 
 void fle_imp_DeleteCriticalSection(void)
@@ -923,12 +926,19 @@ static uint8_t fle_win_prot(int prot)
 static void fle_host_protect(fle_region *r, uint64_t from, uint64_t to, int prot, const char *what)
 {
 #ifdef FLE_VMEM_ARENA
-    uint64_t pg;
+    uint64_t pg = (from - r->base) / FLE_PAGE_SIZE, pg_end = (to - r->base) / FLE_PAGE_SIZE;
 
     (void)what;
     (void)prot;
-    for (pg = (from - r->base) / FLE_PAGE_SIZE; pg < (to - r->base) / FLE_PAGE_SIZE; pg++)
-        if (r->pages[pg] == FLE_PG_RESERVED) memset((void *)(uintptr_t)(r->base + pg * FLE_PAGE_SIZE), 0, (size_t)FLE_PAGE_SIZE);
+    while (pg < pg_end) {
+        if (r->pages[pg] == FLE_PG_RESERVED) {
+            uint64_t run0 = pg++;
+            while (pg < pg_end && r->pages[pg] == FLE_PG_RESERVED) pg++;
+            memset((void *)(uintptr_t)(r->base + run0 * FLE_PAGE_SIZE), 0, (size_t)((pg - run0) * FLE_PAGE_SIZE));
+        } else {
+            pg++;
+        }
+    }
 #else
     (void)r;
     if (mprotect((void *)(uintptr_t)from, to - from, prot) != 0) STOP("mprotect failed %s %#llx\n", what, (unsigned long long)from);

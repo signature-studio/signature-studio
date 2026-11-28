@@ -114,9 +114,20 @@ uint64_t fle_audio_tick_of_frame(uint64_t frames)
 
     if (r->sample_rate == 0) return 0;
     if (fle_audio_external()) {
+        uint32_t q = fle_tp_quantum_frames();
         c = fle_audio_consumed();
-        if (frames <= c) return fle_sys_clock_ticks();
+        if (frames <= c) return q > 1u ? fle_sys_clock_ticks() + 10000u : fle_sys_clock_ticks();
         rel = frames - c;
+        if (q > 1u) {
+            uint64_t qframes = ((rel + (uint64_t)q - 1u) / (uint64_t)q) * (uint64_t)q;
+            uint64_t ticks = (qframes * FLE_QPF_HZ + r->sample_rate - 1u) / r->sample_rate;
+            double age_ms = fle_tp_rd_age_ms();
+            uint64_t age_ticks = age_ms > 0.0 ? (uint64_t)(age_ms * 10000.0) : 0u;
+            /* Wake 0.2 ms AFTER the 128-frame AudioWorklet quantum edge so RD has already advanced; 1.0 ms floor avoids sub-ms JSPI chains */
+            uint64_t target_ticks = ticks + 2000u;
+            uint64_t wait_ticks = target_ticks > age_ticks + 10000u ? target_ticks - age_ticks : 10000u;
+            return fle_sys_clock_ticks() + wait_ticks;
+        }
         num = rel * FLE_QPF_HZ;
         return fle_sys_clock_ticks() + (num + r->sample_rate - 1u) / r->sample_rate;
     }
@@ -262,6 +273,10 @@ int fle_audio_wait_until(uint64_t dl)
         if (stretch > 20.0) st_over20++;
         if (stretch > 50.0) st_over50++;
         if (stretch > 78.0) st_over78++;
+    }
+    if (v > pace_virt0 && (double)(v - pace_virt0) > (now - pace_real0 + 5.0) * 10000.0) {
+        pace_real0 = now;
+        pace_virt0 = v;
     }
     due = pace_real0 + (double)(dl - pace_virt0) / 10000.0;
     wait = due - now;

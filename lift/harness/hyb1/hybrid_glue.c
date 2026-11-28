@@ -12,6 +12,7 @@ __attribute__((used, noinline)) void fle_hyb_dispatch(uint64_t va) { fle_dispatc
 /* Decision 0169 (inline dispatch, opt-in): the compiled code does the lookup of fle_dispatch itself and calls this when the progress count reaches the limit (the line of fle_dispatch:
  * `if (++fle_progress_count >= fle_progress_limit && fle_progress_slice) fle_progress_slice();`; the increment was done by the compiled code). */
 __attribute__((used, noinline)) void fle_hyb_slice(void) { if (fle_progress_slice) fle_progress_slice(); }
+__attribute__((used, noinline)) void fle_hyb_loop_slice(void) { if (fle_loop_slice) fle_loop_slice(); }
 
 /* `mov r64, gs:[off]` of compiled code: the C path does not read the TEB buffer, fle_gs_ld8 answers (and fills fle_teb[0x30], fle_teb[0x58] on the way) for the running guest thread. Reading
  * fle_teb directly (as fe-wasmgen does without a C runtime) gives 0 until the first read through the C path - found by ddmin on the OTT pilot (the TLS epoch of the thread-safe statics). */

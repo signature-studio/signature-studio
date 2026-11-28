@@ -98,10 +98,16 @@ function setup(): { p: GlDeskPresenter; mem: ArrayBuffer; calls: Call[]; surface
 const names = (calls: Call[]): string[] => calls.map((c) => c[0]);
 
 describe('GlDeskPresenter', () => {
-  it('switches the runtime to the scene only after the GL context and the program exist', () => {
-    const t = setup();
-    expect(t.api.modes).toEqual([1]);
-    expect(t.calls.some((c) => c[0] === 'linkProgram')).toBe(true);
+  it('switches the runtime to the scene only after the GL context and the program exist, without preserveDrawingBuffer', () => {
+    const mem = new ArrayBuffer(1 << 16);
+    const { gl, calls } = fakeGl();
+    const attrs: unknown[] = [];
+    const surface = { width: 1920, height: 1080, getContext: (_k: string, a?: unknown) => { attrs.push(a); return gl as never; } };
+    const api = { modes: [] as number[], resyncs: 0, scene: () => 4096, sceneMode(on: number) { this.modes.push(on); }, resync() { this.resyncs++; }, describe: () => '' };
+    new GlDeskPresenter(surface as never, api, () => mem);
+    expect(attrs[0]).toMatchObject({ preserveDrawingBuffer: false });
+    expect(api.modes).toEqual([1]);
+    expect(calls.some((c) => c[0] === 'linkProgram')).toBe(true);
   });
   it('a new window: a texture of its size, its whole surface uploaded straight from the engine memory with the surface stride, one quad drawn', () => {
     const t = setup();
@@ -151,7 +157,7 @@ describe('GlDeskPresenter', () => {
     expect(rects).toEqual([[50, 40, 80, 60], [300, 200, 100, 50]]);
     expect(t.calls.filter((c) => c[0] === 'drawArrays')).toHaveLength(2);
   });
-  it('a written rectangle of windows that did not move: only its screen rectangle is cleared and drawn again (a scissor box; the canvas keeps the rest), every window in its order', () => {
+  it('a written rectangle of windows: only the dirty rect is uploaded and all quads draw in one pass without scissor overhead', () => {
     const t = setup();
     const a: W = { lid: 3, x: 10, y: 20, w: 100, h: 50, bits: 0x8000, stride: 400, fresh: true }, b: W = { lid: 4, x: 50, y: 40, w: 80, h: 60, bits: 0x20000, stride: 320, fresh: true };
     t.set({ flags: SCENE_FLAG_CHANGED | SCENE_FLAG_WHOLE, wins: [a, b], upds: [{ lid: 3, x0: 0, y0: 0, x1: 100, y1: 50 }, { lid: 4, x0: 0, y0: 0, x1: 80, y1: 60 }] });
@@ -160,23 +166,23 @@ describe('GlDeskPresenter', () => {
     t.calls.length = 0;
     const before = t.p.stats.drawPixels;
     expect(t.p.present()).toBe(1);
-    expect(t.calls.filter((c) => c[0] === 'scissor')).toEqual([['scissor', 17, 1080 - 32, 10, 3]]);   // the written pixels: screen (17, 29) to (27, 32), GL's origin at the bottom
+    const up = t.calls.find((c) => c[0] === 'texSubImage2D') as Call;
+    expect(up.slice(3, 7)).toEqual([7, 9, 10, 3]);
+    expect(t.calls.filter((c) => c[0] === 'scissor')).toHaveLength(0);
     expect(t.calls.filter((c) => c[0] === 'clear')).toHaveLength(1);
     expect(t.calls.filter((c) => c[0] === 'drawArrays')).toHaveLength(2);
     expect(names(t.calls)).not.toContain('texStorage2D');
-    expect(t.p.stats.drawPixels - before).toBe(30);
+    expect(t.p.stats.drawPixels - before).toBe(1920 * 1080);
   });
-  it('a window region that changed without a flag: the whole screen is drawn again (no scissor box)', () => {
+  it('an opaque full-screen bottom window skips the redundant color clear', () => {
     const t = setup();
-    const a: W = { lid: 3, x: 10, y: 20, w: 100, h: 50, bits: 0x8000, stride: 400, fresh: true };
-    t.set({ flags: SCENE_FLAG_CHANGED | SCENE_FLAG_WHOLE, wins: [a], upds: [{ lid: 3, x0: 0, y0: 0, x1: 100, y1: 50 }] });
-    t.p.present();
-    t.set({ flags: 0, wins: [{ ...a, fresh: false, region: [0, 0, 60, 50] }], upds: [{ lid: 3, x0: 0, y0: 0, x1: 1, y1: 1 }] });
+    const full: W = { lid: 3, x: 0, y: 0, w: 1920, h: 1080, bits: 0x8000, stride: 7680, fresh: true };
+    t.set({ flags: SCENE_FLAG_CHANGED | SCENE_FLAG_WHOLE, wins: [full], upds: [{ lid: 3, x0: 0, y0: 0, x1: 1920, y1: 1080 }] });
     t.calls.length = 0;
     expect(t.p.present()).toBe(1);
-    expect(t.calls.filter((c) => c[0] === 'scissor')).toHaveLength(0);
-    expect(t.calls.filter((c) => c[0] === 'clear')).toHaveLength(1);
-    expect(t.p.stats.drawPixels).toBe(1920 * 1080 + 1920 * 1080);
+    expect(t.calls.filter((c) => c[0] === 'clear')).toHaveLength(0);
+    expect(t.calls.filter((c) => c[0] === 'drawArrays')).toHaveLength(1);
+    expect(t.p.stats.drawPixels).toBe(1920 * 1080);
   });
   it('a window that is gone loses its texture; a window of another size gets a new one', () => {
     const t = setup();

@@ -27,11 +27,13 @@ typedef struct {
 extern fle_eflags FL;
 #endif
 
+static inline __attribute__((noreturn, cold, noinline)) void fle_undef_fail(void) {
+    fprintf(stderr, "fle: read of an undefined flag\n");
+    abort();
+}
+
 static inline FLE_AI uint8_t fle_rd(uint8_t f) {
-    if (f == FLE_UNDEF) {
-        fprintf(stderr, "fle: read of an undefined flag\n");
-        abort();
-    }
+    if (__builtin_expect(f == FLE_UNDEF, 0)) fle_undef_fail();
     return f;
 }
 
@@ -50,13 +52,8 @@ static inline FLE_AI int64_t fle_sext(unsigned w, uint64_t v) {
 }
 
 static inline FLE_AI void fle_szp(unsigned w, uint64_t r) {
-    uint8_t p;
     r &= fle_mask(w);
-    p = (uint8_t)r;
-    p ^= p >> 4;
-    p ^= p >> 2;
-    p ^= p >> 1;
-    FL.pf = (uint8_t)((~p) & 1);
+    FL.pf = (uint8_t)(__builtin_parity((unsigned)(uint8_t)r) ^ 1);
     FL.zf = r == 0;
     FL.sf = fle_sb(w, r);
 }
@@ -67,20 +64,26 @@ static inline FLE_AI void fle_undef_all(void) {
 
 /* Count above the operand width (8- and 16-bit shifts with a masked count of
  * 9..31) gives an undefined result in the SDM. Stop instead of making a value. */
-static inline FLE_AI void fle_bad_count(void) {
+static inline __attribute__((noreturn, cold, noinline)) void fle_bad_count(void) {
     fprintf(stderr, "fle: shift count above operand width (undefined result)\n");
     abort();
 }
 
 static inline FLE_AI uint64_t fle_op_add(unsigned w, uint64_t a, uint64_t b, uint8_t cin) {
     uint64_t m = fle_mask(w);
-    unsigned __int128 full;
     uint64_t r;
     a &= m;
     b &= m;
-    full = (unsigned __int128)a + b + cin;
-    r = (uint64_t)full & m;
-    FL.cf = (uint8_t)((full >> w) & 1);
+    if (w < 64) {
+        uint64_t s = a + b + cin;
+        r = s & m;
+        FL.cf = (uint8_t)((s >> w) & 1);
+    } else {
+        uint64_t s0 = a + b;
+        uint8_t c0 = s0 < a;
+        r = s0 + cin;
+        FL.cf = c0 | (r < s0);
+    }
     FL.af = (uint8_t)(((a ^ b ^ r) >> 4) & 1);
     FL.of = fle_sb(w, (a ^ r) & (b ^ r));
     fle_szp(w, r);
@@ -93,7 +96,7 @@ static inline FLE_AI uint64_t fle_op_sub(unsigned w, uint64_t a, uint64_t b, uin
     a &= m;
     b &= m;
     r = (a - b - bin) & m;
-    FL.cf = (unsigned __int128)a < (unsigned __int128)b + bin;
+    FL.cf = (a < b) || (bin && a == b);
     FL.af = (uint8_t)(((a ^ b ^ r) >> 4) & 1);
     FL.of = fle_sb(w, (a ^ b) & (a ^ r));
     fle_szp(w, r);
@@ -150,10 +153,10 @@ static inline FLE_AI uint64_t fle_op_shl(unsigned w, uint64_t a, uint64_t cnt) {
     if (c == 0) {
         return a;
     }
-    if (c > w) {
+    if (__builtin_expect(c > w, 0)) {
         fle_bad_count();
     }
-    r = (uint64_t)((unsigned __int128)a << c) & m;
+    r = (a << c) & m;
     cf = (uint8_t)((a >> (w - c)) & 1);
     FL.cf = cf;
     FL.of = c == 1 ? (uint8_t)(fle_sb(w, r) ^ cf) : FLE_UNDEF;
@@ -170,7 +173,7 @@ static inline FLE_AI uint64_t fle_op_shr(unsigned w, uint64_t a, uint64_t cnt) {
     if (c == 0) {
         return a;
     }
-    if (c > w) {
+    if (__builtin_expect(c > w, 0)) {
         fle_bad_count();
     }
     r = a >> c;
@@ -190,7 +193,7 @@ static inline FLE_AI uint64_t fle_op_sar(unsigned w, uint64_t a, uint64_t cnt) {
     if (c == 0) {
         return a;
     }
-    if (c > w) {
+    if (__builtin_expect(c > w, 0)) {
         fle_bad_count();
     }
     s = fle_sext(w, a);
@@ -267,6 +270,11 @@ static inline FLE_AI void fle_op_comisd(uint64_t a, uint64_t b) {
 /* Jcc, SETcc, CMOVcc. CC is the low nibble of the opcode (tttn). Each case
  * reads every flag that its SDM formula names, so an undefined flag stops the
  * run even when a short-circuit would not need it. */
+static inline __attribute__((noreturn, cold, noinline)) void fle_bad_cc(void) {
+    fprintf(stderr, "fle: bad condition code\n");
+    abort();
+}
+
 static inline FLE_AI int fle_cc(unsigned cc) {
     switch (cc) {
     case 0x0: return fle_rd(FL.of);
@@ -286,8 +294,7 @@ static inline FLE_AI int fle_cc(unsigned cc) {
     case 0xe: { int z = fle_rd(FL.zf); int s = fle_rd(FL.sf); int o = fle_rd(FL.of); return z || (s != o); }
     case 0xf: { int z = fle_rd(FL.zf); int s = fle_rd(FL.sf); int o = fle_rd(FL.of); return !z && (s == o); }
     default:
-        fprintf(stderr, "fle: bad condition code\n");
-        abort();
+        fle_bad_cc();
     }
 }
 

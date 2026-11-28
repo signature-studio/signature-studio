@@ -117,6 +117,7 @@ interface AppApi {
   clipboard: ClipboardState;
   /** decision 0223: the desktop presenter's counters (as of its last report), and the SHA-256 of the desktop canvas read back in the Worker */
   deskStats: unknown;
+  displayFrameTimes: number[];
   readbackDesk(): Promise<{ width: number; height: number; sha256: string }>;
   /** a test aid (any display method): the compositor's whole picture as the window table is now, as a SHA-256 / as base64 of its R, G, B, A bytes */
   deskDumpHash(): Promise<{ width: number; height: number; sha256: string }>;
@@ -204,6 +205,7 @@ const app: AppApi = {
   sendRaw: (ev) => sendRaw(ev, 'test'),
   taskbar: null as unknown as TaskbarRestore,
   deskStats: null,
+  displayFrameTimes: [],
   readbackDesk: () => client.readback('desk'),
   deskDumpHash: async () => { const d = await client.deskDump(); return { width: d.width, height: d.height, sha256: await sha256Hex(new Uint8Array(d.data)) }; },
   guestText: (markers, radius = 0) => client.guestText(markers, radius),
@@ -445,9 +447,20 @@ app.taskbar = new TaskbarRestore($('taskbar-restore') as HTMLButtonElement, { se
 const desktopInput = attachDesktopInput($('desktop'), { enabled: inputEnabled, sendTab: () => sendTabBox.checked, onRaw: sendRaw, rect: () => view.rect(), screen: () => view.screenSize });
 void desktopInput;
 
+let lastPointerInfoText = '';
+let lastCursorInfoText = '';
 function renderDesktopInfo(): void {
-  $('pointer-info').textContent = lastInput?.screen ? `pointer: screen (${lastInput.screen.x}, ${lastInput.screen.y})` : 'pointer: -';
-  $('cursor-info').textContent = `cursor: ${app.cursor.css}${app.cursor.why ? ` (${app.cursor.why})` : ''}`;
+  const ptrText = lastInput?.screen ? `pointer: screen (${lastInput.screen.x}, ${lastInput.screen.y})` : 'pointer: -';
+  if (ptrText !== lastPointerInfoText) {
+    lastPointerInfoText = ptrText;
+    $('pointer-info').textContent = ptrText;
+  }
+  const cssLabel = app.cursor.css.length > 160 ? 'custom image' : app.cursor.css;
+  const curText = `cursor: ${cssLabel}${app.cursor.why ? ` (${app.cursor.why})` : ''}`;
+  if (curText !== lastCursorInfoText) {
+    lastCursorInfoText = curText;
+    $('cursor-info').textContent = curText;
+  }
 }
 
 function renderStatus(): void {
@@ -625,6 +638,18 @@ setInterval(renderPerf, 1000);
 const cursorPictures = new Map<number, CursorPictureState>();
 /** #1392: the engine's picture of a cursor as the page shows it: the PNG of the engine's pixels (not scaled; the size is checked against the browser's limit where it is shown, cursorCss) */
 const pictureLogged = new Map<number, string>();
+const cursorPictureCache = new Map<string, CursorPictureState>();
+function rgbaHashHex(u8: Uint8Array): string {
+  const words = new Uint32Array(u8.buffer, u8.byteOffset, u8.byteLength >> 2);
+  let h1 = 0x811c9dc5;
+  let h2 = 0x9e3779b9;
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i] as number;
+    h1 = Math.imul(h1 ^ w, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ ((w << 13) | (w >>> 19)), 0x85ebca6b) >>> 0;
+  }
+  return `${h1.toString(16)}_${h2.toString(16)}`;
+}
 function pictureState(m: Extract<FromWorker, { t: 'cursorpic' }>): CursorPictureState {
   if (m.picture === null) return { ok: false, why: m.why };
   const p = m.picture;
@@ -632,11 +657,17 @@ function pictureState(m: Extract<FromWorker, { t: 'cursorpic' }>): CursorPicture
   const rgba = new Uint8Array(p.rgba);
   const what = `the guest's cursor ${source}${p.made ? '' : `: RT_CURSOR ${p.cursorId}`}, ${p.width} x ${p.height}, hot spot ${p.hotX}, ${p.hotY}; ${p.alpha ? `drawn with the alpha bytes (${p.transparent} transparent, ${p.opaque} opaque pixels)` : `${p.invert} pixels drawn black (AND 1, XOR not 0)`}`;
   if (pictureLogged.get(m.handle) !== what) { pictureLogged.set(m.handle, what); addLog('info', what); }
-  return {
+  const cacheKey = `${p.width}x${p.height}:${p.hotX},${p.hotY}:${p.alpha ? 1 : 0}:${p.invert}:${p.transparent}:${p.opaque}:${p.raw !== null ? 1 : 0}:${rgbaHashHex(rgba)}`;
+  const cached = cursorPictureCache.get(cacheKey);
+  if (cached) return cached;
+  const state: CursorPictureState = {
     ok: true, url: pngDataUrl(p.width, p.height, rgba),
     hotX: p.hotX, hotY: p.hotY, source, cursorId: p.cursorId, width: p.width, height: p.height, invert: p.invert, alpha: p.alpha,
     ...(p.raw !== null ? { raw: base64Of(new Uint8Array(p.raw)) } : {}),
   };
+  if (cursorPictureCache.size >= 128) cursorPictureCache.clear();
+  cursorPictureCache.set(cacheKey, state);
+  return state;
 }
 
 /** #1390: what the engine's cursor reports were that the page could not show as they are (a count per report of a state, not per pointer move) */
@@ -688,6 +719,10 @@ const client = new EngineClient({
   },
   desk(m) {
     app.deskStats = m.stats;
+    if (m.displayAt?.length) {
+      app.displayFrameTimes.push(...m.displayAt);
+      if (app.displayFrameTimes.length > 8000) app.displayFrameTimes.splice(0, app.displayFrameTimes.length - 8000);
+    }
     deskHistory.add(nowAbs(), m.stats.presents);
     if (m.answers && m.at.length > 0) app.latency.answer(m.answers, DESKTOP, m.at[m.at.length - 1] as number);
     for (const t of m.at) { app.latency.frame(DESKTOP, t, t, t); app.lastChanged = { at: t }; perfRecorder.update(t); }

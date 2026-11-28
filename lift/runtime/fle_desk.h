@@ -104,6 +104,9 @@ typedef struct {
 
 /* 1: from now on the description is made by fle_desk_scene (and fle_desk_wrote only collects the rectangles); 0: the compositor of fle_desk_compose again. */
 void fle_desk_scene_mode(int on);
+int fle_desk_is_scene_mode(void);
+/* Returns 1 when scene updates, whole/resync flags, or screen dimensions require recomposing a scene frame. */
+int fle_desk_scene_dirty(void);
 /* The description of the picture as the window table is now; the collected rectangles are consumed. Always the same address. */
 const fle_scene *fle_desk_scene(void);
 

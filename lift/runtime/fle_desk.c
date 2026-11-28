@@ -244,13 +244,64 @@ static void draw_rect(uint32_t *base, int32_t stride, int32_t ox, int32_t oy, co
 
 /* The one rule of 'report only what differs' (the trim of decision 0223, which the scene of decision 0240 shares): in one row, the span [*a, *b) narrowed to its first and its last pixel where `old` and `neu` differ; `old` takes the new
  * pixels there. 0: the row is the same (nothing changes, nothing is reported). Used by paint() on the compositor's picture and by sh_trim() on the scene's copy of a window's surface. */
+typedef uint64_t fle_v2u64 __attribute__((vector_size(16), aligned(1)));
+
 static int trim_row(uint32_t *old, const uint32_t *neu, int32_t *a, int32_t *b)
 {
     int32_t x0 = *a, x1 = *b;
 
+    if (x0 >= x1) return 0;
+    while (x0 + 16 <= x1) {
+        fle_v2u64 o0, n0, o1, n1, o2, n2, o3, n3, d;
+
+        memcpy(&o0, old + x0, 16u);
+        memcpy(&n0, neu + x0, 16u);
+        memcpy(&o1, old + x0 + 4, 16u);
+        memcpy(&n1, neu + x0 + 4, 16u);
+        memcpy(&o2, old + x0 + 8, 16u);
+        memcpy(&n2, neu + x0 + 8, 16u);
+        memcpy(&o3, old + x0 + 12, 16u);
+        memcpy(&n3, neu + x0 + 12, 16u);
+        d = (o0 ^ n0) | (o1 ^ n1) | (o2 ^ n2) | (o3 ^ n3);
+        if ((d[0] | d[1]) != 0u) break;
+        x0 += 16;
+    }
+    while (x0 + 4 <= x1) {
+        fle_v2u64 o, n, d;
+
+        memcpy(&o, old + x0, 16u);
+        memcpy(&n, neu + x0, 16u);
+        d = o ^ n;
+        if ((d[0] | d[1]) != 0u) break;
+        x0 += 4;
+    }
     while (x0 < x1 && old[x0] == neu[x0]) x0++;
     if (x0 == x1) return 0;
-    while (old[x1 - 1] == neu[x1 - 1]) x1--;
+    while (x1 - 16 >= x0) {
+        fle_v2u64 o0, n0, o1, n1, o2, n2, o3, n3, d;
+
+        memcpy(&o0, old + x1 - 16, 16u);
+        memcpy(&n0, neu + x1 - 16, 16u);
+        memcpy(&o1, old + x1 - 12, 16u);
+        memcpy(&n1, neu + x1 - 12, 16u);
+        memcpy(&o2, old + x1 - 8, 16u);
+        memcpy(&n2, neu + x1 - 8, 16u);
+        memcpy(&o3, old + x1 - 4, 16u);
+        memcpy(&n3, neu + x1 - 4, 16u);
+        d = (o0 ^ n0) | (o1 ^ n1) | (o2 ^ n2) | (o3 ^ n3);
+        if ((d[0] | d[1]) != 0u) break;
+        x1 -= 16;
+    }
+    while (x1 - 4 >= x0) {
+        fle_v2u64 o, n, d;
+
+        memcpy(&o, old + x1 - 4, 16u);
+        memcpy(&n, neu + x1 - 4, 16u);
+        d = o ^ n;
+        if ((d[0] | d[1]) != 0u) break;
+        x1 -= 4;
+    }
+    while (x1 > x0 && old[x1 - 1] == neu[x1 - 1]) x1--;
     memcpy(old + x0, neu + x0, (size_t)(x1 - x0) * 4u);
     *a = x0;
     *b = x1;
@@ -500,8 +551,13 @@ const uint8_t *fle_desk_picture(void) { return (const uint8_t *)(const void *)pi
 
 /* ---- Decision 0240 (gpu1): the scene (fle_desk.h) ---- */
 static fle_scene sc;
-static uint32_t su_lid[FLE_SCENE_MAX_WINDOWS];      /* the rectangles collected by fle_desk_wrote: one bounding rectangle per window, in its surface */
-static fle_desk_rect su_r[FLE_SCENE_MAX_WINDOWS];
+#define SCENE_WIN_MAX_RECTS 16u
+typedef struct {
+    uint32_t lid;
+    unsigned n;
+    fle_desk_rect r[SCENE_WIN_MAX_RECTS];
+} su_entry;
+static su_entry su_list[FLE_SCENE_MAX_WINDOWS];
 static unsigned n_su;
 static int scene_whole = 1;
 /* What the browser holds of each window's surface, byte for byte (B, G, R, X as the surface has them): a written rectangle whose pixels are the ones the browser already has is not reported (the idle redraw of the main form writes
@@ -574,6 +630,57 @@ static int sh_trim(const dwin *c, uint32_t *sh, fle_desk_rect *r)
     return 1;
 }
 
+static void scene_rect_add(fle_desk_rect *list, unsigned *n, int32_t x0, int32_t y0, int32_t x1, int32_t y1)
+{
+    fle_desk_rect r;
+    unsigned i;
+
+    if (x0 >= x1 || y0 >= y1) return;
+    r.x0 = x0;
+    r.y0 = y0;
+    r.x1 = x1;
+    r.y1 = y1;
+    for (i = 0; i < *n; i++)
+        if (rect_in(&r, &list[i])) return;
+    for (i = 0; i < *n;) {
+        if (rect_in(&list[i], &r)) list[i] = list[--*n];
+        else i++;
+    }
+    for (i = 0; i < *n; i++)
+        if (rect_touch(&r, &list[i])) {
+            fle_desk_rect u = rect_union(&r, &list[i]);
+            uint64_t ar = (uint64_t)rect_area(&r), al = (uint64_t)rect_area(&list[i]), au = (uint64_t)rect_area(&u);
+
+            if (ar + al <= (UINT64_MAX / 5u) && au * 4u <= (ar + al) * 5u) {
+                list[i] = list[--*n];
+                scene_rect_add(list, n, u.x0, u.y0, u.x1, u.y1);
+                return;
+            }
+        }
+    if (*n == SCENE_WIN_MAX_RECTS) {
+        unsigned bi = 0;
+        int64_t best = -1;
+
+        for (i = 0; i < *n; i++) {
+            fle_desk_rect u = rect_union(&r, &list[i]);
+            int64_t grow = rect_area(&u) - rect_area(&list[i]);
+
+            if (best < 0 || grow < best) {
+                best = grow;
+                bi = i;
+            }
+        }
+        {
+            fle_desk_rect u = rect_union(&r, &list[bi]);
+
+            list[bi] = list[--*n];
+            scene_rect_add(list, n, u.x0, u.y0, u.x1, u.y1);
+        }
+        return;
+    }
+    list[(*n)++] = r;
+}
+
 static void scene_wrote(uint32_t lid, int64_t x0, int64_t y0, int64_t x1, int64_t y1)
 {
     unsigned i;
@@ -585,22 +692,17 @@ static void scene_wrote(uint32_t lid, int64_t x0, int64_t y0, int64_t x1, int64_
     if (x1 > 0x7fffffff) x1 = 0x7fffffff;
     if (y1 > 0x7fffffff) y1 = 0x7fffffff;
     for (i = 0; i < n_su; i++)
-        if (su_lid[i] == lid) {
-            if (x0 < su_r[i].x0) su_r[i].x0 = (int32_t)x0;
-            if (y0 < su_r[i].y0) su_r[i].y0 = (int32_t)y0;
-            if (x1 > su_r[i].x1) su_r[i].x1 = (int32_t)x1;
-            if (y1 > su_r[i].y1) su_r[i].y1 = (int32_t)y1;
+        if (su_list[i].lid == lid) {
+            scene_rect_add(su_list[i].r, &su_list[i].n, (int32_t)x0, (int32_t)y0, (int32_t)x1, (int32_t)y1);
             return;
         }
     if (n_su == FLE_SCENE_MAX_WINDOWS) {            /* decision 0385: more distinct windows written since the last description than the table holds: the next description sends every window whole, so no written pixel is left out */
         need_full = 1;
         return;
     }
-    su_lid[n_su] = lid;
-    su_r[n_su].x0 = (int32_t)x0;
-    su_r[n_su].y0 = (int32_t)y0;
-    su_r[n_su].x1 = (int32_t)x1;
-    su_r[n_su].y1 = (int32_t)y1;
+    su_list[n_su].lid = lid;
+    su_list[n_su].n = 0;
+    scene_rect_add(su_list[n_su].r, &su_list[n_su].n, (int32_t)x0, (int32_t)y0, (int32_t)x1, (int32_t)y1);
     n_su++;
 }
 
@@ -611,6 +713,13 @@ EMSCRIPTEN_KEEPALIVE void fle_desk_scene_mode(int on)
     n_su = 0;
     nprev = 0;
     need_full = 1;
+}
+
+int fle_desk_is_scene_mode(void) { return scene_on; }
+
+EMSCRIPTEN_KEEPALIVE int fle_desk_scene_dirty(void)
+{
+    return n_su != 0 || scene_whole || need_full || W_ != fle_screen_w() || H_ != fle_screen_h();
 }
 
 EMSCRIPTEN_KEEPALIVE const fle_scene *fle_desk_scene(void)
@@ -688,26 +797,43 @@ EMSCRIPTEN_KEEPALIVE const fle_scene *fle_desk_scene(void)
         o->cr = c->cr;
         o->cb = c->cb;
         if (fresh) {                    /* a new texture: the whole surface */
-            sc.upd[nu].lid = c->lid;
-            sc.upd[nu].x0 = 0;
-            sc.upd[nu].y0 = 0;
-            sc.upd[nu].x1 = (int32_t)c->w;
-            sc.upd[nu].y1 = (int32_t)c->h;
-            nu++;
+            if (nu < FLE_SCENE_MAX_UPDATES) {
+                sc.upd[nu].lid = c->lid;
+                sc.upd[nu].x0 = 0;
+                sc.upd[nu].y0 = 0;
+                sc.upd[nu].x1 = (int32_t)c->w;
+                sc.upd[nu].y1 = (int32_t)c->h;
+                nu++;
+            }
         } else {
             for (j = 0; j < n_su; j++)
-                if (su_lid[j] == c->lid) {
-                    fle_desk_rect r = su_r[j];
+                if (su_list[j].lid == c->lid) {
+                    const su_entry *e = &su_list[j];
+                    unsigned first_u = nu;
+                    unsigned rem_wins = ncur - 1u - i;
+                    unsigned max_for_this = (FLE_SCENE_MAX_UPDATES > first_u + rem_wins) ? (FLE_SCENE_MAX_UPDATES - first_u - rem_wins) : 1u;
 
-                    if (r.x1 > (int32_t)c->w) r.x1 = (int32_t)c->w;
-                    if (r.y1 > (int32_t)c->h) r.y1 = (int32_t)c->h;
-                    if (r.x0 < r.x1 && r.y0 < r.y1 && sh_trim(c, sh, &r)) {
-                        sc.upd[nu].lid = c->lid;
-                        sc.upd[nu].x0 = r.x0;
-                        sc.upd[nu].y0 = r.y0;
-                        sc.upd[nu].x1 = r.x1;
-                        sc.upd[nu].y1 = r.y1;
-                        nu++;
+                    for (unsigned k = 0; k < e->n; k++) {
+                        fle_desk_rect r = e->r[k];
+
+                        if (r.x1 > (int32_t)c->w) r.x1 = (int32_t)c->w;
+                        if (r.y1 > (int32_t)c->h) r.y1 = (int32_t)c->h;
+                        if (r.x0 >= r.x1 || r.y0 >= r.y1 || !sh_trim(c, sh, &r)) continue;
+                        if (nu - first_u < max_for_this && nu < FLE_SCENE_MAX_UPDATES) {
+                            sc.upd[nu].lid = c->lid;
+                            sc.upd[nu].x0 = r.x0;
+                            sc.upd[nu].y0 = r.y0;
+                            sc.upd[nu].x1 = r.x1;
+                            sc.upd[nu].y1 = r.y1;
+                            nu++;
+                        } else if (nu > first_u) {
+                            fle_scene_upd *pu = &sc.upd[nu - 1u];
+
+                            if (r.x0 < pu->x0) pu->x0 = r.x0;
+                            if (r.y0 < pu->y0) pu->y0 = r.y0;
+                            if (r.x1 > pu->x1) pu->x1 = r.x1;
+                            if (r.y1 > pu->y1) pu->y1 = r.y1;
+                        }
                     }
                     break;
                 }

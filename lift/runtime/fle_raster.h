@@ -75,6 +75,9 @@ uint64_t fle_r_blit(const fle_rsurf *d, const fle_rrect *clip, int64_t dx, int64
  * first one that differed (1; alpha2b: to the end of the call that found it, and the later calls whole). See fle_raster.c. */
 void fle_r_changed_begin(void);
 int fle_r_changed(fle_rrect *r);
+#define FLE_R_DIFF_MAX 16u
+void fle_r_diff_begin(void);
+int fle_r_diff_end(fle_rrect *out, unsigned cap);
 /* mode = the stretching mode of the DC (1 BLACKONWHITE = AND of the pixels that a shrink merges, 2 WHITEONBLACK = OR, 3 COLORONCOLOR = delete, 4 HALFTONE = mean of the colours); a pixel that is not merged is copied. */
 /* MaskBlt (Learn): per destination pixel, mask bit 1 applies the foreground ternary operation fg, mask bit 0 the background one bg. `mask` is a 1-bit surface read at (mx + i, my + j). Returns the pixels written. */
 uint64_t fle_r_maskblt(const fle_rsurf *d, const fle_rrect *clip, int64_t dx, int64_t dy, int64_t w, int64_t h, const fle_rsurf *s, int64_t sx, int64_t sy, const fle_rsurf *mask, int64_t mx, int64_t my, uint32_t fg, uint32_t bg, uint32_t pat);

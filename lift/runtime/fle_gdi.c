@@ -24,6 +24,8 @@
 #include "fle_callback.h"
 #include "fle_spi.h"
 
+int fle_desk_is_scene_mode(void) __attribute__((weak));
+
 static int64_t fle_gdi_owner_tid;
 
 static void fle_gdi_check_thread(const char *api)
@@ -2188,6 +2190,16 @@ static int blit_begin(const target *t)
     fle_r_changed_begin();
     return 1;
 }
+static int blit_begin_rect(const target *t)
+{
+    if (!t->is_window) return 0;
+    if (fle_desk_is_scene_mode && fle_desk_is_scene_mode()) {
+        fle_r_diff_begin();
+        return 2;
+    }
+    fle_r_changed_begin();
+    return 1;
+}
 static void blit_end(int begun, fle_rrect *dr, uint64_t *n)
 {
     fle_rrect w = *dr;
@@ -2195,6 +2207,22 @@ static void blit_end(int begun, fle_rrect *dr, uint64_t *n)
     if (!begun) return;
     if (!fle_r_changed(&w)) *n = 0;
     else *dr = w;
+}
+static void blit_finish(int chk, const char *api, const target *t, fle_rrect dr, uint64_t n)
+{
+    if (chk == 2) {
+        fle_rrect rects[FLE_R_DIFF_MAX];
+        int nr = fle_r_diff_end(rects, FLE_R_DIFF_MAX);
+
+        if (nr < 0) {
+            target_wrote(api, t, dr, n);
+        } else {
+            for (int k = 0; k < nr; k++) target_wrote(api, t, rects[k], 1u);
+        }
+        return;
+    }
+    blit_end(chk, &dr, &n);
+    target_wrote(api, t, dr, n);
 }
 
 /* The colour of a brush: a live solid brush made by CreateBrushIndirect or CreateSolidBrush; the stock brushes WHITE_BRUSH, LTGRAY_BRUSH, GRAY_BRUSH, DKGRAY_BRUSH, BLACK_BRUSH are solid (S-stock-brush-colour: the
@@ -2207,7 +2235,14 @@ static uint32_t brush_color(const char *api, const char *pre, uint64_t hbr, int 
 
     *hollow = 0;
     if (hbr_is_arg && hbr >= 1u && hbr <= FLE_GDI_SYS_COLOR_COUNT) return sys_colors[hbr - 1u];       /* a system colour index plus 1 (FillRect page; the table of decision 0123) */
-    if (!o) pixel_stop(api, pre, hbr_is_arg ? "hbr is not a live brush of this runtime nor a system colour index plus 1 (0 to 30)" : "the brush selected into the DC is gone");
+    if (!o) {
+        if (hbr_is_arg) {
+            char epre[120];
+            snprintf(epre, sizeof epre, "%s (hbr 0x%" PRIx64 ")", pre, hbr);
+            pixel_stop(api, epre, "hbr is not a live brush of this runtime nor a system colour index plus 1 (0 to 30)");
+        }
+        pixel_stop(api, pre, "the brush selected into the DC is gone");
+    }
     switch (o->kind) {
     case FLE_GDI_KIND_BRUSH:
         if (o->u[0] == FLE_GDI_BS_PATTERN) pixel_stop(api, pre, "the brush is a pattern brush (CreatePatternBrush): the pixels of a pattern fill are not implemented (decision 0132, S-patternbrush)");
@@ -2359,7 +2394,7 @@ static void blit_call(const char *api, const char *pre, uint64_t hdst, int64_t x
             dest_in.x1 = dest_in.x0 + (in.x1 - in.x0);
             dest_in.y1 = dest_in.y0 + (in.y1 - in.y0);
             n = 0;
-            chk = blit_begin(&td);
+            chk = blit_begin_rect(&td);
             EACH_CLIP(td, n += fle_r_blit(&td.s, CL_, dest_in.x0, dest_in.y0, in.x1 - in.x0, in.y1 - in.y0, &ts.s, in.x0, in.y0, idx, pat));
             dr = dest_in;
         } else {
@@ -2385,7 +2420,7 @@ static void blit_call(const char *api, const char *pre, uint64_t hdst, int64_t x
             /* decision 0126: the same size and the same direction is a plain copy (BitBlt's path: a SRCCOPY between two surfaces of one format is a byte copy, the unused byte of a 32-bit pixel included, decision 0111);
              * a different size or a mirror is stretched (S-stretch-groups) */
             if ((cx < 0 ? -cx : cx) == (sw < 0 ? -sw : sw) && (cy < 0 ? -cy : cy) == (sh < 0 ? -sh : sh) && (cx < 0) == (sw < 0) && (cy < 0) == (sh < 0)) {
-                chk = blit_begin(&td);
+                chk = blit_begin_rect(&td);
                 EACH_CLIP(td, n += fle_r_blit(&td.s, CL_, cx < 0 ? dr.x0 + cx : dr.x0, cy < 0 ? dr.y0 + cy : dr.y0, cx < 0 ? -cx : cx, cy < 0 ? -cy : cy, &ts.s, sw < 0 ? sr2.x0 + sw : sr2.x0, sh < 0 ? sr2.y0 + sh : sr2.y0, idx, pat));
             } else {
                 EACH_CLIP(td, n += fle_r_stretch(&td.s, CL_, dr.x0, dr.y0, cx, cy, &ts.s, sr2.x0, sr2.y0, sw, sh, idx, pat, dd->stretch));
@@ -2395,8 +2430,7 @@ static void blit_call(const char *api, const char *pre, uint64_t hdst, int64_t x
             EACH_CLIP(td, n += fle_r_rop_rect(&td.s, CL_, dr, idx, pat));
         }
     }
-    blit_end(chk, &dr, &n);
-    target_wrote(api, &td, dr, n);
+    blit_finish(chk, api, &td, dr, n);
     R[0] = 1;
 }
 
@@ -2406,11 +2440,9 @@ void fle_imp_BitBlt(void)
     int32_t x = (int32_t)(uint32_t)R[2], y = (int32_t)(uint32_t)R[8], cx = (int32_t)(uint32_t)R[9], cy = (int32_t)(uint32_t)fle_arg(5);
     int32_t x1 = (int32_t)(uint32_t)fle_arg(7), y1 = (int32_t)(uint32_t)fle_arg(8);
     uint32_t rop = (uint32_t)fle_arg(9);
-    char pre[200];
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "pixel transfer between DCs (rop 0x%x, %d x %d to (%d, %d) from (%d, %d))", (unsigned)rop, (int)cx, (int)cy, (int)x, (int)y, (int)x1, (int)y1);
-    blit_call(api, pre, R[1], x, y, cx, cy, fle_arg(6), x1, y1, rop, 0, 0, 0);
+    blit_call(api, "pixel transfer between DCs", R[1], x, y, cx, cy, fle_arg(6), x1, y1, rop, 0, 0, 0);
 }
 
 /* Decision 0319 section 14 (alpha1, PROVISIONAL): the 32-bit pixels of a rectangle of a DC, for the drag image of ImageList_DragEnter / DragMove / DragShowNolock (fle_imagelist.c). Device units of the DC (a window DC from
@@ -2421,15 +2453,13 @@ void fle_imp_BitBlt(void)
 int fle_gdi_dc_blend32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *argb, uint32_t alpha_const, uint32_t *saved, uint8_t *valid)
 {
     target t;
-    char pre[120];
     int32_t i, j;
     uint64_t n = 0;
     fle_rrect bnd = { 0, 0, 0, 0 };
     int have = 0;
 
     if (w <= 0 || h <= 0) return 1;
-    snprintf(pre, sizeof pre, "drawing the drag image (%d x %d at (%d, %d))", (int)w, (int)h, (int)x, (int)y);
-    get_target(api, pre, hdc, "hdc", &t);
+    get_target(api, "drawing the drag image", hdc, "hdc", &t);
     if (valid) memset(valid, 0, (size_t)w * (size_t)h);
     if (!target_live(api, &t)) return 1;
     if (!fle_r_direct(&t.s) || t.s.bpp != 32) return 0;
@@ -2471,15 +2501,13 @@ int fle_gdi_dc_blend32(const char *api, uint64_t hdc, int32_t x, int32_t y, int3
 int fle_gdi_dc_put32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *px, const uint8_t *valid)
 {
     target t;
-    char pre[120];
     int32_t i, j;
     uint64_t n = 0;
     fle_rrect bnd = { 0, 0, 0, 0 };
     int have = 0;
 
     if (w <= 0 || h <= 0) return 1;
-    snprintf(pre, sizeof pre, "restoring the background of the drag image (%d x %d at (%d, %d))", (int)w, (int)h, (int)x, (int)y);
-    get_target(api, pre, hdc, "hdc", &t);
+    get_target(api, "restoring the background of the drag image", hdc, "hdc", &t);
     if (!target_live(api, &t)) return 1;
     if (!fle_r_direct(&t.s) || t.s.bpp != 32) return 0;
     for (j = 0; j < h; j++) {
@@ -2508,17 +2536,20 @@ int fle_gdi_dc_put32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_
 void fle_imp_PatBlt(void)
 {
     static const char api[] = "PatBlt";
+    static const char pre[] = "painting a rectangle with the selected brush";
     int32_t x = (int32_t)(uint32_t)R[2], y = (int32_t)(uint32_t)R[8], w = (int32_t)(uint32_t)R[9], h = (int32_t)(uint32_t)fle_arg(5);
     uint32_t rop = (uint32_t)fle_arg(6), idx, pat = 0;
     target t;
     gdi_dc *dc;
     fle_rrect r;
     uint64_t n;
-    char pre[200];
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "painting a rectangle with the selected brush (rop 0x%x, %d x %d at (%d, %d))", (unsigned)rop, (int)w, (int)h, (int)x, (int)y);
-    if (!fle_r_rop3_valid(rop & ~UINT32_C(0x40000000), &idx)) pixel_stop(api, pre, "rop is not one of the 256 ternary raster-operation codes of the page");
+    if (!fle_r_rop3_valid(rop & ~UINT32_C(0x40000000), &idx)) {
+        char epre[200];
+        snprintf(epre, sizeof epre, "painting a rectangle with the selected brush (rop 0x%x, %d x %d at (%d, %d))", (unsigned)rop, (int)w, (int)h, (int)x, (int)y);
+        pixel_stop(api, epre, "rop is not one of the 256 ternary raster-operation codes of the page");
+    }
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -2552,6 +2583,7 @@ void fle_imp_PatBlt(void)
 void fle_imp_FillRect(void)
 {
     static const char api[] = "FillRect";
+    static const char pre[] = "filling a rectangle with a brush";
     uint64_t prc = R[2], hbr = R[8];
     int32_t l, t_, rt, b;
     uint32_t cref;
@@ -2560,10 +2592,8 @@ void fle_imp_FillRect(void)
     gdi_dc *dc;
     fle_rrect r;
     uint64_t n;
-    char pre[120];
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "filling a rectangle with a brush (hbr 0x%" PRIx64 ")", hbr);
     get_target(api, pre, R[1], "hDC", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hDC");
@@ -2597,6 +2627,7 @@ void fle_imp_FillRect(void)
 void fle_imp_ScrollDC(void)
 {
     static const char api[] = "ScrollDC";
+    static const char pre[] = "scrolling the bits of a DC";
     uint64_t hdc = R[1], prc_scroll = R[9], prc_clip = fle_arg(5), hrgn = fle_arg(6), prc_update = fle_arg(7);
     int32_t dx = (int32_t)(uint32_t)R[2], dy = (int32_t)(uint32_t)R[8], ox = 0, oy = 0;
     target t;
@@ -2605,11 +2636,9 @@ void fle_imp_ScrollDC(void)
     const fle_rrect *cl;
     uint32_t nc, k, bpp;
     uint64_t npx = 0;
-    char pre[160];
     int chk;
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "scrolling the bits of a DC (dx %d, dy %d)", (int)dx, (int)dy);
     get_target(api, pre, hdc, "hDC", &t);
     if (t.is_window) {
         fle_gdc_info gi;
@@ -2708,16 +2737,15 @@ void fle_imp_ScrollDC(void)
 void fle_imp_InvertRect(void)
 {
     static const char api[] = "InvertRect";
+    static const char pre[] = "inverting a rectangle";
     uint64_t prc = R[2];
     int32_t l, t_, rt, b;
     target t;
     gdi_dc *dc;
     fle_rrect r;
     uint64_t n;
-    char pre[80];
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "inverting a rectangle (hDC 0x%" PRIx64 ")", R[1]);
     get_target(api, pre, R[1], "hDC", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hDC");
@@ -3744,10 +3772,9 @@ void fle_imp_StretchDIBits(void)
     int chk = 0;   /* decision 0245: fle_r_changed_begin was called */
     int64_t sx0, sy0, nrows;
     uint64_t n;
-    char pre[260];
+    static const char pre[] = "pixel transfer from a DIB";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "pixel transfer from a DIB (StretchDIBits rop 0x%x, iUsage %u, %d x %d to (%d, %d) from %d x %d at (%d, %d))", (unsigned)rop, (unsigned)usage, (int)wd, (int)hd, (int)xd, (int)yd, (int)ws, (int)hs, (int)xs, (int)ys);
     idx = ternary(api, pre, rop, 1);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
@@ -3779,31 +3806,33 @@ void fle_imp_StretchDIBits(void)
         dr = dev_rect(dc, &t, xd, yd, wd, hd);
         if (sx0 < whole.x0 || sy0 < whole.y0 || ex > whole.x1 || ey > whole.y1) {
             /* the source rectangle is partly outside the image: only a 1:1 copy has a defined place for the part that is inside (S-source-outside); a stretched one stops */
-            if ((wd < 0 ? -(int64_t)wd : wd) != aw || (hd < 0 ? -(int64_t)hd : hd) != ah) pixel_stop(api, pre, "the source rectangle is not inside the image and the copy is stretched: which destination pixels it covers is not on the page");
+            if ((wd < 0 ? -(int64_t)wd : wd) != aw || (hd < 0 ? -(int64_t)hd : hd) != ah) {
+                char epre[260];
+                snprintf(epre, sizeof epre, "pixel transfer from a DIB (StretchDIBits rop 0x%x, iUsage %u, %d x %d to (%d, %d) from %d x %d at (%d, %d))", (unsigned)rop, (unsigned)usage, (int)wd, (int)hd, (int)xd, (int)yd, (int)ws, (int)hs, (int)xs, (int)ys);
+                pixel_stop(api, epre, "the source rectangle is not inside the image and the copy is stretched: which destination pixels it covers is not on the page");
+            }
             fle_r_clip(&in, &whole);
             if (fle_r_empty(&in)) {
                 R[0] = 0;
                 return;
             }
             n = 0;
-            chk = blit_begin(&t);
+            chk = blit_begin_rect(&t);
             EACH_CLIP(t, n += fle_r_blit(&t.s, CL_, dr.x0 + (in.x0 - sx0), dr.y0 + (in.y0 - sy0), in.x1 - in.x0, in.y1 - in.y0, &img, in.x0, in.y0, idx, pat));
-            blit_end(chk, &dr, &n);
-            target_wrote(api, &t, dr, n);
+            blit_finish(chk, api, &t, dr, n);
             R[0] = (uint32_t)(int32_t)(in.y1 - in.y0);
             return;
         }
         if ((wd < 0 ? -(int64_t)wd : wd) == aw && (hd < 0 ? -(int64_t)hd : hd) == ah && (wd < 0) == (ws < 0) && (hd < 0) == (hs < 0)) {
             n = 0;
-            chk = blit_begin(&t);
+            chk = blit_begin_rect(&t);
             EACH_CLIP(t, n += fle_r_blit(&t.s, CL_, wd < 0 ? dr.x0 + wd : dr.x0, hd < 0 ? dr.y0 + hd : dr.y0, aw, ah, &img, sx0, sy0, idx, pat));
         } else {
             n = 0;
             EACH_CLIP(t, n += fle_r_stretch(&t.s, CL_, dr.x0, dr.y0, wd, hd, &img, sx0 + (ws < 0 ? aw : 0), sy0 + (hs < 0 ? ah : 0), ws, hs, idx, pat, dc->stretch));
         }
     }
-    blit_end(chk, &dr, &n);
-    target_wrote(api, &t, dr, n);
+    blit_finish(chk, api, &t, dr, n);
     R[0] = (uint32_t)(int32_t)((hd < 0) != (hs < 0) ? -(hd < 0 ? -hd : hd) : (hd < 0 ? -hd : hd));
 }
 
@@ -3830,10 +3859,9 @@ void fle_imp_SetDIBitsToDevice(void)
     int chk = 0;   /* decision 0245: fle_r_changed_begin was called */
     int64_t top_row, nrows;
     uint64_t n = 0;
-    char pre[260];
+    static const char pre[] = "pixel transfer from a DIB";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "pixel transfer from a DIB (SetDIBitsToDevice %u x %u to (%d, %d) from (%d, %d), StartScan %u, cLines %u, ColorUse %u)", (unsigned)w, (unsigned)h, (int)xd, (int)yd, (int)xs, (int)ys, (unsigned)start, (unsigned)nl, (unsigned)usage);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -3853,12 +3881,11 @@ void fle_imp_SetDIBitsToDevice(void)
         fle_r_clip(&in, &whole);
         if (fle_r_empty(&in)) return;
         n = 0;
-        chk = blit_begin(&t);
+        chk = blit_begin_rect(&t);
         EACH_CLIP(t, n += fle_r_blit(&t.s, CL_, dr.x0 + (in.x0 - ox), dr.y0 + (in.y0 - oy), in.x1 - in.x0, in.y1 - in.y0, &img, in.x0, in.y0, FLE_R_SRCCOPY_IDX, 0));
         R[0] = (uint32_t)(in.y1 - in.y0);
     }
-    blit_end(chk, &dr, &n);
-    target_wrote(api, &t, dr, n);
+    blit_finish(chk, api, &t, dr, n);
 }
 
 /* gdi32!StretchBlt: BOOL f(HDC hdcDest rcx, int xDest edx, int yDest r8d, int wDest r9d, int hDest [5], HDC hdcSrc [6], int xSrc [7], int ySrc [8], int wSrc [9], int hSrc [10], DWORD rop [11]). Learn (StretchBlt):
@@ -3893,10 +3920,9 @@ void fle_imp_GetPixel(void)
     target t;
     gdi_dc *dc;
     fle_rrect r;
-    char pre[100];
+    static const char pre[] = "reading a pixel";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "reading a pixel (GetPixel at (%d, %d))", (int)x, (int)y);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -3922,10 +3948,9 @@ static void set_pixel(const char *api, int v)
     target t;
     gdi_dc *dc;
     fle_rrect r;
-    char pre[110];
+    static const char pre[] = "setting a pixel";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "setting a pixel (%s at (%d, %d), colour 0x%x)", api, (int)x, (int)y, (unsigned)color);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -4125,10 +4150,9 @@ void fle_imp_LineTo(void)
     int inv;
     uint32_t col;
     uint64_t n = 0;
-    char pre[100];
+    static const char pre[] = "drawing a line";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "drawing a line (LineTo (%d, %d))", (int)x, (int)y);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -4169,10 +4193,9 @@ void fle_imp_Rectangle(void)
     int inv, hollow;
     uint32_t pen, fill;
     uint64_t n = 0;
-    char pre[110];
+    static const char pre[] = "drawing a rectangle";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "drawing a rectangle (Rectangle (%d, %d, %d, %d))", (int)l, (int)t_, (int)r, (int)b);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -4219,10 +4242,9 @@ void fle_imp_FrameRect(void)
     gdi_dc *dc;
     fle_rrect q;
     uint64_t n = 0;
-    char pre[110];
+    static const char pre[] = "drawing a frame";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "drawing a frame (FrameRect hbr 0x%" PRIx64 ")", hbr);
     get_target(api, pre, R[1], "hDC", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hDC");
@@ -4708,25 +4730,42 @@ void fle_gdi_table_stats(uint64_t o[6])
     o[5] = k;
 }
 
-static int cmp_i32(const void *a, const void *b) { int32_t x = *(const int32_t *)a, y = *(const int32_t *)b; return x < y ? -1 : x > y; }
-static int cmp_rrect_tl(const void *a, const void *b)
-{
-    const rrect *x = (const rrect *)a, *y = (const rrect *)b;
-    if (x->t != y->t) return x->t < y->t ? -1 : 1;
-    return x->l < y->l ? -1 : x->l > y->l;
-}
-
 /* Decision 0229 (ref1, PROVISIONAL): the band builder of rgn_combine. Bands are given from top to bottom; each is a list of disjoint, non-touching, left-to-right x intervals. A rectangle of the
  * band directly above (the one whose bottom is this band's top) that has the same left and right is extended downwards (the merge rule of decision 0123: per rectangle, not per band); the others start new rectangles.
- * Only the rectangles of the band directly above can match, so the builder keeps their indices (prev) instead of scanning the whole list. */
-typedef struct { rgnset *out; uint32_t *prev, *cur; uint32_t nprev, ncur, capp, capc; } rgn_bld;
+ * Only the rectangles of the band directly above can match, so the builder keeps their indices (prev) instead of scanning the whole list. Small regions keep prev/cur on the stack (up to 64 rects/band) with zero heap churn. */
+typedef struct {
+    rgnset *out;
+    uint32_t *prev, *cur;
+    uint32_t nprev, ncur, capp, capc;
+    uint32_t prev_s[64], cur_s[64];
+} rgn_bld;
 
-static void rb_push(uint32_t **a, uint32_t *n, uint32_t *cap, uint32_t v)
+static void rb_init(rgn_bld *bld, rgnset *out)
+{
+    bld->out = out;
+    bld->prev = bld->prev_s;
+    bld->cur = bld->cur_s;
+    bld->nprev = 0u;
+    bld->ncur = 0u;
+    bld->capp = 64u;
+    bld->capc = 64u;
+}
+
+static void rb_free(const rgn_bld *bld, uint32_t *p)
+{
+    if (p && p != bld->prev_s && p != bld->cur_s) free(p);
+}
+
+static void rb_push(const rgn_bld *bld, uint32_t **a, uint32_t *n, uint32_t *cap, uint32_t v)
 {
     if (*n == *cap) {
         uint32_t nc = *cap ? *cap * 2u : 16u;
-        uint32_t *p = (uint32_t *)realloc(*a, (size_t)nc * sizeof *p);
+        int on_stack = (*a == bld->prev_s || *a == bld->cur_s);
+        uint32_t *p = on_stack
+            ? (uint32_t *)malloc((size_t)nc * sizeof *p)
+            : (uint32_t *)realloc(*a, (size_t)nc * sizeof *p);
         if (!p) fle_stop("region", "out of memory");
+        if (on_stack && *n > 0u) memcpy(p, *a, (size_t)(*n) * sizeof *p);
         *a = p;
         *cap = nc;
     }
@@ -4745,7 +4784,7 @@ static void rb_band(rgn_bld *bld, int32_t y0, int32_t y1, const int32_t *xl, con
             rrect *pr = &bld->out->r[bld->prev[q]];
             if (pr->l == xl[i] && pr->r == xr[i] && pr->b == y0) {
                 pr->b = y1;
-                rb_push(&bld->cur, &bld->ncur, &bld->capc, bld->prev[q]);
+                rb_push(bld, &bld->cur, &bld->ncur, &bld->capc, bld->prev[q]);
                 found = 1;
                 break;
             }
@@ -4756,7 +4795,7 @@ static void rb_band(rgn_bld *bld, int32_t y0, int32_t y1, const int32_t *xl, con
         bld->out->r[bld->out->n].t = y0;
         bld->out->r[bld->out->n].r = xr[i];
         bld->out->r[bld->out->n].b = y1;
-        rb_push(&bld->cur, &bld->ncur, &bld->capc, bld->out->n);
+        rb_push(bld, &bld->cur, &bld->ncur, &bld->capc, bld->out->n);
         bld->out->n++;
     }
     t = bld->prev; bld->prev = bld->cur; bld->cur = t;
@@ -4764,12 +4803,32 @@ static void rb_band(rgn_bld *bld, int32_t y0, int32_t y1, const int32_t *xl, con
     bld->nprev = bld->ncur;
 }
 
+static void sort_rrect_tl(rrect *r, uint32_t n)
+{
+    uint32_t h;
+
+    if (n <= 1u) return;
+    h = 1u;
+    while (h < n / 3u) h = h * 3u + 1u;
+    for (; h > 0u; h /= 3u) {
+        for (uint32_t i = h; i < n; i++) {
+            rrect k = r[i];
+            uint32_t j = i;
+            while (j >= h && (r[j - h].t > k.t || (r[j - h].t == k.t && r[j - h].l > k.l))) {
+                r[j] = r[j - h];
+                j -= h;
+            }
+            r[j] = k;
+        }
+    }
+}
+
 static void rb_end(rgn_bld *bld)
 {
     rgnset *o = bld->out;
-    if (o->n > 1) qsort(o->r, o->n, sizeof o->r[0], cmp_rrect_tl);   /* by top then left (the merge can leave a taller rectangle before a shorter one of an earlier top) */
-    free(bld->prev);
-    free(bld->cur);
+    sort_rrect_tl(o->r, o->n);   /* by top then left (the merge can leave a taller rectangle before a shorter one of an earlier top) */
+    rb_free(bld, bld->prev);
+    rb_free(bld, bld->cur);
 }
 
 /* sorts the intervals (xl, xr) by left edge and merges the overlapping or touching ones; returns the count */
@@ -4803,28 +4862,160 @@ static uint32_t iv_merge(int32_t *xl, int32_t *xr, uint32_t nx)
 
 static uint32_t uniq_sorted_i32(int32_t *v, uint32_t n)
 {
-    uint32_t i, w = 0;
+    uint32_t i, w = 0, h = 1u;
 
-    qsort(v, n, sizeof *v, cmp_i32);
+    if (n <= 1u) return n;
+    while (h < n / 3u) h = h * 3u + 1u;
+    for (; h > 0u; h /= 3u) {
+        for (i = h; i < n; i++) {
+            int32_t k = v[i];
+            uint32_t j = i;
+            while (j >= h && v[j - h] > k) {
+                v[j] = v[j - h];
+                j -= h;
+            }
+            v[j] = k;
+        }
+    }
     for (i = 0; i < n; i++)
         if (w == 0 || v[w - 1] != v[i]) v[w++] = v[i];
     return w;
+}
+
+static void rgn_copy_raw(rgnset *out, const rgnset *src)
+{
+    out->n = src->n;
+    if (src->n) {
+        rgn_reserve(out, src->n);
+        memcpy(out->r, src->r, (size_t)src->n * sizeof out->r[0]);
+    }
+}
+
+/* Fast O(nn) RGN_AND_ specialization when one operand is a single rectangle: clips the multi-rect region first, skipping xs arrays/second source/empty rects. */
+static void rgn_and_rect(rgnset *out, const rgnset *src, rrect clip)
+{
+    rrect clip_s[128];
+    int32_t ys_s[256], al_s[128], ar_s[128];
+    rrect *clipped = clip_s;
+    int32_t *ys = ys_s, *al = al_s, *ar = ar_s;
+    void *heap = NULL;
+    uint32_t nn = src->n, nc = 0, ny = 0, i, k;
+    rgn_bld bld;
+
+    if (clip.r <= clip.l || clip.b <= clip.t) { out->n = 0; return; }
+    if (nn > 128u) {
+        size_t sz = (size_t)nn * sizeof *clipped + (size_t)nn * 4u * sizeof(int32_t);
+        heap = malloc(sz);
+        if (!heap) fle_stop("region", "out of memory");
+        clipped = (rrect *)heap;
+        ys = (int32_t *)(clipped + nn);
+        al = ys + (size_t)nn * 2u;
+        ar = al + nn;
+    }
+    for (i = 0; i < nn; i++) {
+        rrect r = src->r[i];
+        int32_t il, it, ir, ib;
+        if (r.t >= clip.b) break;
+        if (r.b <= clip.t) continue;
+        il = r.l > clip.l ? r.l : clip.l;
+        ir = r.r < clip.r ? r.r : clip.r;
+        if (il >= ir) continue;
+        it = r.t > clip.t ? r.t : clip.t;
+        ib = r.b < clip.b ? r.b : clip.b;
+        if (it >= ib) continue;
+        clipped[nc++] = (rrect){ il, it, ir, ib };
+    }
+    if (nc == 0u) {
+        free(heap);
+        out->n = 0;
+        return;
+    }
+    if (nc == 1u) {
+        rrect only = clipped[0];
+        free(heap);
+        rgn_set_rect_(out, only.l, only.t, only.r, only.b);
+        return;
+    }
+    for (i = 0; i < nc; i++) { ys[ny++] = clipped[i].t; ys[ny++] = clipped[i].b; }
+    ny = uniq_sorted_i32(ys, ny);
+    out->n = 0;
+    rb_init(&bld, out);
+    for (k = 0; k + 1u < ny; k++) {
+        int32_t y0 = ys[k], y1 = ys[k + 1u];
+        uint32_t nal = 0;
+        for (i = 0; i < nc; i++) {
+            if (clipped[i].t > y0) break;
+            if (clipped[i].b >= y1) { al[nal] = clipped[i].l; ar[nal] = clipped[i].r; nal++; }
+        }
+        nal = iv_merge(al, ar, nal);
+        rb_band(&bld, y0, y1, al, ar, nal);
+    }
+    rb_end(&bld);
+    free(heap);
 }
 
 /* out = a (mode) b for RGN_AND_ / RGN_OR_ / RGN_XOR_ / RGN_DIFF_ (decision 0229: replaces the grid of cells of decision 0123 that was limited to 192 cells and 64 rectangles; the result is the same normal form). `out` may not alias a or b. */
 static void rgn_combine(rgnset *out, const rgnset *a, const rgnset *b, int mode)
 {
     uint32_t na = a->n, nb = b->n, tot = na + nb, i, k, ny = 0;
-    int32_t *ys = (int32_t *)malloc(((size_t)tot * 2u + 2u) * sizeof *ys);
-    int32_t *al = (int32_t *)malloc(((size_t)na + 1u) * sizeof *al), *ar = (int32_t *)malloc(((size_t)na + 1u) * sizeof *ar);
-    int32_t *bl = (int32_t *)malloc(((size_t)nb + 1u) * sizeof *bl), *br = (int32_t *)malloc(((size_t)nb + 1u) * sizeof *br);
-    int32_t *xs = (int32_t *)malloc(((size_t)tot * 2u + 2u) * sizeof *xs), *rl = (int32_t *)malloc(((size_t)tot * 2u + 2u) * sizeof *rl), *rr = (int32_t *)malloc(((size_t)tot * 2u + 2u) * sizeof *rr);
+    int32_t ys_s[258], al_s[129], ar_s[129], bl_s[129], br_s[129], xs_s[258], rl_s[258], rr_s[258];
+    int32_t *ys, *al, *ar, *bl, *br, *xs, *rl, *rr;
+    int32_t *heap = NULL;
     rgn_bld bld;
 
-    if (!ys || !al || !ar || !bl || !br || !xs || !rl || !rr) fle_stop("region", "out of memory");
+    if (na == 0 && nb == 0) { out->n = 0; return; }
+    if (mode == RGN_AND_) {
+        if (na == 0 || nb == 0) { out->n = 0; return; }
+        if (na == 1 && nb == 1) {
+            int32_t l = a->r[0].l > b->r[0].l ? a->r[0].l : b->r[0].l;
+            int32_t t = a->r[0].t > b->r[0].t ? a->r[0].t : b->r[0].t;
+            int32_t r = a->r[0].r < b->r[0].r ? a->r[0].r : b->r[0].r;
+            int32_t bt = a->r[0].b < b->r[0].b ? a->r[0].b : b->r[0].b;
+            rgn_set_rect_(out, l, t, r, bt);
+            return;
+        }
+        if (na == 1) { rgn_and_rect(out, b, a->r[0]); return; }
+        if (nb == 1) { rgn_and_rect(out, a, b->r[0]); return; }
+    } else if (mode == RGN_DIFF_) {
+        if (na == 0) { out->n = 0; return; }
+        if (nb == 0) { rgn_copy_raw(out, a); return; }
+        if (na == 1 && nb == 1) {
+            rrect A = a->r[0], B = b->r[0];
+            int32_t il = A.l > B.l ? A.l : B.l, it = A.t > B.t ? A.t : B.t;
+            int32_t ir = A.r < B.r ? A.r : B.r, ib = A.b < B.b ? A.b : B.b;
+            if (il >= ir || it >= ib) { rgn_set_rect_(out, A.l, A.t, A.r, A.b); return; }
+            out->n = 0;
+            rgn_reserve(out, 4u);
+            if (A.t < it) out->r[out->n++] = (rrect){ A.l, A.t, A.r, it };
+            if (A.l < il) out->r[out->n++] = (rrect){ A.l, it, il, ib };
+            if (ir < A.r) out->r[out->n++] = (rrect){ ir, it, A.r, ib };
+            if (ib < A.b) out->r[out->n++] = (rrect){ A.l, ib, A.r, A.b };
+            return;
+        }
+    } else if (mode == RGN_OR_ || mode == RGN_XOR_) {
+        if (na == 0) { rgn_copy_raw(out, b); return; }
+        if (nb == 0) { rgn_copy_raw(out, a); return; }
+    }
+    if (tot <= 128u) {
+        ys = ys_s; al = al_s; ar = ar_s; bl = bl_s; br = br_s; xs = xs_s; rl = rl_s; rr = rr_s;
+    } else {
+        size_t y_len = (size_t)tot * 2u + 2u;
+        size_t a_len = (size_t)na + 1u;
+        size_t b_len = (size_t)nb + 1u;
+        size_t words = y_len * 4u + a_len * 2u + b_len * 2u;
+        heap = (int32_t *)malloc(words * sizeof *heap);
+        if (!heap) fle_stop("region", "out of memory");
+        ys = heap;
+        xs = ys + y_len;
+        rl = xs + y_len;
+        rr = rl + y_len;
+        al = rr + y_len;
+        ar = al + a_len;
+        bl = ar + a_len;
+        br = bl + b_len;
+    }
     out->n = 0;
-    memset(&bld, 0, sizeof bld);
-    bld.out = out;
+    rb_init(&bld, out);
     for (i = 0; i < na; i++) { ys[ny++] = a->r[i].t; ys[ny++] = a->r[i].b; }
     for (i = 0; i < nb; i++) { ys[ny++] = b->r[i].t; ys[ny++] = b->r[i].b; }
     ny = uniq_sorted_i32(ys, ny);
@@ -4856,7 +5047,7 @@ static void rgn_combine(rgnset *out, const rgnset *a, const rgnset *b, int mode)
         rb_band(&bld, y0, y1, rl, rr, nres);
     }
     rb_end(&bld);
-    free(ys); free(al); free(ar); free(bl); free(br); free(xs); free(rl); free(rr);
+    free(heap);
 }
 
 static int rgn_has(const rgnset *s, int32_t x, int32_t y)
@@ -5020,7 +5211,16 @@ int fle_gdi_region_set_pieces(uint64_t h, const int32_t (*p)[4], uint32_t n)
     }
     s->n = 0;
     if (ny == 0) return 1;
-    qsort(ys, ny, sizeof ys[0], rgn_cmp_i32);
+    if (ny <= 24u) {
+        for (i = 1u; i < ny; i++) {
+            int32_t kv = ys[i];
+            uint32_t j = i;
+            while (j > 0u && ys[j - 1u] > kv) { ys[j] = ys[j - 1u]; j--; }
+            ys[j] = kv;
+        }
+    } else {
+        qsort(ys, ny, sizeof ys[0], rgn_cmp_i32);
+    }
     for (i = 0, nb = 0; i < ny; i++) if (i == 0 || ys[i] != ys[i - 1]) ys[nb++] = ys[i];
     /* the bands between consecutive y edges: the x intervals of the pieces that cover the band, merged; a band with the same intervals as the one above it, and touching it, extends it (Y-X bands, as the other regions are kept) */
     for (k = 0; k + 1 < nb; k++) {

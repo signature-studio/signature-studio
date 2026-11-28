@@ -138,7 +138,6 @@ int fle_input_host_mouse(int kind, int32_t x, int32_t y, int32_t data)
     unsigned b;
 
     if (kind != FLE_IN_MOVE && kind != FLE_IN_BDOWN && kind != FLE_IN_BUP && kind != FLE_IN_WHEEL) return 0;
-    if (ev_n >= EV_MAX) return 0;
     /* S-pointer-clamp: the pointer cannot leave the virtual screen (the page of SetCursorPos adjusts a point outside the clip rectangle; the screen is the rectangle, as fle_win.c's setter does) */
     if (x < 0) x = 0;
     if (y < 0) y = 0;
@@ -146,6 +145,17 @@ int fle_input_host_mouse(int kind, int32_t x, int32_t y, int32_t data)
     if (y > FLE_GDC_VERTRES - 1) y = FLE_GDC_VERTRES - 1;
     fle_win_host_pointer_set(x, y);
     fle_win_pointer_get(&x, &y);
+    if (kind == FLE_IN_MOVE && ev_n > 0) {
+        hwev *tail = &evq[(ev_head + ev_n - 1u) % EV_MAX];
+
+        if (tail->kind == FLE_IN_MOVE && tail->mk == mk_flags()) {
+            tail->x = x;
+            tail->y = y;
+            tail->ticks = clk();
+            return 1;
+        }
+    }
+    if (ev_n >= EV_MAX) return 0;
     if (kind == FLE_IN_BDOWN || kind == FLE_IN_BUP) {
         b = data == (int32_t)FLE_IN_BTN_R ? VK_RBUTTON_ : data == (int32_t)FLE_IN_BTN_M ? VK_MBUTTON_ : VK_LBUTTON_;
         set_key(key_async, b, kind == FLE_IN_BDOWN);

@@ -222,16 +222,41 @@ struct ds_buf {
     uint32_t start_pos;      /* frames */
     uint64_t pulled;         /* device frames handed to the output so far: index of the first frame not handed yet */
     uint64_t prev_abs;       /* last play position seen by the notification check, unrolled, in frames */
+    uint64_t buffered_until; /* device frame index up to which the guest has unlocked audio ahead */
     int32_t vol, pan;
     uint32_t freq;
     uint32_t nnotify;
     ds_notify_pos *notify;
     uint64_t unlocks, unlock_bytes;
+    int gains_dirty;
+    float cached_gl, cached_gr;
 };
 
 static ds_dev *devs[MAX_DEV];
 static ds_buf *bufs[MAX_BUF];
+static unsigned bufs_hi;
+static unsigned active_play_cnt;
+static int audio_dirty;
+static int sync_has_last;
+static uint64_t sync_last_c, sync_last_wf;
+static uint32_t sync_last_lead;
+static uint64_t unlock_gen;
 static dsound_stats stats;
+
+static void set_playing(ds_buf *b, int on)
+{
+    int was = b->playing != 0;
+    int now = on != 0;
+
+    if (was == now) return;
+    b->playing = now;
+    if (now) active_play_cnt++;
+    else {
+        if (active_play_cnt > 0) active_play_cnt--;
+        b->buffered_until = 0;
+    }
+    audio_dirty = 1;
+}
 
 const dsound_stats *fle_dsound_stats(void) { return &stats; }
 
@@ -250,11 +275,7 @@ static int guid_eq(uint64_t g, const uint8_t want[16])
 /* ---- the audio engine of the device: mixing and notification ---- */
 static unsigned play_count(void)
 {
-    unsigned i, n = 0;
-
-    for (i = 0; i < MAX_BUF; i++)
-        if (bufs[i] && bufs[i]->live && bufs[i]->playing) n++;
-    return n;
+    return active_play_cnt;
 }
 
 static uint32_t size_frames(const ds_buf *b) { return b->size / b->fmt.align; }
@@ -278,18 +299,23 @@ static float sample_at(const ds_buf *b, uint32_t frame, unsigned ch)
     }
 }
 
-static void gains(const ds_buf *b, float *gl, float *gr)
+static void gains(ds_buf *b, float *gl, float *gr)
 {
-    float v = b->silent_until_coop ? 0.0f : powf(10.0f, (float)b->vol / 2000.0f);   /* Learn SetVolume: attenuation in hundredths of a dB */
-    float l = v, r = v;
+    if (b->gains_dirty) {
+        float v = b->silent_until_coop ? 0.0f : powf(10.0f, (float)b->vol / 2000.0f);   /* Learn SetVolume: attenuation in hundredths of a dB */
+        float l = v, r = v;
 
-    if (b->pan > 0) l *= powf(10.0f, -(float)b->pan / 2000.0f);   /* Learn SetPan: DSBPAN_RIGHT means the left channel is attenuated by 100 dB */
-    if (b->pan < 0) r *= powf(10.0f, (float)b->pan / 2000.0f);
-    if (b->vol <= DSBVOLUME_MIN) l = r = 0.0f;
-    if (b->pan >= DSBPAN_RIGHT) l = 0.0f;
-    if (b->pan <= -DSBPAN_RIGHT) r = 0.0f;
-    *gl = l;
-    *gr = r;
+        if (b->pan > 0) l *= powf(10.0f, -(float)b->pan / 2000.0f);   /* Learn SetPan: DSBPAN_RIGHT means the left channel is attenuated by 100 dB */
+        if (b->pan < 0) r *= powf(10.0f, (float)b->pan / 2000.0f);
+        if (b->vol <= DSBVOLUME_MIN) l = r = 0.0f;
+        if (b->pan >= DSBPAN_RIGHT) l = 0.0f;
+        if (b->pan <= -DSBPAN_RIGHT) r = 0.0f;
+        b->cached_gl = l;
+        b->cached_gr = r;
+        b->gains_dirty = 0;
+    }
+    *gl = b->cached_gl;
+    *gr = b->cached_gr;
 }
 
 /* Mixes the playing buffers for the device frames [i0, i0 + n) into out (interleaved L R). A buffer that has not started (index < base) adds nothing; a buffer that is not looping and reaches its end stops there. */
@@ -299,25 +325,74 @@ static void mix_chunk(uint64_t i0, uint32_t n, float *out)
     uint32_t j;
 
     memset(out, 0, (size_t)n * 2u * sizeof(float));
-    for (bi = 0; bi < MAX_BUF; bi++) {
+    if (active_play_cnt == 0) return;
+    for (bi = 0; bi < bufs_hi; bi++) {
         ds_buf *b = bufs[bi];
         float gl, gr;
-        uint32_t sf;
+        uint32_t sf, j0 = 0, n_eff = n;
+        uint64_t pos;
 
         if (!b || !b->live || !b->playing || b->primary) continue;
         sf = size_frames(b);
+        if (sf == 0) continue;
+        if (fle_audio_external() && b->looping && b->buffered_until > 0) {
+            if (i0 >= b->buffered_until) continue;
+            if (i0 + n > b->buffered_until) n_eff = (uint32_t)(b->buffered_until - i0);
+        }
         gains(b, &gl, &gr);
-        for (j = 0; j < n; j++) {
-            uint64_t i = i0 + j, pos;
+        if (gl == 0.0f && gr == 0.0f) continue;
+        if (i0 < b->base) {
+            uint64_t skip = b->base - i0;
 
-            if (i < b->base) continue;
-            pos = (uint64_t)b->start_pos + (i - b->base);
-            if (pos >= sf) {
-                if (!b->looping) continue;
-                pos %= sf;
+            if (skip >= n_eff) continue;
+            j0 = (uint32_t)skip;
+        }
+        pos = (uint64_t)b->start_pos + (i0 + j0 - b->base);
+        if (pos >= sf) {
+            if (!b->looping) continue;
+            pos %= sf;
+        }
+        if (b->fmt.channels == 2 && (b->fmt.tag == WAVE_FORMAT_IEEE_FLOAT_ || (b->fmt.tag == WAVE_FORMAT_PCM_ && b->fmt.bits == 16))) {
+            j = j0;
+            while (j < n_eff) {
+                uint32_t avail = sf - (uint32_t)pos;
+                uint32_t chunk = (n_eff - j < avail) ? (n_eff - j) : avail;
+
+                if (b->fmt.tag == WAVE_FORMAT_IEEE_FLOAT_) {
+                    const float *src = (const float *)(const void *)b->data + (size_t)pos * 2u;
+
+                    for (uint32_t k = 0; k < chunk; k++) {
+                        out[2u * (j + k)] += gl * src[2u * k];
+                        out[2u * (j + k) + 1u] += gr * src[2u * k + 1u];
+                    }
+                } else {
+                    const int16_t *src = (const int16_t *)(const void *)b->data + (size_t)pos * 2u;
+                    const float gl_s = gl * (1.0f / 32768.0f);
+                    const float gr_s = gr * (1.0f / 32768.0f);
+
+                    for (uint32_t k = 0; k < chunk; k++) {
+                        out[2u * (j + k)] += gl_s * (float)src[2u * k];
+                        out[2u * (j + k) + 1u] += gr_s * (float)src[2u * k + 1u];
+                    }
+                }
+                j += chunk;
+                pos += chunk;
+                if (pos == sf) {
+                    if (!b->looping) break;
+                    pos = 0;
+                }
             }
-            out[2u * j] += gl * sample_at(b, (uint32_t)pos, 0);
-            out[2u * j + 1u] += gr * sample_at(b, (uint32_t)pos, 1);
+            continue;
+        }
+        for (j = j0; j < n_eff; j++) {
+            uint64_t i = i0 + j, cur_pos = (uint64_t)b->start_pos + (i - b->base);
+
+            if (cur_pos >= sf) {
+                if (!b->looping) break;
+                cur_pos %= sf;
+            }
+            out[2u * j] += gl * sample_at(b, (uint32_t)cur_pos, 0);
+            out[2u * j + 1u] += gr * sample_at(b, (uint32_t)cur_pos, 1);
         }
     }
 }
@@ -427,11 +502,12 @@ static void audio_sync(void)
     fle_audio_ring_t *r;
 
     /* With an external consumer the ring is refilled while nothing plays too (silence, mix_chunk starts from zeros): the idle engine wakes for that refill (fle_audio_next_tick), so the output never runs dry for want of a publish (#1334). */
-    if (play_count() == 0 && !fle_audio_external()) return;
+    if (active_play_cnt == 0 && !fle_audio_external()) return;
     r = fle_audio_ring_get();
     fle_audio_ring_sync_consumer();
     c = fle_audio_consumed();
     lead = fle_audio_lead_frames();
+    if (!audio_dirty && sync_has_last && c == sync_last_c && lead == sync_last_lead && r->write_frames == sync_last_wf && r->write_frames >= c + lead) return;
     r->lead_frames = lead;
     if (r->write_frames < c) {
         /* The poll is later than the frames it should have handed over. Virtual clock: the clock moves only inside the scheduler's waits, while no guest code runs, so the buffers did not change in the gap: the frames are
@@ -454,7 +530,7 @@ static void audio_sync(void)
             if (took == 0) break;
         }
     }
-    for (bi = 0; bi < MAX_BUF; bi++) {
+    for (bi = 0; bi < bufs_hi; bi++) {
         ds_buf *b = bufs[bi];
         uint64_t now_abs, sf;
 
@@ -465,14 +541,19 @@ static void audio_sync(void)
         fire_notifications(b, b->prev_abs, now_abs);
         b->prev_abs = now_abs;
         if (!b->looping && now_abs >= sf) {   /* Learn Play: "If this value is not set, the buffer will stop when it reaches the end of the sound data." */
-            b->playing = 0;
+            set_playing(b, 0);
             b->cursor = 0;
             b->start_pos = 0;
             for (uint32_t k = 0; k < b->nnotify; k++)
                 if (b->notify[k].off == DSBPN_OFFSETSTOP) fle_event_host_set(b->notify[k].h);
         }
     }
-    if (play_count() == 0) fle_audio_ring_set_state(FLE_AUDIO_OPEN);
+    if (active_play_cnt == 0) fle_audio_ring_set_state(FLE_AUDIO_OPEN);
+    audio_dirty = 0;
+    sync_has_last = 1;
+    sync_last_c = c;
+    sync_last_lead = lead;
+    sync_last_wf = r->write_frames;
 }
 
 void fle_audio_poll(void) { audio_sync(); }
@@ -490,9 +571,9 @@ int fle_audio_next_tick(uint64_t *out)
     int found = 0;
     uint64_t c;
 
-    if (play_count() == 0 && !fle_audio_external()) return 0;
+    if (active_play_cnt == 0 && !fle_audio_external()) return 0;
     c = fle_audio_consumed();
-    for (bi = 0; bi < MAX_BUF; bi++) {
+    for (bi = 0; bi < bufs_hi; bi++) {
         ds_buf *b = bufs[bi];
         uint32_t sf, k;
         uint64_t cur, best = 0;
@@ -662,12 +743,12 @@ static void m_ds_addref(void)
 static void buf_destroy(ds_buf *b)
 {
     b->live = 0;
-    b->playing = 0;
+    set_playing(b, 0);
     free(b->data);
     b->data = NULL;
     free(b->notify);
     b->notify = NULL;
-    if (play_count() == 0) fle_audio_ring_set_state(FLE_AUDIO_OPEN);
+    if (active_play_cnt == 0) fle_audio_ring_set_state(FLE_AUDIO_OPEN);
 }
 
 static void m_ds_release(void)
@@ -679,7 +760,7 @@ static void m_ds_release(void)
     d->refs--;
     if (d->refs == 0) {
         d->live = 0;
-        for (i = 0; i < MAX_BUF; i++)
+        for (i = 0; i < bufs_hi; i++)
             if (bufs[i] && bufs[i]->live && bufs[i]->dev == d) buf_destroy(bufs[i]);
     }
     R[0] = d->refs;
@@ -703,7 +784,9 @@ static ds_buf *new_buf(ds_dev *d)
     b->dev = d;
     b->vol = 0;
     b->pan = 0;
+    b->gains_dirty = 1;
     bufs[i] = b;
+    if (i + 1u > bufs_hi) bufs_hi = i + 1u;
     return b;
 }
 
@@ -802,8 +885,9 @@ static void m_ds_createsoundbuffer(void)
         if (!b->data) {
             unsigned q;
 
-            for (q = 0; q < MAX_BUF; q++)
+            for (q = 0; q < bufs_hi; q++)
                 if (bufs[q] == b) bufs[q] = NULL;
+            while (bufs_hi > 0 && !bufs[bufs_hi - 1u]) bufs_hi--;
             free(b);
             ret(HR_OUTOFMEMORY);
             return;
@@ -865,7 +949,7 @@ static void m_ds_setcoop(void)
     d->coop = level;
     d->hwnd = hwnd;
     for (i = 0; i < MAX_BUF; i++)
-        if (bufs[i] && bufs[i]->live && bufs[i]->dev == d) bufs[i]->silent_until_coop = 0;   /* Learn Play: "no sound will be produced until a cooperative level has been set" */
+        if (bufs[i] && bufs[i]->live && bufs[i]->dev == d) { bufs[i]->silent_until_coop = 0; bufs[i]->gains_dirty = 1; }   /* Learn Play: "no sound will be produced until a cooperative level has been set" */
     ret(HR_OK);
 }
 
@@ -1058,7 +1142,7 @@ static void m_b_setvolume(void)
 
     if (!(b->flags & DSBCAPS_CTRLVOLUME)) { ret(0x8878001Eu); return; }   /* Learn: DSERR_CONTROLUNAVAIL; the control must be asked for when the buffer is made (DSERR_CONTROLUNAVAIL text) */
     if (v > 0 || v < DSBVOLUME_MIN) { ret(HR_INVALIDPARAM); return; }     /* Learn SetVolume: allowable values are DSBVOLUME_MAX (0) to DSBVOLUME_MIN (-10000) */
-    b->vol = v;
+    if (b->vol != v) { b->vol = v; b->gains_dirty = 1; }
     ret(HR_OK);
 }
 
@@ -1069,7 +1153,7 @@ static void m_b_setpan(void)
 
     if (!(b->flags & DSBCAPS_CTRLPAN)) { ret(0x8878001Eu); return; }
     if (v > DSBPAN_RIGHT || v < -DSBPAN_RIGHT) { ret(HR_INVALIDPARAM); return; }   /* Learn SetPan: DSBPAN_LEFT (-10000) to DSBPAN_RIGHT (10000) */
-    b->pan = v;
+    if (b->pan != v) { b->pan = v; b->gains_dirty = 1; }
     ret(HR_OK);
 }
 
@@ -1160,16 +1244,62 @@ static void m_b_unlock(void)
     b->unlock_bytes += (uint64_t)n1 + n2;
     stats.unlocks++;
     stats.unlock_bytes += (uint64_t)n1 + n2;
+    audio_dirty = 1;
     if (fle_audio_external() && b->playing) {   /* the page measures the delay from this write to the read of the region by the output: the first frame of the region is read when the consumed count reaches c + its distance ahead of the play cursor */
         uint32_t pl, wr;
         uint64_t sf = size_frames(b), c = fle_audio_consumed(), d, off_f = b->lk_off / b->fmt.align, wf0 = fle_audio_ring_get()->write_frames;
+        uint64_t n_f = ((uint64_t)n1 + n2) / b->fmt.align;
+        uint64_t raw_pl = abs_pos_at(b, c);
+        uint64_t pl_f = sf ? (b->looping ? raw_pl % sf : (raw_pl > sf ? sf : raw_pl)) % sf : 0u;
 
+        d = sf ? ((off_f + sf - pl_f) % sf) : 0u;
+        if (n_f > 0 && sf > 0) {
+            uint64_t end_d = d + n_f <= sf ? d + n_f : (d > sf / 2u ? d + n_f - sf : sf);
+
+            if (c + end_d > b->buffered_until) b->buffered_until = c + end_d;
+            if (b->looping && !b->primary) unlock_gen++;
+        }
         cursors(b, &pl, &wr);
-        d = (off_f + sf - (pl / b->fmt.align) % sf) % sf;
-        fle_audio_unlock_note((double)(c + d), (n1 + n2) / b->fmt.align);
+        fle_audio_unlock_note((double)(c + d), (uint32_t)n_f);
         rewrite_unread(b, (uint32_t)off_f, n1 / b->fmt.align, n2 / b->fmt.align, wf0);
     }
     ret(HR_OK);
+}
+
+uint64_t fle_audio_unlock_gen(void)
+{
+    return unlock_gen;
+}
+
+double fle_audio_slack_ms(void)
+{
+    uint64_t c;
+    unsigned bi;
+    int any = 0;
+    double min_ms = 1e9;
+
+    if (!fle_audio_external()) return 0.0;
+    if (active_play_cnt == 0) return 1e9;
+    c = fle_audio_consumed();
+    for (bi = 0; bi < bufs_hi; bi++) {
+        const ds_buf *b = bufs[bi];
+        uint32_t sf;
+        double ms;
+
+        if (!b || !b->live || !b->playing || b->primary || !b->looping) continue;
+        any = 1;
+        sf = size_frames(b);
+        if (sf < 1024u || b->buffered_until <= c) return 0.0;
+        ms = (double)(b->buffered_until - c) * 1000.0 / (double)b->fmt.rate;
+        if (ms < min_ms) min_ms = ms;
+    }
+    return any ? min_ms : 0.0;
+}
+
+/* Returns 1 when every active looping secondary buffer has at least 28 ms of unlocked audio ahead of the external consumer, or when no audio is playing under external consumer mode. */
+int fle_audio_has_slack(void)
+{
+    return fle_audio_slack_ms() >= 28.0;
 }
 
 static void restart_geometry(ds_buf *b, uint32_t pos_frames)
@@ -1181,6 +1311,8 @@ static void restart_geometry(ds_buf *b, uint32_t pos_frames)
     b->base = r->write_frames > c ? r->write_frames : c;   /* frames already handed to the output are not changed */
     b->pulled = b->base;
     b->prev_abs = pos_frames;
+    b->buffered_until = 0;
+    audio_dirty = 1;
 }
 
 /* IDirectSoundBuffer::Play(this, dwReserved1 edx, dwPriority r8d, dwFlags r9d) */
@@ -1219,7 +1351,8 @@ static void m_b_play(void)
     }
     b->looping = (flags & DSBPLAY_LOOPING) != 0;
     b->silent_until_coop = b->dev->coop == 0;
-    b->playing = 1;
+    b->gains_dirty = 1;
+    set_playing(b, 1);
     restart_geometry(b, b->cursor);
     stats.plays++;
     audio_sync();   /* the first frames are in the ring before the state says PLAYING (the consumer starts on the state) */
@@ -1297,10 +1430,10 @@ static void m_b_stop(void)
          * (Learn Stop: "sets the play cursor to the sample that follows the last sample played"). */
         at = abs_pos_at(b, b->pulled);
         b->cursor = (uint32_t)(b->looping ? at % sf : (at > sf ? sf : at));
-        b->playing = 0;
+        set_playing(b, 0);
         for (k = 0; k < b->nnotify; k++)
             if (b->notify[k].off == DSBPN_OFFSETSTOP) fle_event_host_set(b->notify[k].h);   /* Learn DSBPOSITIONNOTIFY: DSBPN_OFFSETSTOP signals when Stop is called */
-        if (play_count() == 0) fle_audio_ring_set_state(FLE_AUDIO_OPEN);
+        if (active_play_cnt == 0) fle_audio_ring_set_state(FLE_AUDIO_OPEN);
         stats.stops++;
     }
     ret(HR_OK);
@@ -1372,6 +1505,7 @@ static void m_n_setpos(void)
     free(b->notify);
     b->notify = a;
     b->nnotify = n;
+    audio_dirty = 1;
     ret(HR_OK);
 }
 

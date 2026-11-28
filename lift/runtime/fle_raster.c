@@ -308,6 +308,9 @@ static uint32_t src_color(const fle_rsurf *d, const fle_rsurf *s, int64_t x, int
  * the first one that differs. Any other call of the run (another raster operation, another format, a copy inside one surface) sets "unknown". With no begin the calls compare nothing and cost what they cost before. */
 static int ch_active, ch_unknown, ch_any;
 static int64_t ch_y0, ch_y1;
+static int df_active, df_unknown;
+static fle_rrect df_rects[FLE_R_DIFF_MAX];
+static unsigned df_n;
 
 void fle_r_changed_begin(void)
 {
@@ -329,6 +332,90 @@ int fle_r_changed(fle_rrect *r)
     return 1;
 }
 
+void fle_r_diff_begin(void)
+{
+    df_active = 1;
+    df_unknown = 0;
+    df_n = 0;
+}
+
+int fle_r_diff_end(fle_rrect *out, unsigned cap)
+{
+    int unknown = df_unknown;
+    unsigned n = df_n;
+
+    df_active = 0;
+    df_unknown = 0;
+    df_n = 0;
+    if (unknown) return -1;
+    if (n > cap) {
+        fle_rrect u = df_rects[0];
+        for (unsigned i = 1; i < n; i++) {
+            if (df_rects[i].x0 < u.x0) u.x0 = df_rects[i].x0;
+            if (df_rects[i].y0 < u.y0) u.y0 = df_rects[i].y0;
+            if (df_rects[i].x1 > u.x1) u.x1 = df_rects[i].x1;
+            if (df_rects[i].y1 > u.y1) u.y1 = df_rects[i].y1;
+        }
+        if (cap > 0) {
+            out[0] = u;
+            return 1;
+        }
+        return -1;
+    }
+    for (unsigned i = 0; i < n; i++) out[i] = df_rects[i];
+    return (int)n;
+}
+
+static void df_add_span(int64_t x0, int64_t y0, int64_t x1, int64_t y1)
+{
+    uint64_t an = (uint64_t)(x1 - x0) * (uint64_t)(y1 - y0);
+
+    for (unsigned i = 0; i < df_n; i++) {
+        fle_rrect *r = &df_rects[i];
+        int64_t ux0 = x0 < r->x0 ? x0 : r->x0;
+        int64_t uy0 = y0 < r->y0 ? y0 : r->y0;
+        int64_t ux1 = x1 > r->x1 ? x1 : r->x1;
+        int64_t uy1 = y1 > r->y1 ? y1 : r->y1;
+
+        if (x0 >= r->x0 && y0 >= r->y0 && x1 <= r->x1 && y1 <= r->y1) return;
+        if (y1 >= r->y0 - 4 && y0 <= r->y1 + 4 && x0 <= r->x1 + 32 && r->x0 <= x1 + 32) {
+            uint64_t ar = (uint64_t)(r->x1 - r->x0) * (uint64_t)(r->y1 - r->y0);
+            uint64_t au = (uint64_t)(ux1 - ux0) * (uint64_t)(uy1 - uy0);
+
+            if (ar + an <= (UINT64_MAX / 5u) && au * 4u <= (ar + an) * 5u) {
+                r->x0 = ux0; r->y0 = uy0; r->x1 = ux1; r->y1 = uy1;
+                return;
+            }
+        }
+    }
+    if (df_n < FLE_R_DIFF_MAX) {
+        df_rects[df_n++] = (fle_rrect){ x0, y0, x1, y1 };
+        return;
+    }
+    {
+        unsigned bi = 0;
+        uint64_t best = UINT64_MAX;
+
+        for (unsigned i = 0; i < df_n; i++) {
+            fle_rrect *r = &df_rects[i];
+            int64_t ux0 = x0 < r->x0 ? x0 : r->x0;
+            int64_t uy0 = y0 < r->y0 ? y0 : r->y0;
+            int64_t ux1 = x1 > r->x1 ? x1 : r->x1;
+            int64_t uy1 = y1 > r->y1 ? y1 : r->y1;
+            uint64_t grow = (uint64_t)(ux1 - ux0) * (uint64_t)(uy1 - uy0) - (uint64_t)(r->x1 - r->x0) * (uint64_t)(r->y1 - r->y0);
+
+            if (grow < best) {
+                best = grow;
+                bi = i;
+            }
+        }
+        if (x0 < df_rects[bi].x0) df_rects[bi].x0 = x0;
+        if (y0 < df_rects[bi].y0) df_rects[bi].y0 = y0;
+        if (x1 > df_rects[bi].x1) df_rects[bi].x1 = x1;
+        if (y1 > df_rects[bi].y1) df_rects[bi].y1 = y1;
+    }
+}
+
 /* rows [y0, y1) may have changed: the first row that differed up to the end of its call, or a whole later call */
 static void ch_rows(int64_t y0, int64_t y1)
 {
@@ -340,6 +427,162 @@ static void ch_rows(int64_t y0, int64_t y1)
 /* A copy with a ternary operation. The source rectangle must lie inside the source surface (the caller checks: BitBlt "only does clipping on the destination DC"). The same surface as source and destination
  * is handled like memmove: the rows (and, in a row, the columns) are visited in the direction that does not overwrite what is still to be read. The unused byte of a 32-bit pixel is copied by a plain SRCCOPY
  * between two surfaces of the same format (bytes, decision 0111) and is 0 otherwise. */
+typedef uint64_t fle_r_v2u64 __attribute__((vector_size(16), aligned(1)));
+static const uint8_t fle_r_z16[16] = { 0 };
+
+static inline __attribute__((always_inline)) int diff_vec_nz(fle_r_v2u64 d)
+{
+    return memcmp(&d, fle_r_z16, 16) != 0;
+}
+
+static inline __attribute__((always_inline)) fle_r_v2u64 diff_load_px4(const uint8_t *p, fle_r_v2u64 vm, int mask_alpha)
+{
+    fle_r_v2u64 v;
+
+    memcpy(&v, p, 16);
+    if (mask_alpha) v &= vm;
+    return v;
+}
+
+static inline __attribute__((always_inline)) void diff_store_px4(uint8_t *tp, const uint8_t *fp, fle_r_v2u64 vm, int mask_alpha)
+{
+    fle_r_v2u64 v = diff_load_px4(fp, vm, mask_alpha);
+
+    memcpy(tp, &v, 16);
+}
+
+static inline __attribute__((always_inline)) void diff_blit_row(uint8_t *to, const uint8_t *from, int64_t x0, int64_t y, int64_t cnt, int mask_alpha)
+{
+    static const uint8_t keep3d[8] = { 0xFFu, 0xFFu, 0xFFu, 0x00u, 0xFFu, 0xFFu, 0xFFu, 0x00u };
+    uint64_t m64;
+    fle_r_v2u64 vm;
+    const uint8_t *fp = from;
+    uint8_t *tp = to;
+    int64_t k = 0, span_x0 = 0, span_x1 = 0, gap = 0;
+    int span_open = 0;
+
+    memcpy(&m64, keep3d, 8);
+    vm = (fle_r_v2u64){ m64, m64 };
+
+    for (;;) {
+        if (!span_open) {
+            for (; k + 32 <= cnt; k += 32, fp += 128, tp += 128) {
+                fle_r_v2u64 o, d;
+
+                memcpy(&o, tp, 16);       d  = o ^ diff_load_px4(fp, vm, mask_alpha);
+                memcpy(&o, tp + 16, 16);  d |= o ^ diff_load_px4(fp + 16, vm, mask_alpha);
+                memcpy(&o, tp + 32, 16);  d |= o ^ diff_load_px4(fp + 32, vm, mask_alpha);
+                memcpy(&o, tp + 48, 16);  d |= o ^ diff_load_px4(fp + 48, vm, mask_alpha);
+                memcpy(&o, tp + 64, 16);  d |= o ^ diff_load_px4(fp + 64, vm, mask_alpha);
+                memcpy(&o, tp + 80, 16);  d |= o ^ diff_load_px4(fp + 80, vm, mask_alpha);
+                memcpy(&o, tp + 96, 16);  d |= o ^ diff_load_px4(fp + 96, vm, mask_alpha);
+                memcpy(&o, tp + 112, 16); d |= o ^ diff_load_px4(fp + 112, vm, mask_alpha);
+                if (__builtin_expect(diff_vec_nz(d), 0)) break;
+            }
+            for (; k + 16 <= cnt; k += 16, fp += 64, tp += 64) {
+                fle_r_v2u64 o, d;
+
+                memcpy(&o, tp, 16);      d  = o ^ diff_load_px4(fp, vm, mask_alpha);
+                memcpy(&o, tp + 16, 16); d |= o ^ diff_load_px4(fp + 16, vm, mask_alpha);
+                memcpy(&o, tp + 32, 16); d |= o ^ diff_load_px4(fp + 32, vm, mask_alpha);
+                memcpy(&o, tp + 48, 16); d |= o ^ diff_load_px4(fp + 48, vm, mask_alpha);
+                if (__builtin_expect(diff_vec_nz(d), 0)) {
+                    diff_store_px4(tp, fp, vm, mask_alpha);
+                    diff_store_px4(tp + 16, fp + 16, vm, mask_alpha);
+                    diff_store_px4(tp + 32, fp + 32, vm, mask_alpha);
+                    diff_store_px4(tp + 48, fp + 48, vm, mask_alpha);
+                    span_x0 = x0 + k;
+                    span_x1 = x0 + k + 16;
+                    span_open = 1;
+                    gap = 0;
+                    k += 16; fp += 64; tp += 64;
+                    break;
+                }
+            }
+            if (k + 16 > cnt && !span_open) break;
+        }
+        if (span_open) {
+            for (; k + 16 <= cnt; k += 16, fp += 64, tp += 64) {
+                fle_r_v2u64 o, d;
+
+                memcpy(&o, tp, 16);      d  = o ^ diff_load_px4(fp, vm, mask_alpha);
+                memcpy(&o, tp + 16, 16); d |= o ^ diff_load_px4(fp + 16, vm, mask_alpha);
+                memcpy(&o, tp + 32, 16); d |= o ^ diff_load_px4(fp + 32, vm, mask_alpha);
+                memcpy(&o, tp + 48, 16); d |= o ^ diff_load_px4(fp + 48, vm, mask_alpha);
+                if (__builtin_expect(!diff_vec_nz(d), 1)) {
+                    gap += 16;
+                    if (gap >= 128) {
+                        df_add_span(span_x0, y, span_x1, y + 1);
+                        span_open = 0;
+                        k += 16; fp += 64; tp += 64;
+                        break;
+                    }
+                } else {
+                    diff_store_px4(tp, fp, vm, mask_alpha);
+                    diff_store_px4(tp + 16, fp + 16, vm, mask_alpha);
+                    diff_store_px4(tp + 32, fp + 32, vm, mask_alpha);
+                    diff_store_px4(tp + 48, fp + 48, vm, mask_alpha);
+                    span_x1 = x0 + k + 16;
+                    gap = 0;
+                }
+            }
+            if (k + 16 > cnt) break;
+        }
+    }
+    for (; k + 4 <= cnt; k += 4, fp += 16, tp += 16) {
+        fle_r_v2u64 vv = diff_load_px4(fp, vm, mask_alpha), vo, dd;
+
+        memcpy(&vo, tp, 16);
+        dd = vo ^ vv;
+        if (!diff_vec_nz(dd)) {
+            if (span_open) {
+                gap += 4;
+                if (gap >= 128) { df_add_span(span_x0, y, span_x1, y + 1); span_open = 0; }
+            }
+        } else {
+            memcpy(tp, &vv, 16);
+            if (!span_open) { span_x0 = x0 + k; span_open = 1; }
+            span_x1 = x0 + k + 4;
+            gap = 0;
+        }
+    }
+    for (; k < cnt; k++, fp += 4, tp += 4) {
+        uint32_t v, o;
+
+        memcpy(&v, fp, 4);
+        if (mask_alpha) v &= 0x00FFFFFFu;
+        memcpy(&o, tp, 4);
+        if (o == v) {
+            if (span_open) {
+                gap++;
+                if (gap >= 128) { df_add_span(span_x0, y, span_x1, y + 1); span_open = 0; }
+            }
+        } else {
+            memcpy(tp, &v, 4);
+            if (!span_open) { span_x0 = x0 + k; span_open = 1; }
+            span_x1 = x0 + k + 1;
+            gap = 0;
+        }
+    }
+    if (span_open) df_add_span(span_x0, y, span_x1, y + 1);
+}
+
+static __attribute__((noinline)) uint64_t diff_blit_rect(const fle_rsurf *d, const fle_rsurf *s, const fle_rrect *r, int64_t dx, int64_t dy, int64_t sx, int64_t sy, int mask_alpha)
+{
+    int64_t cnt = r->x1 - r->x0, rows = r->y1 - r->y0;
+    intptr_t dstep = d->bottom_up ? -(intptr_t)d->stride : (intptr_t)d->stride;
+    intptr_t sstep = s->bottom_up ? -(intptr_t)s->stride : (intptr_t)s->stride;
+    uint8_t *to = fle_r_row(d, (uint32_t)r->y0) + (uint64_t)r->x0 * 4u;
+    const uint8_t *from = fle_r_row(s, (uint32_t)(sy + (r->y0 - dy))) + (uint64_t)(sx + (r->x0 - dx)) * 4u;
+    int64_t y = r->y0;
+
+    for (int64_t i = 0; i < rows; i++, y++, to += dstep, from += sstep) {
+        if (mask_alpha) diff_blit_row(to, from, r->x0, y, cnt, 1);
+        else diff_blit_row(to, from, r->x0, y, cnt, 0);
+    }
+    return (uint64_t)rows * (uint64_t)cnt;
+}
+
 uint64_t fle_r_blit(const fle_rsurf *d, const fle_rrect *clip, int64_t dx, int64_t dy, int64_t w, int64_t h, const fle_rsurf *s, int64_t sx, int64_t sy, uint32_t idx, uint32_t pat)
 {
     fle_rrect c = eff_clip(d, clip), r = { dx, dy, dx + w, dy + h };
@@ -354,28 +597,65 @@ uint64_t fle_r_blit(const fle_rsurf *d, const fle_rrect *clip, int64_t dx, int64
     int back = same_surface && dy == sy && dx > sx;
     uint64_t n = 0;
     int cmp;   /* decision 0245: this call compares what it writes (see fle_r_changed) */
+    int diff;
 
     fle_r_clip(&r, &c);
     if (fle_r_empty(&r)) return 0;
     cmp = ch_active && !same_surface && d->bpp == 32 && (bytes || fast);
     if (ch_active && !cmp) ch_unknown = 1;
     if (cmp && ch_any) ch_rows(r.y0, r.y1);   /* alpha2b: a row has differed already: this call is copied as before and is all "may have changed" */
+    diff = df_active && !same_surface && d->bpp == 32 && (bytes || fast);
+    if (df_active && !diff) df_unknown = 1;
+    if (diff) return diff_blit_rect(d, s, &r, dx, dy, sx, sy, bytes ? 0 : 1);
     for (int64_t i = 0; i < r.y1 - r.y0; i++) {
         int64_t y = down ? r.y1 - 1 - i : r.y0 + i;
         int64_t sy_ = sy + (y - dy);
 
         if (bytes && cmp && !ch_any) {
-            uint32_t *to = (uint32_t *)(void *)(fle_r_row(d, (uint32_t)y) + (uint64_t)r.x0 * 4u), acc = 0;
+            typedef uint32_t fle_r_v4u __attribute__((vector_size(16), aligned(1)));
+            uint8_t *to = fle_r_row(d, (uint32_t)y) + (uint64_t)r.x0 * 4u;
             const uint8_t *from = fle_r_row(s, (uint32_t)sy_) + (uint64_t)(sx + (r.x0 - dx)) * 4u;
-            int64_t cnt = r.x1 - r.x0;
+            int64_t cnt = r.x1 - r.x0, k = 0;
+            uint32_t acc = 0;
+            fle_r_v4u vacc = { 0u, 0u, 0u, 0u };
 
-            for (int64_t k = 0; k < cnt; k++) {
+            for (; k + 16 <= cnt; k += 16) {
+                const uint8_t *fp = from + (uint64_t)k * 4u;
+                uint8_t *tp = to + (uint64_t)k * 4u;
+                fle_r_v4u v0, v1, v2, v3, o0, o1, o2, o3;
+
+                memcpy(&v0, fp, 16);
+                memcpy(&v1, fp + 16, 16);
+                memcpy(&v2, fp + 32, 16);
+                memcpy(&v3, fp + 48, 16);
+                memcpy(&o0, tp, 16);
+                memcpy(&o1, tp + 16, 16);
+                memcpy(&o2, tp + 32, 16);
+                memcpy(&o3, tp + 48, 16);
+                vacc |= (o0 ^ v0) | (o1 ^ v1) | (o2 ^ v2) | (o3 ^ v3);
+                memcpy(tp, &v0, 16);
+                memcpy(tp + 16, &v1, 16);
+                memcpy(tp + 32, &v2, 16);
+                memcpy(tp + 48, &v3, 16);
+            }
+            for (; k + 4 <= cnt; k += 4) {
+                fle_r_v4u vv, vo;
+
+                memcpy(&vv, from + (uint64_t)k * 4u, 16);
+                memcpy(&vo, to + (uint64_t)k * 4u, 16);
+                vacc |= vo ^ vv;
+                memcpy(to + (uint64_t)k * 4u, &vv, 16);
+            }
+            {
+                acc = (uint32_t)(memcmp(&vacc, fle_r_z16, 16) != 0);
+            }
+            for (; k < cnt; k++) {
                 uint32_t v, o;
 
                 memcpy(&v, from + (uint64_t)k * 4u, 4);
-                memcpy(&o, to + k, 4);
+                memcpy(&o, to + (uint64_t)k * 4u, 4);
                 acc |= o ^ v;
-                memcpy(to + k, &v, 4);
+                memcpy(to + (uint64_t)k * 4u, &v, 4);
             }
             if (acc) ch_rows(y, r.y1);
             n += (uint64_t)cnt;
@@ -391,27 +671,66 @@ uint64_t fle_r_blit(const fle_rsurf *d, const fle_rrect *clip, int64_t dx, int64
             continue;
         }
         if (fast && cmp && !ch_any) {
+            typedef uint32_t fle_r_v4u __attribute__((vector_size(16), aligned(1)));
             static const uint8_t keep3c[4] = { 0xFFu, 0xFFu, 0xFFu, 0x00u };
             uint32_t m, acc = 0;
-            int64_t cnt = r.x1 - r.x0;
-            uint32_t *to = (uint32_t *)(void *)(fle_r_row(d, (uint32_t)y) + (uint64_t)r.x0 * 4u);
+            int64_t cnt = r.x1 - r.x0, k = 0;
+            uint8_t *to = fle_r_row(d, (uint32_t)y) + (uint64_t)r.x0 * 4u;
             const uint8_t *from = fle_r_row(s, (uint32_t)sy_) + (uint64_t)(sx + (r.x0 - dx)) * 4u;
+            fle_r_v4u vm, vacc = { 0u, 0u, 0u, 0u };
 
             memcpy(&m, keep3c, 4);
-            for (int64_t k = 0; k < cnt; k++) {
+            vm = (fle_r_v4u){ m, m, m, m };
+            for (; k + 16 <= cnt; k += 16) {
+                const uint8_t *fp = from + (uint64_t)k * 4u;
+                uint8_t *tp = to + (uint64_t)k * 4u;
+                fle_r_v4u v0, v1, v2, v3, o0, o1, o2, o3;
+
+                memcpy(&v0, fp, 16);
+                memcpy(&v1, fp + 16, 16);
+                memcpy(&v2, fp + 32, 16);
+                memcpy(&v3, fp + 48, 16);
+                v0 &= vm;
+                v1 &= vm;
+                v2 &= vm;
+                v3 &= vm;
+                memcpy(&o0, tp, 16);
+                memcpy(&o1, tp + 16, 16);
+                memcpy(&o2, tp + 32, 16);
+                memcpy(&o3, tp + 48, 16);
+                vacc |= (o0 ^ v0) | (o1 ^ v1) | (o2 ^ v2) | (o3 ^ v3);
+                memcpy(tp, &v0, 16);
+                memcpy(tp + 16, &v1, 16);
+                memcpy(tp + 32, &v2, 16);
+                memcpy(tp + 48, &v3, 16);
+            }
+            for (; k + 4 <= cnt; k += 4) {
+                fle_r_v4u vv, vo;
+
+                memcpy(&vv, from + (uint64_t)k * 4u, 16);
+                vv &= vm;
+                memcpy(&vo, to + (uint64_t)k * 4u, 16);
+                vacc |= vo ^ vv;
+                memcpy(to + (uint64_t)k * 4u, &vv, 16);
+            }
+            {
+                acc = (uint32_t)(memcmp(&vacc, fle_r_z16, 16) != 0);
+            }
+            for (; k < cnt; k++) {
                 uint32_t v, o;
 
                 memcpy(&v, from + (uint64_t)k * 4u, 4);
                 v &= m;
-                memcpy(&o, to + k, 4);
+                memcpy(&o, to + (uint64_t)k * 4u, 4);
                 acc |= o ^ v;
-                memcpy(to + k, &v, 4);
+                memcpy(to + (uint64_t)k * 4u, &v, 4);
             }
             if (acc) ch_rows(y, r.y1);
             n += (uint64_t)cnt;
             continue;
         }
         if (fast) {
+            typedef uint32_t fle_r_v4u __attribute__((vector_size(16), aligned(1)));
             static const uint8_t keep3[4] = { 0xFFu, 0xFFu, 0xFFu, 0x00u };
             uint32_t m, v;
             int64_t cnt = r.x1 - r.x0;
@@ -422,7 +741,35 @@ uint64_t fle_r_blit(const fle_rsurf *d, const fle_rrect *clip, int64_t dx, int64
             if (back) {
                 for (int64_t k = cnt - 1; k >= 0; k--) { memcpy(&v, from + (uint64_t)k * 4u, 4); v &= m; memcpy(to + (uint64_t)k * 4u, &v, 4); }
             } else {
-                for (int64_t k = 0; k < cnt; k++) { memcpy(&v, from + (uint64_t)k * 4u, 4); v &= m; memcpy(to + (uint64_t)k * 4u, &v, 4); }
+                fle_r_v4u vm = { m, m, m, m };
+                int64_t k = 0;
+
+                for (; k + 16 <= cnt; k += 16) {
+                    const uint8_t *fp = from + (uint64_t)k * 4u;
+                    uint8_t *tp = to + (uint64_t)k * 4u;
+                    fle_r_v4u v0, v1, v2, v3;
+
+                    memcpy(&v0, fp, 16);
+                    memcpy(&v1, fp + 16, 16);
+                    memcpy(&v2, fp + 32, 16);
+                    memcpy(&v3, fp + 48, 16);
+                    v0 &= vm;
+                    v1 &= vm;
+                    v2 &= vm;
+                    v3 &= vm;
+                    memcpy(tp, &v0, 16);
+                    memcpy(tp + 16, &v1, 16);
+                    memcpy(tp + 32, &v2, 16);
+                    memcpy(tp + 48, &v3, 16);
+                }
+                for (; k + 4 <= cnt; k += 4) {
+                    fle_r_v4u vv;
+
+                    memcpy(&vv, from + (uint64_t)k * 4u, 16);
+                    vv &= vm;
+                    memcpy(to + (uint64_t)k * 4u, &vv, 16);
+                }
+                for (; k < cnt; k++) { memcpy(&v, from + (uint64_t)k * 4u, 4); v &= m; memcpy(to + (uint64_t)k * 4u, &v, 4); }
             }
             n += (uint64_t)cnt;
             continue;

@@ -204,6 +204,43 @@ describe('IdleDriver: the engine\'s idle in wall-clock mode', () => {
     expect(r.processed).toEqual([{ n: 1, at: 1000 }]);
     expect(r.d.awaitingCount).toBe(0);
   });
+
+  it('takeAwaiting(count) consumes only the oldest count items and leaves newer inline inputs awaiting', () => {
+    const r = rig();
+    r.idle(1, 0, 0);
+    r.d.injectedInline([{ seq: 1, tPage: 1000, tInject: 1001, ev: move(1, 1) }, { seq: 2, tPage: 1001, tInject: 1001, ev: move(2, 2) }]);
+    r.d.injectedInline([{ seq: 3, tPage: 1005, tInject: 1006, ev: move(3, 3) }]);
+    expect(r.d.awaitingCount).toBe(3);
+    expect(r.d.takeAwaiting(0)).toEqual([]);
+    expect(r.d.awaitingCount).toBe(3);
+    expect(r.d.takeAwaiting(2).map((x) => x.seq)).toEqual([1, 2]);
+    expect(r.d.awaitingCount).toBe(1);
+    expect(r.d.takeAwaiting().map((x) => x.seq)).toEqual([3]);
+    expect(r.d.awaitingCount).toBe(0);
+  });
+
+  it('with maxLeadMs: 1, a +50 ms virtual-clock lead ahead of wall time is capped to 1 ms instead of stretching the wait', () => {
+    const timers: { fn: () => void; ms: number; id: number; live: boolean }[] = [];
+    let t = 1000;
+    let nextId = 1;
+    const d = new IdleDriver(
+      { mouse: () => 1, key: () => 1, clockTo: () => {} },
+      { deliver: () => true, now: () => t, setTimer: (fn, ms) => { const o = { fn: () => { o.live = false; fn(); }, ms, id: nextId++, live: true }; timers.push(o); return o; }, clearTimer: (h) => { (h as { live: boolean }).live = false; } },
+      {},
+      { maxLeadMs: 1 },
+    );
+    d.onIdle(1, 0, 10 * TICKS_PER_MS);
+    t += 10;
+    timers[0]?.fn();
+    t += 5;
+    // Virtual clock jumped +50 ms ahead of wall target while engine ran for 5 ms wall time
+    d.onIdle(2, 60 * TICKS_PER_MS, 70 * TICKS_PER_MS);
+    const live = timers.filter((x) => x.live);
+    expect(d.stats.leadCuts).toBe(1);
+    expect(d.stats.maxLeadTicks).toBeLessThanOrEqual(TICKS_PER_MS);
+    expect(live).toHaveLength(1);
+    expect(live[0]?.ms).toBeCloseTo(11, 6);
+  });
 });
 
 describe('IdleDriver: the page\'s rate of requestAnimationFrame (Issue #1402)', () => {

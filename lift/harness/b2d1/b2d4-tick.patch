@@ -11,35 +11,56 @@ index af389f3..399fde8 100644
  //! \cond INTERNAL
  //! \addtogroup blend2d_pipeline_reference
  //! \{
-@@ -47,6 +49,7 @@ struct FillBoxA_Base {
+@@ -47,19 +49,25 @@ struct FillBoxA_Base {
      BL_ASSUME(h > 0);
++    uint32_t b2d_tick_acc = 0u;
++    uint32_t b2d_row_ticks = w / 128u + 1u;
      if (CompOp::kOptimizeOpaque && msk == 255) {
        while (h) {
-+        fle_b2d_tick(w / 128u + 1u);
++        b2d_tick_acc += b2d_row_ticks;
++        if (__builtin_expect(b2d_tick_acc >= 4096u, 0)) { fle_b2d_tick(b2d_tick_acc); b2d_tick_acc = 0u; }
          compOp.rectStartX(x0);
          dstPtr = compOp.compositeCSpanOpaque(dstPtr, w);
          dstPtr += dstStride;
-@@ -56,6 +59,7 @@ struct FillBoxA_Base {
+         compOp.advanceY();
+         h--;
+       }
      }
      else {
        while (h) {
-+        fle_b2d_tick(w / 128u + 1u);
++        b2d_tick_acc += b2d_row_ticks;
++        if (__builtin_expect(b2d_tick_acc >= 4096u, 0)) { fle_b2d_tick(b2d_tick_acc); b2d_tick_acc = 0u; }
          compOp.rectStartX(x0);
          dstPtr = compOp.compositeCSpanMasked(dstPtr, w, msk);
          dstPtr += dstStride;
-@@ -86,6 +90,7 @@ struct FillMask_Base {
+         compOp.advanceY();
+         h--;
+       }
+     }
+@@ -86,5 +94,9 @@ struct FillMask_Base {
      uint32_t h = uint32_t(fillData->box.y1) - y0;
  
++    uint32_t b2d_tick_acc = 0u;
++    uint32_t b2d_row_ticks = uint32_t(fillData->box.x1) / 128u + 1u;
      for (;;) {
-+      fle_b2d_tick(uint32_t(fillData->box.x1) / 128u + 1u);
++      b2d_tick_acc += b2d_row_ticks;
++      if (__builtin_expect(b2d_tick_acc >= 4096u, 0)) { fle_b2d_tick(b2d_tick_acc); b2d_tick_acc = 0u; }
        uint32_t x1AndType = cmdPtr->_x1AndType;
        uint32_t x = cmdPtr->x0();
  
-@@ -366,6 +371,7 @@ L_Scanline_Done1:
+@@ -206,4 +218,6 @@ struct FillAnalytic_Base {
+     BLBitWord bitWord;
+     BLBitWord bitWordTmp;
++    uint32_t b2d_tick_acc = 0u;
++    uint32_t b2d_row_ticks = uint32_t(xEnd) / 128u + 1u;
+ 
+     goto L_Scanline_Init;
+@@ -366,6 +380,8 @@ L_Scanline_Done1:
        compOp.advanceY();
  
  L_Scanline_Init:
-+      fle_b2d_tick(uint32_t(xEnd) / 128u + 1u);
++      b2d_tick_acc += b2d_row_ticks;
++      if (__builtin_expect(b2d_tick_acc >= 4096u, 0)) { fle_b2d_tick(b2d_tick_acc); b2d_tick_acc = 0u; }
        xOff = 0;
        bitWord = 0;
        bitPtrEnd = PtrOps::offset(bitPtr, bitStride);

@@ -652,7 +652,7 @@ pub fn compile(data: &[u8], extra: &[u64], specs: &[fe_decode::Spec], conf: &Con
         }
     }
     let no_xplans: HashMap<u64, xabi::XPlan> = HashMap::new();
-    let dry = Ctx { c_mode, c_imp: &c_imp_dry, c_dispatch: 0, ext: &no_ext, hybrid_r: 0, sigs: &empty_sigs, fidx: &empty_idx, opts: &opts, dry: true, ui_ty, text_lo: text_lo as u32, mulhu: 0, mulhs: 0, import_sites: &import_sites, import_idx: &no_names, mx_window: c_mode && conf.hybrid_mx.is_some(), mx_slow_i64: 0, census: conf.census, hybrid_x: 0, xplans: &no_xplans, mx_addr: if conf.hybrid_mx.is_some() && c_mode { 1 } else { 0 }, mx_buf: 0, mx_hyb: 0, mx_ld: 0, mx_st: 0, x87_ld: if c_mode { 1 } else { 0 }, x87_st: if c_mode { 1 } else { 0 }, progress_addr: 0, gs_ld: if c_mode { 1 } else { 0 }, ti_helper: 0 };
+    let dry = Ctx { c_mode, c_imp: &c_imp_dry, c_dispatch: 0, ext: &no_ext, hybrid_r: 0, sigs: &empty_sigs, fidx: &empty_idx, opts: &opts, dry: true, ui_ty, text_lo: text_lo as u32, mulhu: 0, mulhs: 0, import_sites: &import_sites, import_idx: &no_names, mx_window: c_mode && conf.hybrid_mx.is_some(), mx_slow_i64: 0, census: conf.census, hybrid_x: 0, xplans: &no_xplans, mx_addr: if conf.hybrid_mx.is_some() && c_mode { 1 } else { 0 }, mx_buf: 0, mx_hyb: 0, mx_ld: if c_mode { 1 } else { 0 }, mx_st: if c_mode { 1 } else { 0 }, x87_ld: if c_mode { 1 } else { 0 }, x87_st: if c_mode { 1 } else { 0 }, progress_addr: 0, gs_ld: if c_mode { 1 } else { 0 }, ti_helper: 0, fast_ind_leaves: &[], ti_limit: 0, ti_landing: 0, ti_hook: 0, loop_slice: 0 };
     let no_skip: HashSet<u64> = HashSet::new();
     // decision 0185: a function whose dry-run wasm body exceeds the limits of the Config (bytes, locals, bytes x locals) stays on the C path
     let (lim_bytes, lim_locals, lim_cost) = (conf.max_fn_bytes, conf.max_fn_locals, conf.max_fn_cost);
@@ -843,7 +843,7 @@ pub fn compile(data: &[u8], extra: &[u64], specs: &[fe_decode::Spec], conf: &Con
             why.push("pops the stack".to_string());
         }
         match xsums.get(&k) {
-            Some(x) if x.xin != 0 || x.xw != 0 => why.push(format!("xmm in {:#06x} written {:#06x}", x.xin, x.xw)),
+            Some(x) if x.xin != 0 || (x.xw & !crate::xabi::IMP_W) != 0 => why.push(format!("xmm in {:#06x} written {:#06x}", x.xin, x.xw)),
             Some(_) => {}
             None => why.push("xmm unknown (no hybrid-x summary)".to_string()),
         }
@@ -851,6 +851,10 @@ pub fn compile(data: &[u8], extra: &[u64], specs: &[fe_decode::Spec], conf: &Con
     };
     let fit_map: HashMap<u64, Vec<String>> = if c_mode { closed.iter().map(|&k| (k, fit_why(k))).collect() } else { HashMap::new() };
     let typed_cfg: Option<(u32, u32, u32)> = conf.hybrid_dispatch.filter(|_| c_mode && conf.hybrid_progress.is_some() && conf.hybrid_x.is_some());
+    let any_loop = closed.iter().any(|k| {
+        let cfg = funs[k].cfg.as_ref().unwrap();
+        !cfg.reducible || cfg.is_header.iter().any(|&h| h)
+    });
     let mut fit: Vec<u64> = closed.iter().copied().filter(|k| fit_map.get(k).map_or(false, |w| w.is_empty())).collect();
     fit.sort();
     // a module whose lowered functions hold no indirect call gets nothing (no helper, no adapters, no table)
@@ -900,10 +904,16 @@ pub fn compile(data: &[u8], extra: &[u64], specs: &[fe_decode::Spec], conf: &Con
     let c_dispatch = if c_mode { module.import_func("c", "fle_hyb_dispatch", FuncType { params: vec![Ty::I64], results: vec![] }) } else { 0 };
     let gs_ld = if c_mode { module.import_func("c", "fle_hyb_gs_ld8", FuncType { params: vec![Ty::I64], results: vec![Ty::I64] }) } else { 0 };
     let ti_slice = if typed { module.import_func("c", "fle_hyb_slice", FuncType { params: vec![], results: vec![] }) } else { 0 };
+    let loop_slice = if typed_cfg.is_some() && any_loop {
+        module.import_func("c", "fle_hyb_loop_slice", FuncType { params: vec![], results: vec![] })
+    } else {
+        0
+    };
     let mx_cfg = if c_mode { conf.hybrid_mx } else { None };
     let (mut mx_hyb, mut mx_ld, mut mx_st) = (0, 0, 0);
-    if conf.hybrid_mx.is_some() && c_mode {
-        // MXCSR of the C path: ldmxcsr/stmxcsr and the slow path of the window go to its functions
+    let need_mx_ctl = c_mode && closed.iter().any(|k| funs[k].fun.nodes.values().any(|n| matches!(n, ir::Node::Insn(i) if matches!(i.mnemonic(), iced_x86::Mnemonic::Ldmxcsr | iced_x86::Mnemonic::Stmxcsr))));
+    if (conf.hybrid_mx.is_some() || need_mx_ctl) && c_mode {
+        // MXCSR of the C path: ldmxcsr/stmxcsr and (when enabled) the slow path of the window go to its functions
         mx_ld = module.import_func("c", "fle_mxcsr_load", FuncType { params: vec![Ty::I64], results: vec![] });
         mx_st = module.import_func("c", "fle_mxcsr_store", FuncType { params: vec![Ty::I64], results: vec![] });
         if mx_cfg.is_some() {
@@ -928,14 +938,18 @@ pub fn compile(data: &[u8], extra: &[u64], specs: &[fe_decode::Spec], conf: &Con
     }
     rep.ext = ext.len();
     // MXCSR window / x86 integer-indefinite helpers (host functions) and the global that says MXCSR is in the default state
-    let need_cvtt = closed.iter().any(|k| funs[k].fun.nodes.values().any(|n| matches!(n, ir::Node::Insn(i) if matches!(i.mnemonic(), iced_x86::Mnemonic::Cvttsd2si | iced_x86::Mnemonic::Cvttss2si))));
+    let need_cvtt = closed.iter().any(|k| funs[k].fun.nodes.values().any(|n| matches!(n, ir::Node::Insn(i) if matches!(i.mnemonic(), iced_x86::Mnemonic::Cvttsd2si | iced_x86::Mnemonic::Cvttss2si | iced_x86::Mnemonic::Cvtsd2si | iced_x86::Mnemonic::Cvtss2si))));
     let mut mx_slow_i64 = 0;
     let need_mx_helpers = (c_mode && conf.hybrid_mx.is_some()) || need_cvtt;
     // (the helpers used to be host imports; in the pilot the module is merged with the C path and has no host, so they are functions of the module: see below)
-    // globals: 0 = mx_ok (MXCSR in the state the window rule assumes), 1 = MXCSR, 2 = x87 control word
+    // globals: 0 = mx_ok (MXCSR in the state the window rule assumes), 1 = MXCSR, 2 = x87 control word, 3 = direct-wasm loop preemption countdown
     module.globals.push((1, Some("mx_ok".into())));
     module.globals.push((0x1f80, Some("mxcsr".into())));
     module.globals.push((0x27f, Some("fpucw".into())));
+    if loop_slice != 0 {
+        debug_assert_eq!(module.globals.len(), 3);
+        module.globals.push((4096, None));
+    }
     let h2 = FuncType { params: vec![Ty::I64, Ty::I64], results: vec![Ty::I64] };
     let mulhu = module.add_func(h2.clone(), mulhu_body(false));
     let mulhs = module.add_func(h2, mulhu_body(true));
@@ -983,20 +997,16 @@ pub fn compile(data: &[u8], extra: &[u64], specs: &[fe_decode::Spec], conf: &Con
         ti_k = (8 * fit.len() as u32).max(16).next_power_of_two().trailing_zeros().min(16);
         let ut_idx = module.type_index(ut_ft.clone());
         let mut c = Code::new();
-        for a in [landing, hook] {
-            c.i32_const(0);
-            c.i32_load(a);
-            c.if_();
-            c.i32_const(0);
-            c.i64_const(0);
-            c.return_();
-            c.end();
-        }
+        c.i32_const(0);
+        c.i32_load(landing);
+        c.i32_const(0);
+        c.i32_load(hook);
+        c.i32_or();
         c.local_get(6);
         c.i64_const(32);
         c.i64_shr_u();
-        c.i64_eqz();
-        c.i32_eqz();
+        c.i32_wrap_i64();
+        c.i32_or();
         c.if_();
         c.i32_const(0);
         c.i64_const(0);
@@ -1027,7 +1037,31 @@ pub fn compile(data: &[u8], extra: &[u64], specs: &[fe_decode::Spec], conf: &Con
     for (&k, &i) in &ext_idx {
         fidx.insert(k, i);
     }
-    let cx = Ctx { c_mode, c_imp: &c_imp, c_dispatch, ext: &ext_idx, hybrid_r, sigs, fidx: &fidx, opts: &opts, dry: false, ui_ty, text_lo: text_lo as u32, mulhu, mulhs, import_sites: &import_sites, import_idx: &import_idx, mx_window: c_mode && conf.hybrid_mx.is_some(), mx_slow_i64, census: false, hybrid_x: conf.hybrid_x.unwrap_or(0), xplans: &xplans, mx_addr: mx_cfg.map_or(0, |m| m.0), mx_buf: mx_cfg.map_or(0, |m| m.1), mx_hyb, mx_ld, mx_st, x87_ld, x87_st, progress_addr: conf.hybrid_progress.unwrap_or(0), gs_ld, ti_helper };
+    let (ti_limit, ti_landing, ti_hook) = if typed { typed_cfg.unwrap() } else { (0, 0, 0) };
+    let mut fast_ind_leaves: Vec<(u64, i32)> = Vec::new();
+    if typed {
+        for &k in &fit {
+            let fun = &funs[&k].fun;
+            if fun.blocks.len() == 1 && matches!(fun.blocks[0].term, ir::Term::Ret) && fun.blocks[0].insns.len() == 2 {
+                let ins = fun.insn(fun.blocks[0].insns[0]);
+                if ins.mnemonic() == iced_x86::Mnemonic::Lea
+                    && ins.op_kind(0) == iced_x86::OpKind::Register
+                    && ins.op_register(0) == iced_x86::Register::EAX
+                    && ins.op_kind(1) == iced_x86::OpKind::Memory
+                    && matches!(ins.memory_segment(), iced_x86::Register::None | iced_x86::Register::DS)
+                    && ((ins.memory_base() == iced_x86::Register::RCX && ins.memory_index() == iced_x86::Register::RCX && ins.memory_index_scale() == 1)
+                        || (ins.memory_base() == iced_x86::Register::None && ins.memory_index() == iced_x86::Register::RCX && ins.memory_index_scale() == 2))
+                {
+                    if let Ok(disp) = i32::try_from(ins.memory_displacement64() as i64) {
+                        fast_ind_leaves.push((k, disp));
+                    }
+                }
+            }
+        }
+        fast_ind_leaves.sort();
+        fast_ind_leaves.truncate(4);
+    }
+    let cx = Ctx { c_mode, c_imp: &c_imp, c_dispatch, ext: &ext_idx, hybrid_r, sigs, fidx: &fidx, opts: &opts, dry: false, ui_ty, text_lo: text_lo as u32, mulhu, mulhs, import_sites: &import_sites, import_idx: &import_idx, mx_window: c_mode && conf.hybrid_mx.is_some(), mx_slow_i64, census: false, hybrid_x: conf.hybrid_x.unwrap_or(0), xplans: &xplans, mx_addr: mx_cfg.map_or(0, |m| m.0), mx_buf: mx_cfg.map_or(0, |m| m.1), mx_hyb, mx_ld, mx_st, x87_ld, x87_st, progress_addr: conf.hybrid_progress.unwrap_or(0), gs_ld, ti_helper, fast_ind_leaves: &fast_ind_leaves, ti_limit, ti_landing, ti_hook, loop_slice };
     let mut rows: Vec<FnRow> = Vec::new();
     for &k in &closed {
         let f = &funs[&k];

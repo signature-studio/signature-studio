@@ -1,5 +1,5 @@
 -c -msimd128 -matomics -mbulk-memory -o lift/out-app/obj/b2d/b2d_swap.o
--O2
+-O3
 -std=c++17
 -fno-exceptions
 -fno-rtti

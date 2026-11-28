@@ -347,8 +347,8 @@ fn function_exports(b: &[u8]) -> Result<Vec<String>, String> {
 /// The shapes are the regular expressions of build-engine-bundle.sh: "hex", "dig" (decimal digits) or a literal in the field.
 struct Addrs {
     teb: u64,
-    mxcsr: u64,
-    hyb_buf: u64,
+    _mxcsr: u64,
+    _hyb_buf: u64,
     progress_count: u64,
     progress_limit: u64,
     landing_top: u64,
@@ -379,8 +379,8 @@ fn link_addrs(map_path: &str) -> Result<Addrs, String> {
     let get = |name: &str, shape: [&str; 3]| find_addr(&map, name, shape).ok_or_else(|| format!("an address is missing in the link map: {name}"));
     Ok(Addrs {
         teb: get("fle_teb", ["hex", "hex", "hex"])?,
-        mxcsr: get("fle_mxcsr", ["hex", "hex", "4"])?,
-        hyb_buf: get("fle_hyb_buf", ["hex", "0", "40"])?,
+        _mxcsr: get("fle_mxcsr", ["hex", "hex", "4"])?,
+        _hyb_buf: get("fle_hyb_buf", ["hex", "0", "40"])?,
         progress_count: get("fle_progress_count", ["hex", "hex", "8"])?,
         progress_limit: get("fle_progress_limit", ["hex", "hex", "dig"])?,
         landing_top: get("fle_landing_top", ["hex", "hex", "dig"])?,
@@ -545,9 +545,6 @@ fn hybrid(args: &[String]) -> Result<(), String> {
         format!("0x{:x}", a.teb),
         "--tls-ctx".into(),
         format!("0x{:x}", a.ctx_off),
-        "--hybrid-mx".into(),
-        format!("0x{:x}", a.mxcsr),
-        format!("0x{:x}", a.hyb_buf),
         "--hybrid-progress".into(),
         format!("0x{:x}", a.progress_count),
         "--hybrid-dispatch".into(),

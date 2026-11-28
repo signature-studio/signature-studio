@@ -1,1 +1,1 @@
--std=gnu11 -O2 -ffp-contract=off -fno-fast-math -sSUPPORT_LONGJMP=wasm -Ilift/runtime -msimd128 -matomics -mbulk-memory
+-std=gnu11 -O3 -ffp-contract=off -fno-fast-math -sSUPPORT_LONGJMP=wasm -Ilift/runtime -msimd128 -matomics -mbulk-memory

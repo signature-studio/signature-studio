@@ -2,7 +2,7 @@
 // GEN is the generation of the picture the engine published last; ACK is the generation the render Worker has finished reading. The engine composes only while ACK = GEN, so the picture (which only
 // fle_desk_compose writes) does not change while the render Worker reads it. Only the engine writes GEN and only the render Worker writes ACK.
 
-const GEN = 0, ACK = 1, MODE = 2;
+const GEN = 0, ACK = 1, WANT = 2, MODE = 3;
 export const DESK_CTL_BYTES = 64;
 
 /** the render Worker's presenter, once it exists: none yet, the picture with putImageData, or the scene with WebGL2 */
@@ -17,6 +17,10 @@ export class DeskGate {
   get busy(): boolean { return Atomics.load(this.ctl, ACK) !== Atomics.load(this.ctl, GEN); }
   /** the generation of the last picture published */
   get published(): number { return Atomics.load(this.ctl, GEN); }
+  /** atomic request from the render Worker so the engine Worker can compose inside scheduler points even when MessagePort tasks are delayed */
+  get want(): boolean { return Atomics.load(this.ctl, WANT) !== 0; }
+  request(): void { Atomics.store(this.ctl, WANT, 1); }
+  clearWant(): void { Atomics.store(this.ctl, WANT, 0); }
   publish(gen: number): void { Atomics.store(this.ctl, GEN, gen); }
   ack(gen: number): void { Atomics.store(this.ctl, ACK, gen); }
   /** the render Worker's presenter (PRESENTER_*): the engine composes for it only once one exists (Issue #1520) */

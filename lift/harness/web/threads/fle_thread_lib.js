@@ -21,6 +21,13 @@ addToLibrary({
     starts: 0,
     ends: 0,
     failed: null,
+    lastYield: 0,
+    ch: null,
+    pendingTo: -1,
+    pendingSp: 0,
+    nowMs() {
+      return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+    },
     handover(to, spNew) {
       const S = FleThreads;
       if (S.failed) return;
@@ -61,6 +68,17 @@ addToLibrary({
     if (S.entry) return;
     S.entry = WebAssembly.promising(wasmExports['fle_wasm_thread_entry']);
     S.started[0] = true;
+    S.lastYield = S.nowMs();
+    if (typeof MessageChannel === 'function') {
+      S.ch = new MessageChannel();
+      S.ch.port1.onmessage = () => {
+        const to = S.pendingTo, sp = S.pendingSp;
+        S.pendingTo = -1;
+        if (to >= 0) S.handover(to, sp);
+      };
+      if (typeof S.ch.port1.unref === 'function') S.ch.port1.unref();
+      if (typeof S.ch.port2.unref === 'function') S.ch.port2.unref();
+    }
     Module['fleThreadStats'] = () => ({ switches: S.switches, starts: S.starts, ends: S.ends, failed: S.failed && { idx: S.failed.idx, exit: S.failed.exit, error: S.failed.error && String(S.failed.error) } });
   },
   fle_wasm_thread_switch__deps: ['$FleThreads', '$stackRestore'],
@@ -72,7 +90,15 @@ addToLibrary({
     S.switches++;
     return new Promise((resolve) => {
       S.resume[from] = resolve;
-      queueMicrotask(() => S.handover(to, spNew));
+      const now = S.nowMs();
+      if (S.ch && S.pendingTo < 0 && now - S.lastYield >= 4) {
+        S.lastYield = now;
+        S.pendingTo = to;
+        S.pendingSp = spNew;
+        S.ch.port2.postMessage(0);
+      } else {
+        queueMicrotask(() => S.handover(to, spNew));
+      }
     });
   },
   fle_wasm_thread_slot_new__deps: ['$FleThreads'],

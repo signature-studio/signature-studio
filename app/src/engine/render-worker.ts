@@ -20,7 +20,7 @@ const log = (level: 'info' | 'warn' | 'error', text: string): void => post({ t: 
 const mark = (name: string, detail?: Record<string, unknown>): void => post({ t: 'mark', name, abs: nowAbs(), ...(detail ? { detail } : {}) });
 
 /** decision 0223 / desk2: the frame loop sleeps after this long without a change (desk-sleep.ts) */
-const DESK_SLEEP_AFTER_MS = 100;
+const DESK_SLEEP_AFTER_MS = 500;
 /** C-2: while the picture does not move, the engine is asked this often (about 8 times a second); a change the engine makes by itself shows within this time (an input is answered at once, not by this) */
 const DESK_WAKE_MS = 125;
 
@@ -47,13 +47,18 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let firstPixel = false;
 let lastReport = 0;
 const presentedAt: number[] = [];
+const displayedAt: number[] = [];
 let answers: number[] = [];
+let drewSinceFrame = false;
+let displayFrames: number | null = typeof (self as unknown as { requestAnimationFrame?: unknown }).requestAnimationFrame === 'function' ? 0 : null;
 
 function toEngine(m: RenderToEngine, transfer: Transferable[] = []): void { port?.postMessage(m, transfer); }
 
 /** asks the engine to compose; false when a question is still open */
 function ask(): boolean {
-  if (waiting || !port) return false;
+  if (!port) return false;
+  if (!waiting || (gate && !gate.busy)) gate?.request();
+  if (waiting) return false;
   waiting = true;
   toEngine({ cmd: 'want' });
   return true;
@@ -66,7 +71,19 @@ function nextFrame(): void {
 
 function frame(): void {
   if (!loopOn) return;
-  if (ask()) counters.ticks++;
+  if (drewSinceFrame) {
+    if (displayFrames !== null) displayFrames++;
+    displayedAt.push(nowAbs());
+    if (displayedAt.length > 256) displayedAt.shift();
+    drewSinceFrame = false;
+    flushDesk(false);
+  }
+  gate?.request();
+  if (!waiting) {
+    waiting = true;
+    counters.ticks++;
+    toEngine({ cmd: 'want' });
+  }
   if (quiet.sleepAfterFrame(performance.now())) { loopOn = false; sleepPoll(); return; }
   nextFrame();
 }
@@ -155,6 +172,7 @@ function onFrame(f: Extract<EngineToRender, { t: 'frame' }>): void {
     if (f.changed && presenter && memory) {
       const shown = presenter.present();
       if (shown > 0) {
+        drewSinceFrame = true;
         presentedAt.push(nowAbs());
         if (!firstPixel) { firstPixel = true; mark('first_pixel', { source: 'desktop', width: canvas?.width, height: canvas?.height }); }
         if (f.answers) answers.push(...f.answers);
@@ -164,7 +182,7 @@ function onFrame(f: Extract<EngineToRender, { t: 'frame' }>): void {
   } catch (e) {
     log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`);
   } finally {
-    gate?.ack(f.gen);
+    if (f.changed) gate?.ack(f.gen);
   }
   if (answers.length > 0 && presentedAt.length > 0) flushDesk(true, answers.splice(0));
   else flushDesk(false);
@@ -175,9 +193,10 @@ function flushDesk(force: boolean, answerList?: number[]): void {
   if (!presenter) return;
   const now = performance.now();
   if (!force && now - lastReport < 100) return;
-  if (presentedAt.length === 0 && !force && now - lastReport < 1000) return;
+  if (presentedAt.length === 0 && displayedAt.length === 0 && !force && now - lastReport < 1000) return;
   lastReport = now;
-  post({ t: 'desk', stats: { ...presenter.stats, composeMs: presenter.stats.composeMs + counters.engineComposeMs, ringReads: counters.ringReads, ringFull: 0, wakes: counters.wakes, ticks: counters.ticks, idleTicks: counters.idleTicks, sleeps: quiet.sleeps }, at: presentedAt.splice(0, 64), ...(answerList && answerList.length > 0 ? { answers: answerList } : {}), nWindows: 0 });
+  const displayBatch = displayedAt.length > 0 ? displayedAt.splice(0) : undefined;
+  post({ t: 'desk', stats: { ...presenter.stats, composeMs: presenter.stats.composeMs + counters.engineComposeMs, ringReads: counters.ringReads, ringFull: 0, wakes: counters.wakes, ticks: counters.ticks, idleTicks: counters.idleTicks, sleeps: quiet.sleeps, displayFrames }, at: presentedAt.splice(0, 64), ...(displayBatch ? { displayAt: displayBatch } : {}), ...(answerList && answerList.length > 0 ? { answers: answerList } : {}), nWindows: 0 });
 }
 
 async function readback(key: string): Promise<void> {

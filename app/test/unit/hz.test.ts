@@ -31,15 +31,15 @@ describe('the engine environment (decision 0182)', () => {
 });
 
 describe('the display rate: rounding a measured rate to the nearest standard rate (S-hz-standard, S-hz-round)', () => {
-  it('the standard list is the one in the decision (Issue #1402: 30 added at the low end)', () => { expect(STANDARD_HZ).toEqual([30, 60, 75, 90, 120]); });
+  it('the standard list spans 30 Hz (Issue #1402) through 300 Hz', () => { expect(STANDARD_HZ).toEqual([30, 60, 75, 90, 120, 144, 165, 180, 240, 300]); });
   it.each([
-    [60, 60], [59.94, 60], [61, 60], [75, 75], [74.9, 75], [90, 90], [100, 90], [119.88, 120], [120, 120], [143.9, 120], [144, 120], [165, 120], [239.76, 120], [240, 120],
-    [30, 30], [29.9, 30], [31, 30], [24, 30], [48, 60], [50, 60], [360, 120], [1000, 120],
-    [67, 60], [68, 75], [82, 75], [83, 90], [103, 90], [105, 120], [131, 120], [132, 120], [154, 120], [155, 120], [198, 120], [201, 120],
+    [60, 60], [59.94, 60], [61, 60], [75, 75], [74.9, 75], [90, 90], [100, 90], [119.88, 120], [120, 120], [143.9, 144], [144, 144], [165, 165], [180, 180], [239.76, 240], [240, 240],
+    [30, 30], [29.9, 30], [31, 30], [24, 30], [48, 60], [50, 60], [300, 300], [360, 300], [1000, 300],
+    [67, 60], [68, 75], [82, 75], [83, 90], [103, 90], [105, 120], [131, 120], [132, 144], [154, 144], [155, 165], [172, 165], [173, 180], [207, 180], [208, 240], [268, 240], [269, 300],
   ])('%f Hz -> %i', (m, want) => { expect(roundToStandardHz(m)).toBe(want); });
-  it('decision 0268: no measured rate gives more than 120, and every rate above 120 gives exactly 120', () => {
-    for (let m = 1; m <= 2000; m += 0.5) expect(roundToStandardHz(m)).toBeLessThanOrEqual(120);
-    for (const m of [120.5, 121, 131, 144, 165, 180, 240, 360, 500, 1000]) expect(roundToStandardHz(m)).toBe(120);
+  it('no measured rate gives more than 300, and every rate at or above 300 gives 300', () => {
+    for (let m = 1; m <= 2000; m += 0.5) expect(roundToStandardHz(m)).toBeLessThanOrEqual(300);
+    for (const m of [300, 360, 500, 1000]) expect(roundToStandardHz(m)).toBe(300);
   });
   it('nonsense is the default', () => {
     expect(roundToStandardHz(0)).toBe(HZ_DEFAULT);
@@ -50,7 +50,7 @@ describe('the display rate: rounding a measured rate to the nearest standard rat
 });
 
 describe('measureFrameRate (a fake frame clock)', () => {
-  it.each([[1000 / 60, 60], [1000 / 120, 120], [1000 / 144, 120], [1000 / 165, 120], [1000 / 75, 75], [1000 / 240, 120], [1000 / 30, 30]])('steady frames %f ms -> %i Hz', async (iv, want) => {
+  it.each([[1000 / 60, 60], [1000 / 120, 120], [1000 / 144, 144], [1000 / 165, 165], [1000 / 75, 75], [1000 / 180, 180], [1000 / 240, 240], [1000 / 300, 300], [1000 / 30, 30]])('steady frames %f ms -> %i Hz', async (iv, want) => {
     const f = fakeHost(() => iv);
     const p = measureFrameRate(f.host);
     run(f.host);
@@ -67,7 +67,7 @@ describe('measureFrameRate (a fake frame clock)', () => {
     const b = fakeHost(() => 1000 / 240); const pb = measureFrameRate(b.host); run(b.host); const mb = await pb;
     expect(ma.intervals).toBeGreaterThanOrEqual(29); expect(ma.intervals).toBeLessThanOrEqual(32);
     expect(mb.intervals).toBeGreaterThanOrEqual(119); expect(mb.intervals).toBeLessThanOrEqual(122);
-    expect(ma.hz).toBe(60); expect(mb.hz).toBe(120); // 240 Hz is measured (the window needs its 120 intervals) and 120 is what the engine gets (decision 0268)
+    expect(ma.hz).toBe(60); expect(mb.hz).toBe(240);
   });
   it('late frames of the page\'s start-up do not move the answer (median): every 7th frame is 5x late, the first intervals are slow', async () => {
     const f = fakeHost((i) => (i < 5 ? 80 : i % 7 === 0 ? 5 * (1000 / 120) : 1000 / 120));
@@ -75,13 +75,13 @@ describe('measureFrameRate (a fake frame clock)', () => {
     run(f.host);
     expect((await p).hz).toBe(120);
   });
-  it('jitter of +-15% around 144 Hz is still the top rate, 120 (decision 0268)', async () => {
+  it('jitter around 144 Hz selects 144', async () => {
     let s = 7;
     const rnd = (): number => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
-    const f = fakeHost(() => (1000 / 144) * (0.85 + 0.3 * rnd()));
+    const f = fakeHost(() => (1000 / 144) * (0.95 + 0.1 * rnd()));
     const p = measureFrameRate(f.host);
     run(f.host);
-    expect((await p).hz).toBe(120);
+    expect((await p).hz).toBe(144);
   });
   it('a browser that stops animation frames (a hidden tab) gives the default after the give-up time, and says so', async () => {
     const f = fakeHost(() => 1000 / 60, 3);

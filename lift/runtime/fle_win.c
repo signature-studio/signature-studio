@@ -991,6 +991,23 @@ static void invalid_window(void)
  * "specifies the result of the message processing; it depends on the message sent". HWND_BROADCAST (0xFFFF) is defined by the page (all
  * top-level windows): not modelled, stops. A window of this table gets the message through fle_call_guest and the result is the whole
  * 64 bits of the procedure's return value. An hWnd that is not a live window of this table (NULL included): 0 and last error 1400. */
+static uint64_t g_action_sweep_ms;
+static uint64_t g_action_sweep_gen = 1;
+static uint64_t g_action_allowed_gen;
+static int g_action_dirty = 1;
+
+static void action_note_msg(uint32_t msg)
+{
+    g_action_sweep_gen++;
+    if (msg == 0x0006u || msg == 0x0007u || msg == 0x001Cu ||
+        (msg >= 0x0100u && msg <= 0x0108u) ||
+        msg == 0x0111u || msg == 0x0112u ||
+        (msg >= 0x0201u && msg <= 0x020Eu) ||
+        msg == 0x0215u) {
+        g_action_dirty = 1;
+    }
+}
+
 void fle_imp_SendMessageW(void)
 {
     static const char api[] = "SendMessageW";
@@ -1021,6 +1038,21 @@ void fle_imp_SendMessageW(void)
         fle_thread_wait_sent(api, &sm, tab[i].owner);
         R[0] = sm.result;
         return;
+    }
+    /* Gate redundant CM_ACTIONUPDATE (0xB03F) sweeps during uninterrupted playback or 1000Hz cursor motion: run immediately on state-changing messages, else at most once per 200 ms. */
+    if (msg == 0xB03Fu) {
+        if (g_action_allowed_gen != g_action_sweep_gen) {
+            uint64_t now_ms = clk_now() / FLE_TICKS_PER_MS;
+            if (!g_action_dirty && g_action_sweep_ms != 0 && now_ms >= g_action_sweep_ms && (now_ms - g_action_sweep_ms) < 200u) {
+                R[0] = 0;
+                return;
+            }
+            g_action_allowed_gen = g_action_sweep_gen;
+            g_action_sweep_ms = now_ms;
+            g_action_dirty = 0;
+        }
+    } else if (msg == 0x0006u || msg == 0x0007u || msg == 0x0111u || msg == 0x0112u) {
+        action_note_msg(msg);
     }
     callwndproc_hooks(i, h, msg, wp, lp);
     R[0] = call_wndproc(api, tab[i].wndproc, h, msg, wp, lp);
@@ -2072,6 +2104,7 @@ void fle_imp_GetMessageW(void)
         if (pos >= 0) {
             fle_tmsg m = fle_thread_queue_remove(q, pos);
 
+            action_note_msg(m.msg);
             fill_msg(pmsg, &m);
             q->changebits = 0;
             R[0] = 1;
@@ -2083,6 +2116,7 @@ void fle_imp_GetMessageW(void)
             fle_tmsg sm;
 
             if (fle_win_synth_message(fle_thread_current(), fh, fmin, fmax, 1, 0xFFFFu, &sm)) {
+                action_note_msg(sm.msg);
                 fill_msg(pmsg, &sm);
                 q->changebits = 0;
                 R[0] = 1;
@@ -2095,6 +2129,7 @@ void fle_imp_GetMessageW(void)
             memset(&m, 0, sizeof m);
             m.msg = FLE_WM_QUIT_ID;
             m.wp = (uint64_t)(int64_t)q->quit_code;
+            action_note_msg(m.msg);
             fill_msg(pmsg, &m);
             q->quit = 0;
             q->changebits = 0;
@@ -2147,6 +2182,7 @@ void fle_imp_PeekMessageW(void)
     if (pos >= 0) {
         fle_tmsg m = (rm & FLE_PM_REMOVE) ? fle_thread_queue_remove(q, pos) : q->q[(q->head + (uint32_t)pos) % q->cap];
 
+        action_note_msg(m.msg);
         fill_msg(pmsg, &m);
         q->changebits = 0;
         R[0] = 1;
@@ -2156,6 +2192,7 @@ void fle_imp_PeekMessageW(void)
         fle_tmsg sm;
 
         if (fle_win_synth_message(fle_thread_current(), fh, fmin, fmax, (rm & FLE_PM_REMOVE) != 0, qs, &sm)) {
+            action_note_msg(sm.msg);
             fill_msg(pmsg, &sm);
             q->changebits = 0;
             R[0] = 1;
@@ -2168,6 +2205,7 @@ void fle_imp_PeekMessageW(void)
         memset(&m, 0, sizeof m);
         m.msg = FLE_WM_QUIT_ID;
         m.wp = (uint64_t)(int64_t)q->quit_code;
+        action_note_msg(m.msg);
         fill_msg(pmsg, &m);
         if (rm & FLE_PM_REMOVE) q->quit = 0;
         q->changebits = 0;
@@ -2201,6 +2239,7 @@ void fle_imp_WaitMessage(void)
         }
         fle_thread_wait_message(api, 2, 0, 0, 0);
     }
+    g_action_sweep_gen++;
     q->changebits = 0;
     R[0] = 1;
 }
@@ -3465,15 +3504,45 @@ static void unc_invalidate(int64_t w, const fle_visrgn *nv, int32_t rx, int32_t 
     upd_invalidate(w, (int32_t)l, (int32_t)t, (int32_t)r, (int32_t)bt, 1);
 }
 
-/* The bits: the old visible region of the window (with its children), moved by (dx, dy), intersected with the new one; the rows are gathered first and then written, so that the source and destination may overlap. */
+/* Copies the region `c` (destination, surface coordinates) from its place moved by (-dx, -dy), in place. The rows are walked against the move (bottom up when dy > 0; with dy = 0, the spans of a row against dx), so that no row or
+ * span is read after it has been written; a span that overlaps itself is moved with memmove. The same bits as gathering everything first and then writing. */
+static void unc_move_rows(const char *api, const fle_rsurf *surf, const fle_visrgn *c, int64_t dx, int64_t dy, uint32_t bpp)
+{
+    uint32_t idx[FLE_VISRGN_MAX], k, j, n = c->n;
+    fle_rrect b;
+    int64_t y, y0, y1, step;
+
+    if (!n) return;
+    for (k = 0; k < n; k++) idx[k] = k;
+    for (k = 1; k < n; k++) {   /* by x0, against dx */
+        uint32_t t = idx[k];
+
+        for (j = k; j > 0 && (dx > 0 ? c->r[idx[j - 1]].x0 < c->r[t].x0 : c->r[idx[j - 1]].x0 > c->r[t].x0); j--) idx[j] = idx[j - 1];
+        idx[j] = t;
+    }
+    b = fle_visrgn_bounds(c);
+    if (dy > 0) { y0 = b.y1 - 1; y1 = b.y0 - 1; step = -1; } else { y0 = b.y0; y1 = b.y1; step = 1; }
+    for (y = y0; y != y1; y += step) {
+        uint8_t *drow = NULL;
+        const uint8_t *srow = NULL;
+
+        for (k = 0; k < n; k++) {
+            const fle_rrect *r = &c->r[idx[k]];
+
+            if (y < r->y0 || y >= r->y1) continue;
+            if (!drow) { drow = fle_r_row(surf, (uint32_t)y); srow = fle_r_row(surf, (uint32_t)(y - dy)); }
+            memmove(drow + (size_t)r->x0 * bpp, srow + (size_t)(r->x0 - dx) * bpp, (size_t)(r->x1 - r->x0) * bpp);
+        }
+    }
+    for (k = 0; k < n; k++) fle_raster_wrote(surf, c->r[k], api);
+}
+
+/* The bits: the old visible region of the window (with its children), moved by (dx, dy), intersected with the new one; moved in place (unc_move_rows). */
 static void unc_copy_bits(const char *api, unc_snap *sn, const unc_item *subj, int64_t dx, int64_t dy, fle_visrgn *copied)
 {
     fle_visrgn c1;
     const fle_rsurf *surf;
-    uint32_t k, bpp;
-    uint8_t *buf = NULL, *p;
-    size_t total = 0;
-    fle_rrect *rr;
+    uint32_t bpp;
 
     copied->n = 0;
     if (!fle_raster_surface_peek || !fle_raster_wrote || !fle_r_row || !fle_r_direct) return;
@@ -3498,31 +3567,7 @@ static void unc_copy_bits(const char *api, unc_snap *sn, const unc_item *subj, i
             fle_visrgn_intersect(copied, &s2);
         }
     }
-    rr = copied->r;
-    for (k = 0; k < copied->n; k++) total += (size_t)(rr[k].x1 - rr[k].x0) * (size_t)(rr[k].y1 - rr[k].y0) * bpp;
-    if (!total) { copied->n = 0; return; }
-    buf = (uint8_t *)malloc(total);
-    if (!buf) { copied->n = 0; return; }
-    p = buf;
-    for (k = 0; k < copied->n; k++) {
-        int64_t y, w = rr[k].x1 - rr[k].x0;
-
-        for (y = rr[k].y0; y < rr[k].y1; y++) {
-            memcpy(p, fle_r_row(surf, (uint32_t)(y - dy)) + (size_t)(rr[k].x0 - dx) * bpp, (size_t)w * bpp);
-            p += (size_t)w * bpp;
-        }
-    }
-    p = buf;
-    for (k = 0; k < copied->n; k++) {
-        int64_t y, w = rr[k].x1 - rr[k].x0;
-
-        for (y = rr[k].y0; y < rr[k].y1; y++) {
-            memcpy(fle_r_row(surf, (uint32_t)y) + (size_t)rr[k].x0 * bpp, p, (size_t)w * bpp);
-            p += (size_t)w * bpp;
-        }
-        fle_raster_wrote(surf, rr[k], api);
-    }
-    free(buf);
+    unc_move_rows(api, surf, copied, dx, dy, bpp);
 }
 
 /* A snapshot that is not complete (more windows touch the changed rectangle than a snapshot holds, or a visible region needs more rectangles than a fle_visrgn keeps) cannot say which part of which window the change uncovered. The
@@ -3923,9 +3968,7 @@ static void scroll_copy_region(const char *api, int64_t root, const fle_visrgn *
 {
     const fle_rsurf *surf;
     fle_visrgn c = *d, s2;
-    uint32_t k, bpp;
-    uint8_t *buf, *p;
-    size_t total = 0;
+    uint32_t bpp;
     fle_rrect sb;
 
     if (!fle_raster_surface_peek || !fle_raster_wrote || !fle_r_row || !fle_r_direct) return;
@@ -3940,30 +3983,7 @@ static void scroll_copy_region(const char *api, int64_t root, const fle_visrgn *
     fle_visrgn_intersect_rect(&s2, sb);
     unc_translate(&s2, dx, dy);
     fle_visrgn_intersect(&c, &s2);
-    for (k = 0; k < c.n; k++) total += (size_t)(c.r[k].x1 - c.r[k].x0) * (size_t)(c.r[k].y1 - c.r[k].y0) * bpp;
-    if (!total) return;
-    buf = (uint8_t *)malloc(total);
-    if (!buf) return;
-    p = buf;
-    for (k = 0; k < c.n; k++) {   /* gather first, then write: the source and destination may overlap */
-        int64_t y, w = c.r[k].x1 - c.r[k].x0;
-
-        for (y = c.r[k].y0; y < c.r[k].y1; y++) {
-            memcpy(p, fle_r_row(surf, (uint32_t)(y - dy)) + (size_t)(c.r[k].x0 - dx) * bpp, (size_t)w * bpp);
-            p += (size_t)w * bpp;
-        }
-    }
-    p = buf;
-    for (k = 0; k < c.n; k++) {
-        int64_t y, w = c.r[k].x1 - c.r[k].x0;
-
-        for (y = c.r[k].y0; y < c.r[k].y1; y++) {
-            memcpy(fle_r_row(surf, (uint32_t)y) + (size_t)c.r[k].x0 * bpp, p, (size_t)w * bpp);
-            p += (size_t)w * bpp;
-        }
-        fle_raster_wrote(surf, c.r[k], api);
-    }
-    free(buf);
+    unc_move_rows(api, surf, &c, dx, dy, bpp);
 }
 
 /* the bounding rectangle of `v` in the client coordinates of the window whose client origin is (cx0, cy0) in surface coordinates; 0 when v is empty */
@@ -5528,6 +5548,7 @@ typedef struct {
 } wtimer;
 
 static wtimer timers[MAX_TIMERS];
+static unsigned timer_hi;
 /* Decision 0136: the WM_TIMER log (the G3 record: the virtual time of each delivery of each window timer). */
 #define TIMER_LOG_MAX 8192u
 static fle_timer_log_t timer_log[TIMER_LOG_MAX];
@@ -5576,7 +5597,7 @@ uint32_t fle_win_timer_live_count(void)
     unsigned k;
     uint32_t n = 0;
 
-    for (k = 0; k < MAX_TIMERS; k++)
+    for (k = 0; k < timer_hi; k++)
         if (timers[k].used && !(timers[k].win >= 0 && !tab[timers[k].win].live)) n++;
     return n;
 }
@@ -5586,7 +5607,7 @@ uint64_t fle_win_timer_max_period_ms(void)
     unsigned k;
     uint64_t best = 0;
 
-    for (k = 0; k < MAX_TIMERS; k++) {
+    for (k = 0; k < timer_hi; k++) {
         if (!timers[k].used || (timers[k].win >= 0 && !tab[timers[k].win].live)) continue;
         if (timers[k].period_ms > best) best = timers[k].period_ms;
     }
@@ -5598,7 +5619,7 @@ uint64_t fle_win_next_timer_tick(unsigned idx)
     unsigned k;
     uint64_t best = 0;
 
-    for (k = 0; k < MAX_TIMERS; k++) {
+    for (k = 0; k < timer_hi; k++) {
         if (!timers[k].used || timers[k].thread != idx) continue;
         if (timers[k].win >= 0 && !tab[timers[k].win].live) continue;
         if (best == 0 || timers[k].deadline < best) best = timers[k].deadline;
@@ -5635,7 +5656,7 @@ void fle_imp_SetTimer(void)
     }
     if (el < USER_TIMER_MINIMUM_) el = USER_TIMER_MINIMUM_;
     if (el > USER_TIMER_MAXIMUM_) el = USER_TIMER_MAXIMUM_;
-    for (k = 0; k < MAX_TIMERS; k++) {
+    for (k = 0; k < timer_hi; k++) {
         if (timers[k].used && timers[k].thread == t && timers[k].win == w && (w >= 0 || timers[k].id == id) && timers[k].id == (w >= 0 ? id : timers[k].id) && (w >= 0 ? 1 : id != 0)) {
             slot = k;
             break;
@@ -5659,6 +5680,7 @@ void fle_imp_SetTimer(void)
         fle_stop(api, "hWnd is not NULL and nIDEvent is 0: the page says the identifier is nonzero and gives no behaviour for 0");
     }
     timers[slot].used = 1;
+    if (slot + 1u > timer_hi) timer_hi = slot + 1u;
     timers[slot].win = w;
     timers[slot].thread = t;
     timers[slot].period_ms = el;
@@ -5686,9 +5708,10 @@ void fle_imp_KillTimer(void)
             return;
         }
     }
-    for (k = 0; k < MAX_TIMERS; k++) {
+    for (k = 0; k < timer_hi; k++) {
         if (timers[k].used && timers[k].win == w && timers[k].id == id && (w >= 0 || timers[k].thread == t)) {
             timers[k].used = 0;
+            while (timer_hi > 0u && !timers[timer_hi - 1u].used) timer_hi--;
             R[0] = 1;
             return;
         }
@@ -5702,8 +5725,9 @@ static void timers_of_window_gone(int64_t w)
 {
     unsigned k;
 
-    for (k = 0; k < MAX_TIMERS; k++)
+    for (k = 0; k < timer_hi; k++)
         if (timers[k].used && timers[k].win == w) timers[k].used = 0;
+    while (timer_hi > 0u && !timers[timer_hi - 1u].used) timer_hi--;
 }
 
 /* The window of thread `t` that has a non-empty update region and is visible and not iconic, first in z-order from the top among the top-level windows and then their children... a window with an update region of the thread:
@@ -5775,7 +5799,7 @@ int fle_win_synth_message(unsigned t, uint64_t fh, uint32_t fmin, uint32_t fmax,
     if ((qs & FLE_QS_TIMER) && FLE_WM_TIMER >= fmin && FLE_WM_TIMER <= fmax) {
         wtimer *best = NULL;
 
-        for (k = 0; k < MAX_TIMERS; k++) {
+        for (k = 0; k < timer_hi; k++) {
             wtimer *tm = &timers[k];
 
             if (!tm->used || tm->thread != t || tm->deadline > now) continue;
@@ -7676,7 +7700,7 @@ int fle_win_host_timer(uint64_t hwnd, uint64_t id, uint32_t ms)
 
     if (w < 0 || id == 0) return 0;
     if (ms < USER_TIMER_MINIMUM_) ms = USER_TIMER_MINIMUM_;
-    for (k = 0; k < MAX_TIMERS; k++)
+    for (k = 0; k < timer_hi; k++)
         if (timers[k].used && timers[k].win == w && timers[k].id == id) {
             slot = k;
             break;
@@ -7689,6 +7713,7 @@ int fle_win_host_timer(uint64_t hwnd, uint64_t id, uint32_t ms)
             }
     if (slot == MAX_TIMERS) return 0;
     timers[slot].used = 1;
+    if (slot + 1u > timer_hi) timer_hi = slot + 1u;
     timers[slot].win = w;
     timers[slot].thread = tab[w].owner;
     timers[slot].id = id;

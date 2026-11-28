@@ -1,4 +1,4 @@
--Oz
+-O2
 -g
 --enable-bulk-memory
 --enable-exception-handling

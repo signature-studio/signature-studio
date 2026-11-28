@@ -59,7 +59,14 @@ int fle_audio_next_tick(uint64_t *out) __attribute__((weak));
 int fle_audio_paced(void) __attribute__((weak));
 /* Decision 0139: told at every switch (the thread that gives up the processor, the thread that gets it): the browser build measures how long each thread ran between two switches (the mixer's block, the UI thread's frame). Weak. */
 void fle_audio_switch_note(unsigned from, unsigned to) __attribute__((weak));
+void fle_audio_idle_begin(unsigned from) __attribute__((weak));
+void fle_audio_idle_note(void) __attribute__((weak));
+int fle_audio_has_slack(void) __attribute__((weak));
+double fle_audio_slack_ms(void) __attribute__((weak));
+uint64_t fle_audio_unlock_gen(void) __attribute__((weak));
+double fle_audio_now_ms(void) __attribute__((weak));
 int fle_audio_wait_until(uint64_t dl) __attribute__((weak));
+void fle_host_on_idle(void) __attribute__((weak));
 /* Decision 0128 (PROVISIONAL, G3), changed by decision 0136: the idle of the embedding host. Provided by harness/fruity_idle.c (wasm) or harness/fruity_g3.c (native) (weak here: a link without it keeps the stop or
  * the clock jump). Called by schedule() when the first thread waits for input with an empty queue and no other thread can run, and the idle STOP of decision 0122 is off (FLE_FRUITY_NO_IDLE_STOP=1). `now` is the
  * virtual clock and `next` the earliest deadline of any waiting thread or window timer (0 = none), in ticks. The host runs while the engine is idle (in a browser: the Worker's event loop turns) and answers:
@@ -129,6 +136,7 @@ typedef struct {
     int state;
     uint32_t suspend;
     int started, closed;
+    uint8_t is_dwm;
     uint64_t start, param;
     void (*nbody)(uint64_t); /* decision 0171: a thread made by fle_thread_spawn runs this C function (and the guest code it calls) instead of the guest function `start` */
     uint64_t narg;
@@ -154,6 +162,7 @@ static thr T[FLE_THREAD_MAX];
 static unsigned nthr, cur;
 static uint64_t next_hser = 2, done_clock;   /* decision 0196: serial 1 is the first thread's, which is never issued: the serial of table index i was i + 1 */
 static uint64_t wait_seq;
+static unsigned wait_cnt_total, wait_cnt_cs, wait_cnt_obj;
 static int idle_stop, trace_on;
 static int hook_registered;
 static thr *pending_free;
@@ -385,6 +394,20 @@ static int msg_ready(const thr *t)
     return q->quit || fle_thread_queue_find(q, t->w.fhwnd, t->w.fmin, t->w.fmax) >= 0;
 }
 
+static void wait_count_add(int kind)
+{
+    wait_cnt_total++;
+    if (kind == W_CS) wait_cnt_cs++;
+    else if (kind == W_OBJECTS) wait_cnt_obj++;
+}
+
+static void wait_count_sub(int kind)
+{
+    wait_cnt_total--;
+    if (kind == W_CS) wait_cnt_cs--;
+    else if (kind == W_OBJECTS) wait_cnt_obj--;
+}
+
 /* Tests the wait of thread t; when satisfied the thread becomes READY. */
 static int try_wake(thr *t)
 {
@@ -425,6 +448,7 @@ static int try_wake(thr *t)
         break;
     }
     if (ok) {
+        wait_count_sub(t->w.kind);
         t->state = T_READY;
         t->w.kind = W_NONE;
     }
@@ -434,28 +458,75 @@ static int try_wake(thr *t)
 /* The waiting threads are tested in the order in which they began to wait, so that one SetEvent of an auto-reset event goes to the one that waited first. */
 static void poll_waiters(void)
 {
-    uint64_t last = 0;
+    thr *wlist[FLE_THREAD_MAX];
+    unsigned i, j, nw = 0;
 
     if (fle_audio_poll) fle_audio_poll();   /* decision 0139: the device signals the notification events that the virtual clock has reached, before any wait is tested */
-    for (;;) {
-        thr *nx = NULL;
-        unsigned i;
+    if (wait_cnt_total == 0) return;
+    for (i = 0; i < nthr; i++) {
+        thr *t = &T[i];
 
-        for (i = 0; i < nthr; i++) {
-            thr *t = &T[i];
-
-            if (t->state != T_WAITING || t->w.seq <= last) continue;
-            if (!nx || t->w.seq < nx->w.seq) nx = t;
+        if (t->state != T_WAITING) continue;
+        j = nw++;
+        while (j > 0 && wlist[j - 1u]->w.seq > t->w.seq) {
+            wlist[j] = wlist[j - 1u];
+            j--;
         }
-        if (!nx) return;
-        last = nx->w.seq;
-        try_wake(nx);
+        wlist[j] = t;
     }
+    for (i = 0; i < nw; i++) try_wake(wlist[i]);
 }
 
 void fle_thread_wake_check(void)
 {
-    if (nthr > 1) poll_waiters();
+    if (nthr > 1 && wait_cnt_total > 0) poll_waiters();
+}
+
+void fle_thread_wake_cs(uint64_t addr)
+{
+    thr *wlist[FLE_THREAD_MAX];
+    unsigned i, j, nw = 0;
+
+    if (nthr < 2 || wait_cnt_cs == 0) return;
+    for (i = 0; i < nthr; i++) {
+        thr *t = &T[i];
+
+        if (t->state != T_WAITING || t->w.kind != W_CS || t->w.cs_addr != addr) continue;
+        j = nw++;
+        while (j > 0 && wlist[j - 1u]->w.seq > t->w.seq) {
+            wlist[j] = wlist[j - 1u];
+            j--;
+        }
+        wlist[j] = t;
+    }
+    for (i = 0; i < nw; i++)
+        if (try_wake(wlist[i])) break;
+}
+
+void fle_thread_wake_event(uint64_t h)
+{
+    thr *wlist[FLE_THREAD_MAX];
+    unsigned i, j, nw = 0;
+
+    if (nthr < 2 || wait_cnt_obj == 0) return;
+    for (i = 0; i < nthr; i++) {
+        thr *t = &T[i];
+        uint32_t k;
+        int match = 0;
+
+        if (t->state != T_WAITING || t->w.kind != W_OBJECTS) continue;
+        for (k = 0; k < t->w.n; k++) {
+            if (t->w.h[k] == h) { match = 1; break; }
+        }
+        if (!match) continue;
+        j = nw++;
+        while (j > 0 && wlist[j - 1u]->w.seq > t->w.seq) {
+            wlist[j] = wlist[j - 1u];
+            j--;
+        }
+        wlist[j] = t;
+    }
+    for (i = 0; i < nw; i++) try_wake(wlist[i]);
 }
 
 /* ---- the switch ---- */
@@ -514,9 +585,12 @@ static int32_t prio_of(unsigned i)
     return T[i].ps.prio;
 }
 
+static int is_ui_thread(unsigned i) { return i == 0 || T[i].is_dwm; }
+static int is_ui_turn_eligible(unsigned i) { return is_ui_thread(i); }
+
 /* The runnable thread (never `cur` itself) that the scheduler takes next, or -1: the one with the highest priority, and among those with the same priority the first after `cur` in creation order (the round-robin). When all runnable
  * threads have the same priority this is the rotation of decision 0122. */
-static int pick_other(void)
+static int pick_other_filtered(int mode)
 {
     unsigned k;
     int best = -1;
@@ -524,8 +598,9 @@ static int pick_other(void)
 
     for (k = 1; k < nthr; k++) {
         unsigned i = (cur + k) % nthr;
+        int ok = mode == 0 || (mode == 1 ? is_ui_thread(i) : prio_of(i) <= 0);
 
-        if (T[i].state == T_READY && T[i].suspend == 0) {
+        if (T[i].state == T_READY && T[i].suspend == 0 && ok) {
             int32_t p = prio_of(i);
 
             if (best < 0 || p > bp) {
@@ -536,6 +611,9 @@ static int pick_other(void)
     }
     return best;
 }
+
+static int pick_other(void) { return pick_other_filtered(0); }
+static int pick_other_ui(void) { return pick_other_filtered(1); }
 
 static const char *state_name(const thr *t)
 {
@@ -684,19 +762,235 @@ static int next_deadline(uint64_t *out)
 /* The caller made `cur` WAITING, DONE or (a yield, or the end of a slice) READY. Returns when `cur` runs again: 1 when another thread ran in between, 0 when not.
  * Decision 0234 (mt3): with `slice` set the caller is a thread that is still running whose time slice has ended (fle_progress_slice): Learn "Scheduling Priorities" lets it go on unless a thread of the same or a higher priority is ready.
  * A thread that gives the processor up itself (Sleep(0), SwitchToThread: Learn Sleep "relinquish the remainder of its time slice to any other thread that is ready to run") or that waits goes to the ready thread of the highest priority. */
+static int ui_turn_active;
+static uint64_t ui_turn_until, ui_turn_cooldown;
+static double ui_turn_start_ms, ui_turn_until_ms, ui_turn_cooldown_ms;
+static double ui_turn_active_min_cd_ms, ui_turn_active_ratio, ui_turn_active_max_cd_ms;
+#define UI_TURN_BUDGET_TICKS     20000u  /* 2.0 ms virtual fallback (native) */
+#define UI_TURN_COOLDOWN_TICKS   20000u  /* 2.0 ms virtual fallback (native) */
+#define UI_TURN_MIN_COOLDOWN_MS  0.4     /* do not arm cooldown for sub-0.4ms quick input/DwmFlush wakes */
+
+static uint64_t ablk_gen;
+static double ablk_ms, ablk_est_ms = 25.0, ablk_peak_ms = 28.0, ablk_last_ms = -1.0;
+static int ablk_running;
+
+static void audio_block_update(double now_ms, int audio_running)
+{
+    uint64_t g;
+
+    if (now_ms < 0.0) return;
+    if (ablk_running && ablk_last_ms >= 0.0 && now_ms > ablk_last_ms) {
+        double dt = now_ms - ablk_last_ms;
+        if (dt < 200.0) ablk_ms += dt;
+    }
+    g = fle_audio_unlock_gen ? fle_audio_unlock_gen() : 0u;
+    if (g != ablk_gen) {
+        if (ablk_gen != 0u && ablk_ms > 2.0) {
+            ablk_est_ms = ablk_est_ms * 0.80 + ablk_ms * 0.20;
+            if (ablk_est_ms < 18.0) ablk_est_ms = 18.0;
+            if (ablk_est_ms > 38.0) ablk_est_ms = 38.0;
+            if (ablk_ms > ablk_peak_ms) ablk_peak_ms = ablk_ms;
+            else ablk_peak_ms = ablk_peak_ms * 0.95 + ablk_ms * 0.05;
+            if (ablk_peak_ms < 24.0) ablk_peak_ms = 24.0;
+            if (ablk_peak_ms > 42.0) ablk_peak_ms = 42.0;
+        }
+        ablk_gen = g;
+        ablk_ms = 0.0;
+    }
+    ablk_running = audio_running;
+    ablk_last_ms = now_ms;
+}
+
+static double audio_headroom_ms(double now_ms)
+{
+    double slack, est, rem;
+
+    (void)now_ms;
+    if (!fle_audio_slack_ms) return (fle_audio_has_slack && fle_audio_has_slack()) ? 30.0 : -1.0;
+    slack = fle_audio_slack_ms();
+    if (slack >= 1e8) return 1e9;
+    if (slack < 22.0) return -1.0;
+    est = ablk_est_ms * 1.15;
+    if (ablk_peak_ms > est) est = ablk_peak_ms;
+    rem = (ablk_ms < est) ? (est - ablk_ms) : 10.0;
+    if (rem < 10.0) rem = 10.0;
+    return slack - (rem + 12.0);
+}
+
+static void pick_ui_pacing(double headroom_ms, double *budget_ms, double *min_cd_ms, double *ratio, double *max_cd_ms)
+{
+    if (headroom_ms >= 20.0) {
+        *budget_ms = 4.2;
+        *min_cd_ms = 0.6;
+        *ratio = 0.65;
+        *max_cd_ms = 2.8;
+    } else if (headroom_ms >= 8.0) {
+        *budget_ms = 3.6;
+        *min_cd_ms = 1.4;
+        *ratio = 1.65;
+        *max_cd_ms = 7.0;
+    } else {
+        *budget_ms = 2.4;
+        *min_cd_ms = 2.0;
+        *ratio = 2.20;
+        *max_cd_ms = 8.0;
+    }
+}
+
+static void arm_ui_cooldown(double now_ms)
+{
+    if (now_ms >= 0.0) {
+        double ui_used = now_ms - ui_turn_start_ms;
+        double min_cd = ui_turn_active_min_cd_ms > 0.0 ? ui_turn_active_min_cd_ms : 0.6;
+        double ratio = ui_turn_active_ratio > 0.0 ? ui_turn_active_ratio : 0.65;
+        double max_cd = ui_turn_active_max_cd_ms > 0.0 ? ui_turn_active_max_cd_ms : 2.8;
+        double cd = ui_used > 0.0 ? ui_used * ratio : min_cd;
+        if (cd < min_cd) cd = min_cd;
+        if (cd > max_cd) cd = max_cd;
+        ui_turn_cooldown_ms = now_ms + cd;
+    } else {
+        ui_turn_cooldown = now_ticks() + UI_TURN_COOLDOWN_TICKS;
+    }
+}
+
+static int vclock_wall_init;
+static double vclock_wall0, vclock_last_ms, last_sched_ms = -1e9;
+static uint64_t vclock_ticks0;
+
+static void vclock_wall_after_idle(double now_ms, int keep_anchor)
+{
+    uint64_t now;
+
+    if (now_ms < 0.0) return;
+    now = now_ticks();
+    if (!keep_anchor || !vclock_wall_init || now_ms < vclock_last_ms || now_ms - vclock_last_ms > 200.0) {
+        vclock_wall_init = 1;
+        vclock_wall0 = now_ms;
+        vclock_last_ms = now_ms;
+        vclock_ticks0 = now;
+        return;
+    }
+    {
+        double dt = now_ms - vclock_wall0;
+        uint64_t expected = dt > 0.0 ? vclock_ticks0 + (uint64_t)(dt * (double)FLE_TICKS_PER_MS) : vclock_ticks0;
+
+        if (now > expected || expected > now + 3u * FLE_TICKS_PER_MS) {
+            vclock_wall0 = now_ms;
+            vclock_ticks0 = now;
+        }
+        vclock_last_ms = now_ms;
+    }
+}
+
+static void vclock_wall_sync(double now_ms)
+{
+    double dt;
+    uint64_t now, target;
+
+    if (now_ms < 0.0) return;
+    if (!fle_audio_paced || !fle_audio_paced()) {
+        vclock_wall_init = 0;
+        return;
+    }
+    now = now_ticks();
+    if (!vclock_wall_init) {
+        vclock_wall_init = 1;
+        vclock_wall0 = now_ms;
+        vclock_last_ms = now_ms;
+        vclock_ticks0 = now;
+        return;
+    }
+    if (now_ms < vclock_last_ms || now_ms - vclock_last_ms > 200.0) {
+        vclock_wall0 = now_ms;
+        vclock_last_ms = now_ms;
+        vclock_ticks0 = now;
+        return;
+    }
+    vclock_last_ms = now_ms;
+    dt = now_ms - vclock_wall0;
+    if (dt <= 0.0) return;
+    target = vclock_ticks0 + (uint64_t)(dt * (double)FLE_TICKS_PER_MS);
+    if (target > now) {
+        fle_sys_clock_advance_to(target);
+    } else if (now > target + 1u * FLE_TICKS_PER_MS) {
+        vclock_wall0 = now_ms;
+        vclock_ticks0 = now;
+        return;
+    }
+    if (dt > 60000.0) {
+        vclock_wall0 = now_ms;
+        vclock_ticks0 = now_ticks();
+    }
+}
+
 static int schedule_ex(int slice)
 {
     for (;;) {
         int o;
         uint64_t dl;
+        double now_ms, headroom;
 
 #if defined(__EMSCRIPTEN__) || defined(FLE_RING_POLL_HOOK)
         if (fle_input_ring_poll) fle_input_ring_poll();
 #endif
+        now_ms = fle_audio_now_ms ? fle_audio_now_ms() : -1.0;
+        if (now_ms >= 0.0) last_sched_ms = now_ms;
+        audio_block_update(now_ms, cur != 0 && !T[cur].is_dwm && prio_of(cur) > 0);
+        vclock_wall_sync(now_ms);
         /* decision 0280 (PROVISIONAL): the host's input ring is read at every scheduler point, so that an input need not wait for the engine's idle */
         poll_waiters();
+        headroom = audio_headroom_ms(now_ms);
+        if (ui_turn_active) {
+            if (headroom <= 0.0) {
+                ui_turn_active = 0;
+            } else if ((now_ms >= 0.0 ? now_ms >= ui_turn_until_ms : now_ticks() >= ui_turn_until) ||
+                       (cur == 0 && T[0].state == T_WAITING && is_input_wait(&T[0]))) {
+                int arm_cd = now_ms < 0.0 || now_ms >= ui_turn_until_ms || (now_ms - ui_turn_start_ms) >= UI_TURN_MIN_COOLDOWN_MS;
+                ui_turn_active = 0;
+                if (arm_cd) arm_ui_cooldown(now_ms);
+            }
+        }
+        if (!ui_turn_active && slice && prio_of(cur) > 0 && !is_ui_thread(cur) &&
+            headroom > 0.0 &&
+            (now_ms >= 0.0 ? now_ms >= ui_turn_cooldown_ms : now_ticks() >= ui_turn_cooldown) &&
+            pick_other_ui() >= 0) {
+            double budget_ms = 4.2, min_cd_ms = 0.6, ratio = 0.65, max_cd_ms = 2.8;
+
+            pick_ui_pacing(headroom, &budget_ms, &min_cd_ms, &ratio, &max_cd_ms);
+            ui_turn_active = 1;
+            ui_turn_active_min_cd_ms = min_cd_ms;
+            ui_turn_active_ratio = ratio;
+            ui_turn_active_max_cd_ms = max_cd_ms;
+            if (now_ms >= 0.0) {
+                ui_turn_start_ms = now_ms;
+                ui_turn_until_ms = now_ms + budget_ms;
+            } else {
+                ui_turn_until = now_ticks() + UI_TURN_BUDGET_TICKS;
+            }
+        }
+        if (ui_turn_active) {
+            int uo = pick_other_ui();
+
+            if (uo >= 0 && !(slice && is_ui_turn_eligible(cur) && prio_of((unsigned)uo) < prio_of(cur))) {
+                ablk_running = (uo != 0 && !T[(unsigned)uo].is_dwm && prio_of((unsigned)uo) > 0);
+                ablk_last_ms = now_ms;
+                switch_to((unsigned)uo);
+                return 1;
+            }
+            if (is_ui_turn_eligible(cur) && T[cur].state == T_READY && T[cur].suspend == 0) {
+                T[cur].state = T_RUNNING;
+                return 0;
+            }
+            {
+                int arm_cd = now_ms < 0.0 || (now_ms - ui_turn_start_ms) >= UI_TURN_MIN_COOLDOWN_MS;
+                ui_turn_active = 0;
+                if (arm_cd) arm_ui_cooldown(now_ms);
+            }
+        }
         o = pick_other();
         if (o >= 0 && !(slice && prio_of((unsigned)o) < prio_of(cur))) {
+            ablk_running = (o != 0 && !T[(unsigned)o].is_dwm && prio_of((unsigned)o) > 0);
+            ablk_last_ms = now_ms;
             switch_to((unsigned)o);
             return 1;
         }
@@ -709,25 +1003,46 @@ static int schedule_ex(int slice)
         if (!idle_stop && fle_thread_idle_hook && is_input_wait(&T[0]) && T[0].q.exists && T[0].q.count == 0 && !T[0].q.sent_head && !T[0].q.quit) {
             uint64_t nx = 0, adv = 0;
             int hr, have = next_deadline(&nx);
+            double after_ms;
 
             if (fle_warn_idle) fle_warn_idle();
+            if (fle_host_on_idle) fle_host_on_idle();
+            if (fle_audio_idle_begin) fle_audio_idle_begin(cur);
+            audio_block_update(now_ms, 0);
             hr = fle_thread_idle_hook(now_ticks(), have ? nx : 0u, &adv);
+            if (fle_audio_idle_note) fle_audio_idle_note();
+            after_ms = fle_audio_now_ms ? fle_audio_now_ms() : -1.0;
+            audio_block_update(after_ms, 0);
             if (hr == 0) stop_report("MessageLoop", "idle: the host ended the wait (no event came; the session was closed)");
             if (hr == 2 && adv > now_ticks()) {
                 if (have && adv > nx) adv = nx;                     /* a deadline is never skipped */
                 fle_sys_clock_advance_to(adv);
             }
+            vclock_wall_after_idle(after_ms, hr == 2);
             continue;
         }
         /* decision 0139: with an external audio consumer (the AudioWorklet) the idle host above has the first say (it knows the page); when it does not apply (the first thread is not waiting for input) a buffer that plays paces the clock in real time */
         if (fle_audio_paced && fle_audio_wait_until && fle_audio_paced() && next_deadline(&dl)) {
             if (dl > now_ticks()) {
-                int w = fle_audio_wait_until(dl);
+                double after_ms;
+                int w;
 
+                if (fle_audio_idle_begin) fle_audio_idle_begin(cur);
+                audio_block_update(now_ms, 0);
+                w = fle_audio_wait_until(dl);
+                if (fle_audio_idle_note) fle_audio_idle_note();
+                after_ms = fle_audio_now_ms ? fle_audio_now_ms() : -1.0;
+                audio_block_update(after_ms, 0);
                 if (w == 0) stop_report("MessageLoop", "idle: the browser ended the wait (the session was closed by the page while the audio device played)");
-                if (w == 1) continue;   /* an input event was posted: evaluate again */
+                if (w == 1) {
+                    vclock_wall_after_idle(after_ms, 0);
+                    continue;   /* an input event was posted: evaluate again */
+                }
                 if (dl > now_ticks()) fle_sys_clock_advance_to(dl);
+                vclock_wall_after_idle(after_ms, 0);
+                continue;
             }
+            vclock_wall_after_idle(now_ms, 0);
             continue;
         }
         if (!next_deadline(&dl)) stop_report("scheduler", "deadlock: no thread can run and no thread waits with a time-out (nothing can wake any of them)");
@@ -741,6 +1056,7 @@ static int schedule(void) { return schedule_ex(0); }
 static void park(void)
 {
     T[cur].state = T_WAITING;
+    wait_count_add(T[cur].w.kind);
     T[cur].w.seq = ++wait_seq;
     schedule();
     T[cur].state = T_RUNNING;
@@ -881,8 +1197,10 @@ void fle_progress_slice(void)
         return;
     }
     pst.slices++;
-    pst.ticks += slice_ticks;
-    fle_sys_clock_advance_to(now_ticks() + slice_ticks);
+    if (!(fle_audio_now_ms && fle_audio_paced && fle_audio_paced())) {
+        pst.ticks += slice_ticks;
+        fle_sys_clock_advance_to(now_ticks() + slice_ticks);
+    }
     t->state = T_READY;
     if (schedule_ex(1)) pst.switches++;
 }
@@ -901,6 +1219,11 @@ void fle_loop_slice(void)
     if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH) {
         if (fle_audio_poll_in_callback) fle_audio_poll_in_callback();
         return;
+    }
+    if (fle_audio_now_ms && fle_audio_paced && fle_audio_paced()) {
+        double now_ms = fle_audio_now_ms();
+        double min_dt = (ui_turn_active || (cur != 0 && prio_of(cur) > 0)) ? 0.35 : 0.8;
+        if (now_ms >= 0.0 && now_ms - last_sched_ms < min_dt) return;
     }
     t->state = T_READY;
     schedule_ex(1);
@@ -1090,6 +1413,7 @@ void fle_imp_DwmFlush(void)
 {
     uint64_t dl = fle_thread_next_frame_tick(now_ticks());
 
+    if (nthr) T[cur].is_dwm = 1;
     dwm_flushes++;
     if (nthr < 2) {
         fle_sys_clock_advance_to(dl);
