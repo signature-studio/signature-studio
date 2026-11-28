@@ -2,8 +2,11 @@
 // (window.__app.audio: detail(), fill(), counters()) and its capture of the output (armCapture: the frames the worklet copies; tools/p3-audio-probe/waveform.mjs for the PCM repeat).
 // The places (PLACE) are guest pixels where the controls are drawn at the 3840 x 2160 guest (4k-dpr1 and 4k-random: the guest is the same at any DPR). They are where to click,
 // not what is expected: a check reads the number that changes (a counter, the output, a picture region's hash) before and after the action.
+import fs from 'node:fs';
+import path from 'node:path';
 import { sleep } from './flow.mjs';
-import { pixelHashRegion, openMenu, waitWindow, windowTable, picture } from './common.mjs';
+import { pixelHashRegion, openMenu, windowTable, picture } from './common.mjs';
+import { absoluteRect, subtree } from './dump.mjs';
 import { armExpression, takeExpression, pcmReport } from '../../p3-audio-probe/waveform.mjs';
 
 export const PLACE = {
@@ -277,25 +280,108 @@ export function parseWav(b) {
   return { valid: true, ...fmt, frames, duration: frames / fmt.rate, peak, nonZeroFraction: samples ? nonZero / samples : 0, bytes: b.length };
 }
 
-/** File > Export > Wave file, then Start in the render form: the file the engine wrote (the page's saved files) as a WAV (parseWav). Its name and the form's left-open state are reported */
-export async function exportWav(guest, { limit = 90000 } = {}) {
+/** the child windows of a window (at any depth) as the table gives them: class, caption, shown flag and the absolute rectangle (guest px) */
+export function childrenReport(table, lid, max = 40) {
+  return subtree(table, lid).slice(0, max).map((c) => {
+    const r = absoluteRect(table, c.lid);
+    return { lid: c.lid, parent: c.parent, cls: c.cls, text: c.text, vis: c.vis, rect: r ? [r.x, r.y, r.w, r.h] : null };
+  });
+}
+
+/** the child windows whose rectangle holds the guest px (x, y): what a click there reaches in the window table */
+const under = (kids, p) => kids.filter((c) => c.rect && p.x >= c.rect[0] && p.x < c.rect[0] + c.rect[2] && p.y >= c.rect[1] && p.y < c.rect[1] + c.rect[3]);
+
+/** the page's "FL Studio asks: Save as" box (the file manager of the page, not an engine window: the window table does not list it): the centre (CSS px) of its button `label`, or null */
+const saveAsButton = (label) => `(() => { const leaves = [...document.querySelectorAll('body *')].filter((e) => e.childElementCount === 0 && (e.textContent || '').trim() === ${JSON.stringify(label)}); const el = leaves.find((e) => { const r = e.getBoundingClientRect(); if (r.width <= 0 || r.height <= 0) return false; let p = e; for (let i = 0; i < 12 && p; i++, p = p.parentElement) if (/FL Studio asks: Save as/.test(p.textContent || '')) return true; return false; }); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
+const saveAsOpen = async (guest) => (await guest.ev(saveAsButton('Save'))) !== null;
+
+/** the render form and the Save box are closed when they are still open after a save that did not come: the box by its Cancel, the form by Escape or its Cancel or Close caption */
+async function closeExport(guest, form) {
+  const formOpen = async () => (await windowTable(guest)).top.some((w) => w.cls === 'TWAVRenderForm');
+  const out = { saveAsClosedBy: null, formClosedBy: null };
+  const cancel = await guest.ev(saveAsButton('Cancel'));
+  if (cancel) {
+    await guest.clickCss(cancel.x, cancel.y);
+    out.saveAsClosedBy = (await waitUntil(async () => !(await saveAsOpen(guest)), 3000, 200)) ? 'cancel' : null;
+  }
+  if (await formOpen()) {
+    // the title bar's close box (the form's top right: 14 px in, 16 px down, as the render form is drawn at 4k), then Escape
+    if (form) {
+      await guest.click(form.x + form.w - 14, form.y + 16);
+      if (await waitUntil(async () => !(await formOpen()), 3000, 200)) out.formClosedBy = 'title close box';
+    }
+    if (out.formClosedBy === null) {
+      await guest.escape();
+      if (await waitUntil(async () => !(await formOpen()), 3000, 200)) out.formClosedBy = 'escape';
+    }
+  }
+  out.leftOpen = await formOpen();
+  out.saveAsStillOpen = await saveAsOpen(guest);
+  return out;
+}
+
+/** File > Export > Wave file: the page's "Save as" box (the file name is set), then its Save: the engine renders the file, or first shows its render form (TWAVRenderForm, with Start).
+ *  The file the engine wrote (the page's saved files) is read as a WAV (parseWav). Its name and the left-open state of the form and of the box are reported. The steps and the
+ *  form's children (caption, shown, rectangle) are in `diag`; a save that does not come closes the box and the form again (closeExport) */
+export async function exportWav(guest, { limit = 30000 } = {}) {
+  const snap = async () => {
+    const t = await windowTable(guest);
+    return t.top.map((w) => `${w.cls} ${w.x},${w.y} ${w.w}x${w.h}`);
+  };
+  const shotAt = async (name) => { if (guest.shots) { fs.mkdirSync(guest.shots, { recursive: true }); await guest.shot(path.join(guest.shots, `${name}.png`)).catch(() => {}); } };
+  const steps = [];
+  const before = await snap();
   await openMenu(guest, 'File');
   await guest.click(PLACE.exportItem.x, PLACE.exportItem.y);
   await sleep(900);
   await guest.click(PLACE.waveItem.x, PLACE.waveItem.y);
-  const form = await waitWindow(guest, 'TWAVRenderForm', 6000);
-  if (form === null) return { valid: false, reason: 'the render form did not open' };
+  await sleep(900);
+  steps.push({ step: 'Wave', windows: await snap(), saveAs: await saveAsOpen(guest) });
+  await shotAt('export-c-wave');
+  const diag = { before, steps };
   // a file of the same name replaces its entry (SavedFilesView), so the count does not move: the time of the last entry tells the new file
   const lastKey = `window.__app.saved.map((f) => f.at).join(',')`;
   const k0 = await guest.ev(lastKey);
-  await guest.click(form.x + form.w - 38, form.y + form.h - 24);
-  const got = await waitUntil(async () => (await guest.ev(lastKey)) !== k0, limit, 500);
-  if (!got) return { valid: false, reason: `no file was saved within ${limit} ms` };
+  const save = await guest.ev(saveAsButton('Save'));
+  diag.saveBy = save ? 'button' : 'none';
+  if (save) await guest.clickCss(save.x, save.y);
+  await waitUntil(async () => (await guest.ev(lastKey)) !== k0 || (await windowTable(guest)).top.some((w) => w.cls === 'TWAVRenderForm'), 8000, 300);
+  steps.push({ step: 'Save', windows: await snap(), saveAs: await saveAsOpen(guest) });
+  await shotAt('export-d-save');
+  const shown = await windowTable(guest);
+  const form = shown.top.find((w) => w.cls === 'TWAVRenderForm') ?? null;
+  const logN = await guest.ev('window.__app.engineLog().length');
+  const saved = async () => (await guest.ev(lastKey)) !== k0;
+  let got = await saved();
+  if (form && !got) {
+    const kids = childrenReport(shown, form.lid);
+    // the Start button: the form's child whose caption is Start; the place measured before (the form's bottom right) is the fallback
+    const cap = kids.find((c) => c.vis && c.rect && /^start$/i.test(c.text));
+    const start = cap ? { x: cap.rect[0] + cap.rect[2] / 2, y: cap.rect[1] + cap.rect[3] / 2 } : { x: form.x + form.w - 38, y: form.y + form.h - 24 };
+    diag.form = { x: form.x, y: form.y, w: form.w, h: form.h, title: form.title, startBy: cap ? `caption ${cap.cls}` : 'offset', children: kids, clickUnder: under(kids, start).map((c) => `${c.cls} "${c.text}"`) };
+    // each way of starting is tried for 5 s: the Start place first (the render took its click at once in the runs of #1526), then the Enter (the form's default), then the Start place again
+    const tries = [];
+    await shotAt('export-e-form');
+    if (!(await saved())) { await guest.click(start.x, start.y); tries.push({ how: diag.form.startBy, saved: await waitUntil(saved, 5000, 500) }); }
+    if (!(await saved())) { await guest.key('Enter', 'Enter', 13); tries.push({ how: 'Enter', saved: await waitUntil(saved, 5000, 500) }); }
+    if (!(await saved())) { await guest.click(start.x, start.y); tries.push({ how: `${diag.form.startBy} again`, saved: await waitUntil(saved, 5000, 500) }); }
+    diag.tries = tries;
+    diag.afterTries = await snap().catch(() => null);
+    await shotAt('export-f-tries');
+    got = await waitUntil(saved, limit, 500);
+  }
+  diag.afterStart = await snap().catch(() => null);
+  diag.engineLog = (await guest.ev(`window.__app.engineLog().slice(${Number(logN)}).slice(-30)`)).map((l) => String(l).slice(0, 200));
+  if (!got) {
+    const closed = await closeExport(guest, form);
+    diag.afterClose = await snap().catch(() => null);
+    return { valid: false, reason: `no file was saved within ${limit} ms`, leftOpen: closed.leftOpen, saveAsOpen: closed.saveAsStillOpen, closedBy: { saveAs: closed.saveAsClosedBy, form: closed.formClosedBy }, diag };
+  }
   const b64 = await guest.ev(`(() => { const f = window.__app.saved[window.__app.saved.length - 1]; const u = new Uint8Array(f.data); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); })()`);
   const name = await guest.ev('window.__app.saved[window.__app.saved.length - 1].name');
   await sleep(500);
   const leftOpen = (await windowTable(guest)).top.some((w) => w.cls === 'TWAVRenderForm');
-  return { name, leftOpen, ...parseWav(Buffer.from(b64, 'base64')) };
+  return { name, leftOpen, saveAsOpen: await saveAsOpen(guest), diag, ...parseWav(Buffer.from(b64, 'base64')) };
 }
 
 /** the number of the window the sound check uses: the transport started, `warm` ms passed */
@@ -675,12 +761,15 @@ export const CHECKS = {
   async 'export-wav'(guest, { mode = 'nonsilent', tempo = 130, tolerance = 0.03 } = {}) {
     const k = await kickSteps(guest);
     const w = await exportWav(guest);
+    // the kick's beats are put back off (the project's start state): a failed export leaves the engine unable to take File > New, so the next scenario would keep them
+    const kickRestored = k.sound;
+    if (kickRestored) for (const b of KICK_BEATS) { await guest.click(kickStep(b).x, kickStep(b).y); await sleep(150); }
     const expectSec = (4 * 60) / tempo;
     const formatOk = w.valid === true && w.channels === 2 && w.bits === 16 && w.format === 1;
     const nonSilent = formatOk && w.peak > 0.05 && w.nonZeroFraction > 0.2;
     const lengthOk = formatOk && Math.abs(w.duration - expectSec) <= tolerance;
     const ok = k.sound && (mode === 'length' ? lengthOk : nonSilent);
-    const results = { mode, kickSound: k.sound, kickNonSilent: k.nonSilent, metronomeOn: k.metronomeOn, valid: w.valid, reason: w.reason ?? null, rate: w.rate ?? null, channels: w.channels ?? null, bits: w.bits ?? null, format: w.format ?? null, frames: w.frames ?? null, durationSec: w.duration ?? null, expectedSec: expectSec, peak: w.peak ?? null, nonZeroFraction: w.nonZeroFraction ?? null, leftOpen: w.leftOpen ?? null, fileName: w.name ?? null };
+    const results = { mode, kickSound: k.sound, kickNonSilent: k.nonSilent, metronomeOn: k.metronomeOn, valid: w.valid, reason: w.reason ?? null, rate: w.rate ?? null, channels: w.channels ?? null, bits: w.bits ?? null, format: w.format ?? null, frames: w.frames ?? null, durationSec: w.duration ?? null, expectedSec: expectSec, peak: w.peak ?? null, nonZeroFraction: w.nonZeroFraction ?? null, leftOpen: w.leftOpen ?? null, saveAsOpen: w.saveAsOpen ?? null, closedBy: w.closedBy ?? null, kickBeatsRestored: kickRestored, fileName: w.name ?? null, exportDiag: w.diag ?? null };
     return { ok, results, notes: [`export ${w.name ?? 'none'}: ${w.valid ? `${w.channels} ch, ${w.bits} bit, ${w.rate} Hz, ${w.duration?.toFixed(4)} s (expected ${expectSec.toFixed(4)} s), peak ${w.peak?.toFixed(3)}, non-zero ${w.nonZeroFraction?.toFixed(3)}` : `not valid: ${w.reason}`}`] };
   },
 

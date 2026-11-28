@@ -249,6 +249,8 @@ async function runShared(sc, repeat, d, env, sh, index, budget) {
     }
   }
   const before = { pageErrors: sh.det.pageErrors, consoleErrors: sh.det.consoleErrors, failedRequests: sh.det.failedRequests, stops: sh.watch.w.stops, dumps: sh.guest.dumpRetries };
+  // the pictures the scenario takes during its run (the export's pictures, lib/audio.mjs exportWav) go to the scenario's own directory of --shots
+  sh.guest.shots = env.shotsDir ? path.join(env.shotsDir, fileTag(d), sc.id.replace('/', '-')) : null;
   let mark = { n: 0, t: null };
   try {
     mark = await logMark(sh.guest);
