@@ -34,7 +34,15 @@ const FIXED_EXTRACT: &str = "ci/extract-dlls.tsv";
 const FIXED_SEED: &str = "lift/harness/seeds/vfs-seed-idle1.tsv";
 /// The Plugin database of the user's data (Issue #1484): the Browser lists the entries of its Installed folder. One `<name>.nfo` per built-in plugin
 /// is put there from the plugins' rows; the files are made in the host tree (`PLUGIN_DB_HOST`, under HOST_DIR) for the seed pack.
-const PLUGIN_DB_GUEST: &str = "C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\";
+const PLUGIN_DB_ROOT: &str = "C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\";
+const PLUGIN_DB_GUEST: &str = concat!("C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\", "Installed\\");
+/// The Installed folder's own .nfo files (Issue #1535): FL probes `Installed\Effects` and `Installed\Generators` after the Installed folder lists its names, and the
+/// entries are the `<name>.nfo` and `<name>.fst` of their category folder. Each pair is (the guest path under PLUGIN_DB_ROOT, the seed's host file: the installer's own).
+const PLUGIN_DB_NODE_NFO: [(&str, &str); 3] = [
+    ("Installed.nfo", "lift/out-idle1/inputs/install/Data/Patches/Plugin database/Installed.nfo"),
+    ("Installed\\Effects.nfo", "lift/out-idle1/inputs/install/Data/Patches/Plugin database/Effects.nfo"),
+    ("Installed\\Generators.nfo", "lift/out-idle1/inputs/install/Data/Patches/Plugin database/Generators.nfo"),
+];
 const PLUGIN_DB_HOST: &str = "lift/out-plugindb";
 const FIXED_SEED_ARGS: &str = "lift/harness/web/seed.args";
 const FIXED_MODULES: &str = "lift/harness/b2d2/modules.tsv";
@@ -634,16 +642,39 @@ pub fn plugin_db_names(dlls: &[Dll]) -> Result<Vec<String>, String> {
     Ok(names.into_iter().collect())
 }
 
-/// The seed rows of the Plugin database entries (`PLUGIN_DB_GUEST`): each `<name>.nfo` is written to the host tree first, and its row names its SHA-256.
-fn plugin_db_rows(names: &[String]) -> Result<Vec<String>, String> {
+/// The category folder (`Effects` or `Generators`) of each plugin's Plugin database entry: the folder above the plugin's folder in its main DLL's path.
+pub fn plugin_db_categories(dlls: &[Dll]) -> BTreeMap<String, String> {
+    dlls.iter()
+        .filter(|d| d.main)
+        .filter_map(|d| {
+            let parts: Vec<&str> = d.guest.split('\\').collect();
+            (parts.len() >= 3).then(|| (parts[parts.len() - 2].to_string(), parts[parts.len() - 3].to_string()))
+        })
+        .collect()
+}
+
+/// The seed rows of the Plugin database entries (`PLUGIN_DB_GUEST`), in their category folders (`Installed\<category>\`): each entry is a `<name>.nfo`
+/// (`Tip=<name>`) and an empty `<name>.fst`; both are written to the host tree first, and their rows name their SHA-256. The Installed folder's own .nfo files
+/// (PLUGIN_DB_NODE_NFO) are the installer's, and their rows name their SHA-256 too.
+fn plugin_db_rows(names: &[String], categories: &BTreeMap<String, String>) -> Result<Vec<String>, String> {
     let dir = format!("{HOST_DIR}/{PLUGIN_DB_HOST}");
     fs::create_dir_all(&dir).map_err(|e| format!("{dir}: {e}"))?;
     let mut rows = Vec::new();
+    for (rel_guest, host) in PLUGIN_DB_NODE_NFO {
+        rows.push(format!("{PLUGIN_DB_ROOT}{rel_guest}\t{host}\t{}", crate::sha256_hex(&format!("{HOST_DIR}/{host}"))?));
+    }
     for name in names {
-        let rel = format!("{PLUGIN_DB_HOST}/{name}.nfo");
-        let path = format!("{HOST_DIR}/{rel}");
-        write(&path, &format!("Tip={name}\r\n"))?;
-        rows.push(format!("{PLUGIN_DB_GUEST}{name}.nfo\t{rel}\t{}", crate::sha256_hex(&path)?));
+        let category = categories.get(name).ok_or_else(|| format!("{name}: no category folder (Effects or Generators) in its main DLL's path"))?;
+        if category != "Effects" && category != "Generators" {
+            return Err(format!("{name}: the category folder {category} is neither Effects nor Generators"));
+        }
+        let nfo = format!("{PLUGIN_DB_HOST}/{category}/{name}.nfo");
+        let fst = format!("{PLUGIN_DB_HOST}/{category}/{name}.fst");
+        fs::create_dir_all(format!("{HOST_DIR}/{PLUGIN_DB_HOST}/{category}")).map_err(|e| format!("{category}: {e}"))?;
+        write(&format!("{HOST_DIR}/{nfo}"), &format!("Tip={name}\r\n"))?;
+        write(&format!("{HOST_DIR}/{fst}"), "")?;
+        rows.push(format!("{PLUGIN_DB_GUEST}{category}\\{name}.nfo\t{nfo}\t{}", crate::sha256_hex(&format!("{HOST_DIR}/{nfo}"))?));
+        rows.push(format!("{PLUGIN_DB_GUEST}{category}\\{name}.fst\t{fst}\t{}", crate::sha256_hex(&format!("{HOST_DIR}/{fst}"))?));
     }
     Ok(rows)
 }
@@ -736,7 +767,7 @@ pub fn generate(with_base: bool) -> Result<(), String> {
     let seed = seed_table(&read_text(FIXED_SEED)?, &dlls, &data);
     write(&format!("{OUT_DIR}/vfs-seed-extract.tsv"), &seed)?;
     let mut idle1 = seed;
-    for row in plugin_db_rows(&plugin_db_names(&dlls)?)? {
+    for row in plugin_db_rows(&plugin_db_names(&dlls)?, &plugin_db_categories(&dlls))? {
         idle1.push_str(&format!("{row}\n"));
     }
     write(&format!("{OUT_DIR}/vfs-seed-idle1.tsv"), &idle1)?;
