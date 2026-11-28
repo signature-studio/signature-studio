@@ -6,8 +6,8 @@ const SCENARIO = {
   name: 'riff-machine-open',
   report: 'R15',
   expect: 'Piano roll > TOOLS > Riff machine: a new top-level window whose caption contains "riff" appears; the engine is engine-idle 3 s after',
-  // the window opens, then the engine stops on an indirect call (#1429; #1387 is closed on main and is no mark)
-  expectFail: '#1429',
+  // the window opens and the engine stays idle: the stop on an indirect call (#1429) is closed and no longer seen, so no mark (#1387 is closed on main too)
+  expectFail: null,
 };
 const TOOLS_LABEL = { fx: 0.819, fy: 0.45 };
 const RIFF_DOWNS = 4;

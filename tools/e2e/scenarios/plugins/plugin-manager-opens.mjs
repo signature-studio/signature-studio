@@ -1,4 +1,4 @@
-// plugins/plugin-manager-opens: an Options item starts PluginManager.exe and its window appears; the engine stays engine-idle for 10 s after. expectFail #1499: the Plugin Manager is another program (the window does not open until #1499).
+// plugins/plugin-manager-opens: an Options item starts PluginManager.exe and its window appears; the engine stays engine-idle for 10 s after. The Plugin Manager is another program, started as a thread of the engine (#1499, closed: the window opens, so no mark).
 import { defineScenario } from '../../lib/scenario.mjs';
 import { openMenu, windowTable } from '../../lib/common.mjs';
 import { sleep } from '../../lib/flow.mjs';
@@ -10,7 +10,7 @@ const WINDOW = /plugin ?manager/i;
 export default defineScenario({
   id: 'plugins/plugin-manager-opens',
   covers: ['plugins/tool/plugin-manager', 'plugins/window/plugin-manager', 'plugins/stop/plugin-manager'],
-  expectFail: '#1499',
+  expectFail: null,
   async run({ guest }) {
     await openMenu(guest, 'Options');
     await guest.escape();

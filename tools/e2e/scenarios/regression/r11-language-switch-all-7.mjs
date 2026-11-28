@@ -9,8 +9,10 @@ const SCENARIO = {
   name: 'language-switch-all-7',
   report: 'R11',
   expect: 'Settings > General > Language: each of de, es, fr, ja, ko, vi, zh chosen in turn; the restart prompt appears; after the reload the engine is idle and reads the same language back',
-  // #1395: the engine stops after the reload (the start in a language other than English); #1419: the Browser's face's console errors
-  expectFail: ['#1395', '#1419'],
+  // #1395 (open): the engine stops after the reload (the start in a language other than English, the symptom of the Issue's title), declared as the stop;
+  // the Browser face's console errors (about:srcdoc, Blocked script execution) recur after #1419 closed, and no open Issue names them: new
+  expectFail: ['#1395', 'new'],
+  expectStop: '#1395',
 };
 export const LANGUAGES = ['de', 'es', 'fr', 'ja', 'ko', 'vi', 'zh'];
 const NAME_OF = {
