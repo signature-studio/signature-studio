@@ -240,6 +240,8 @@
 
 ## 付録: 集計の方法
 
+※ 作業用の `.tmp-full3/`(成果物・ログ・分析の表・スクリプト)は、この所見の後に削除した。以下は、その手順の記録。
+
 - 成果物: `gh run download 46128658286 -D .tmp-full3`(58 の artifact)。job のログ: `gh run view --job <id> --log`(58 件。`.tmp-full3/logs/`)。`gh run view --log`(run 全体)は API の上限で取れない。
 - 試験した版: `git archive eea3c21 tools/e2e | tar -x -C .tmp-full3/src`。判定の関数は `.tmp-full3/src/tools/e2e/lib/plan.mjs`(eea3c21)。
 - 静的な本の一覧: `.tmp-full3/static.mjs`(eea3c21 の `scenarios/*.mjs` を、テキストで読む。playwright が無いため import しない。1,869 本。結果に現れた ID は全て一覧に在る)。
