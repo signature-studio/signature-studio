@@ -223,11 +223,11 @@ function parseWindows(text) {
   });
 }
 
-/** the engine's stop of a run (Issue #1537): null when the engine did not stop (no exit fact and no "== stop:" line in the log); else the stop report's facts (tools/e2e/lib/stop.mjs stopOf: exit, message, stop, registers, report)
+/** the engine's stop of a run (Issue #1537): null when the page recorded no exit of the engine (a "== stop: returned from entry" line is a normal return, not a stop); else the stop report's facts (tools/e2e/lib/stop.mjs stopOf: exit, message, stop, registers, report)
  *  and the last 5 "fle: " lines of the WHOLE log, the ones printed before the play too (a stop during the scene is not in the play's window) */
 export function engineStopOf(lines, exit) {
   const strip = (l) => l.replace(/^\[err\] ?/, '').replace(/^fruity: /, '');
-  if (exit === null && !lines.some((l) => strip(l).startsWith('== stop:'))) return null;
+  if (exit === null) return null;
   const lastFle = lines.map(strip).filter((l) => l.startsWith('fle: ')).slice(-5).map((l) => l.slice(0, 400));
   return { ...stopOf(lines, exit), lastFle };
 }

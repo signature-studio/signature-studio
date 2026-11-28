@@ -305,8 +305,10 @@ try {
   const cut = called(engineStopOf, [...many, '[err] fruity: == stop: exit code 1'], { reason: 'exited', code: 1, message: '' });
   ok('engineStopOf: fle: の行は最後の 5 本', Array.isArray(cut?.lastFle) && cut.lastFle.length === 5 && cut.lastFle[0] === 'fle: line 2' && cut.lastFle[4] === 'fle: line 6', JSON.stringify(cut?.lastFle));
   ok('engineStopOf: 停止が無ければ null(終了の情報も停止の行も無い)', called(engineStopOf, ['[err] fle: x'], null) === null);
-  const noFle = called(engineStopOf, ['[err] fruity: == stop: exit code 2'], null);
-  ok('engineStopOf: 停止の行だけでも記録される(fle: は空)', noFle !== null && Array.isArray(noFle?.lastFle) && noFle.lastFle.length === 0, JSON.stringify(noFle));
+  const returned = called(engineStopOf, ['[err] fruity: == stop: returned from entry'], null);
+  ok('engineStopOf: 終了の情報が無ければ、正常な戻りの停止の行が在っても null', returned === null, JSON.stringify(returned));
+  const noFle = called(engineStopOf, ['[err] fle: x'], { reason: 'stopped', code: 2, message: '' });
+  ok('engineStopOf: 終了の情報が在れば、fle: の行が無くても記録される', noFle !== null && JSON.stringify(noFle?.lastFle) === JSON.stringify(['fle: x']), JSON.stringify(noFle));
 }
 
 console.log(failed === 0 ? 'ok   spec/plugin-run.test.mjs: 全部通った' : `FAIL spec/plugin-run.test.mjs: ${failed} 件`);
