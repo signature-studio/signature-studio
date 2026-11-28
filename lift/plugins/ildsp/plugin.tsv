@@ -1,0 +1,4 @@
+# ildsp_x64.dll (Issue #1539): the DSP DLL of the installer's Shared folder, read by Emphasizer and Frequency Shifter (LoadLibraryW "ildsp_x64.dll", the 126 that stopped the engine
+# before this row). A helper (補助): a library that the plugins load, not a plugin of the Browser (no Plugin database entry). The key is the bare name: fle_realmod_find compares it with the normalized name.
+key	guest	role	sha256	size	hook	args	omit
+ildsp_x64.dll	Shared\ildsp_x64.dll	補助	f4b23b0f93ee9119ca21ad5255c2e239f9bb78d6664289e9888ddcab082faea2	4197376	none	--pdata --reloc-seeds	-
