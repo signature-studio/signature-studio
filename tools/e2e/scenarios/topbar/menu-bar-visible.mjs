@@ -5,6 +5,7 @@ import { windowTable } from '../../lib/common.mjs';
 export default defineScenario({
   id: 'topbar/menu-bar-visible',
   covers: ['topbar/part/tnewmenu'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     const t = await windowTable(guest);
     const bar = t.children.find((c) => c.cls === 'TNewMenu');

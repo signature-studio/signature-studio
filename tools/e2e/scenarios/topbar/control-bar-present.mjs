@@ -5,6 +5,7 @@ import { windowTable } from '../../lib/common.mjs';
 export default defineScenario({
   id: 'topbar/control-bar-present',
   covers: ['topbar/part/tquickcontrolbar'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     const t = await windowTable(guest);
     const bars = t.children.filter((c) => c.cls === 'TQuickControlBar' && c.vis && c.w > 1000);

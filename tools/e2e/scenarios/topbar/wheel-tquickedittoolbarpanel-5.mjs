@@ -5,6 +5,7 @@ import { partOperation } from '../../lib/topbar.mjs';
 export default defineScenario({
   id: 'topbar/wheel-tquickedittoolbarpanel-5',
   covers: ['topbar/wheel/tquickedittoolbarpanel-5', 'topbar/part/tquickedittoolbarpanel-5'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return partOperation(guest, 'tquickedittoolbarpanel-5', 'wheel');
   },

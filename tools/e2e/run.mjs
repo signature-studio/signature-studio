@@ -237,8 +237,9 @@ async function closeShared(sh) {
 async function runShared(sc, repeat, d, env, sh, index, budget) {
   const out = scenarioResult(sc, repeat, d);
   const t0 = Date.now();
-  // the file area (#1488): an engine that an earlier scenario of the page stopped would stop every later one; the page is loaded again first (the file area only)
-  if (sc.area === 'file') {
+  // an engine that an earlier scenario of the page stopped would stop every later one (#1488 for the file area; #1509: every area, the engine's own state decides):
+  // the page is loaded again first, and only when the engine is error or exited (a scenario that leaves the engine idle is not affected)
+  {
     const st = await sh.guest.state().catch(() => null);
     if (st && (st.state === 'error' || st.state === 'exited')) {
       log(`${sc.id}: the engine is ${st.state} (an earlier scenario's stop): the page is loaded again`);

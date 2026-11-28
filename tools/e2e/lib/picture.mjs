@@ -34,6 +34,22 @@ export function regionHash(pic, r) {
   return h.digest('hex');
 }
 
+/** the number of different colours (RGB) in a rectangle of the picture, sampled over about 4096 pixels: 1 for a flat rectangle, 0 when nothing is left */
+export function regionColours(pic, r) {
+  const c = clipRect(pic, r);
+  if (c === null) return 0;
+  const [x0, y0, x1, y1] = c;
+  const step = Math.max(1, Math.ceil(Math.sqrt(((x1 - x0) * (y1 - y0)) / 4096)));
+  const seen = new Set();
+  for (let y = y0; y < y1; y += step) {
+    for (let x = x0; x < x1; x += step) {
+      const i = y * pic.stride + 4 * x;
+      seen.add((pic.bytes[i] << 16) | (pic.bytes[i + 1] << 8) | pic.bytes[i + 2]);
+    }
+  }
+  return seen.size;
+}
+
 /**
  * the number of tiles of `tile` x `tile` guest px whose pixels are all black (R, G and B 0) over the whole picture: a black rectangle of the picture
  * (a tile is counted once; a partial tile at the right or bottom edge is counted with the pixels it has).
