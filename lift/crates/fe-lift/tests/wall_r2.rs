@@ -193,7 +193,7 @@ fn both_sh_get_folder_path_w_thunks_of_flengine_are_answered_under_their_own_dll
     assert_eq!(st.handled["jmp_imp:SHGetFolderPathW"], 1);
     assert_eq!(c.matches("fle_imp_SHGetFolderPathW(); return;").count(), 2, "the user32 thunk is not answered");
     let va = IB + 0x1040 + 0x10 * 3;
-    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "the thunk of user32!SHGetFolderPathW stays unsupported");
+    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"user32.dll!SHGetFolderPathW\"); }}")), "the thunk of user32!SHGetFolderPathW stops by name");
     // the ANSI export of shfolder.dll has no row
     let (st, _) = gen(&[("kernel32.dll", "GetProcAddress"), ("SHFolder.dll", "SHGetFolderPathA")]);
     assert!(!st.handled.keys().any(|k| k.contains("SHGetFolderPathA")), "{:?}", st.handled);
@@ -372,6 +372,8 @@ fn driver() -> &'static PathBuf {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let exe = dir.join(&tag);
         let mut cmd = Command::new("clang");
         cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt);
@@ -619,7 +621,8 @@ fn csidl_appdata_is_the_virtual_roaming_app_data_folder_through_either_dll() {
     let h = std::fs::read_to_string(rt_dir().join("fle_env.h")).unwrap();
     assert!(h.contains("#define FLE_VIRTUAL_USER_PROFILE_DIR \"C:\\\\Users\\\\user\""), "fle_env.h");
     let c = std::fs::read_to_string(rt_dir().join("fle_env.c")).unwrap();
-    assert!(c.contains("#define FLE_APPDATA_SUBDIR \"\\\\AppData\\\\Roaming\""), "fle_env.c");
+    assert!(h.contains("FLE_VIRTUAL_USER_PROFILE_DIR \"\\\\AppData\\\\Roaming\""), "fle_env.h");
+    assert!(c.contains("text = FLE_VIRTUAL_APPDATA_DIR;"), "fle_env.c");
     assert!(c.contains("#define FLE_CSIDL_APPDATA 0x001a"), "fle_env.c");
 }
 

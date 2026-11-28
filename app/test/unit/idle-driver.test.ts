@@ -20,6 +20,7 @@ function rig(opts: { maxQueue?: number; rate?: number; mouseResult?: number } = 
       mouse: (k, x, y, data) => { calls.push(`mouse ${k} ${x} ${y} ${data}`); return opts.mouseResult ?? 1; },
       key: (k, vk, sc, e) => { calls.push(`key ${k} ${vk.toString(16)} ${sc.toString(16)} ${e}`); return 1; },
       clockTo: (ticks) => { calls.push(`clock ${ticks}`); },
+      hz: (hz) => { calls.push(`hz ${hz}`); return 1; },
     },
     {
       deliver: (code) => { delivered.push(code); const w = waiting; waiting = false; return w; },
@@ -239,5 +240,30 @@ describe('IdleDriver: the engine\'s idle in wall-clock mode', () => {
     expect(d.stats.maxLeadTicks).toBeLessThanOrEqual(TICKS_PER_MS);
     expect(live).toHaveLength(1);
     expect(live[0]?.ms).toBeCloseTo(11, 6);
+  });
+});
+
+describe('IdleDriver: the page\'s rate of requestAnimationFrame (Issue #1402)', () => {
+  it('a rate set between two idles is put into the engine at the next idle, once, before the engine is resumed', () => {
+    const r = rig();
+    r.idle(1, 100, 0);
+    expect(r.calls).toEqual([]);
+    r.d.setHz(30);
+    expect(r.calls).toEqual([]);
+    r.idle(2, 200, 0);
+    expect(r.calls).toEqual(['hz 30']);
+    r.idle(3, 300, 0);
+    expect(r.calls).toEqual(['hz 30']);
+  });
+
+  it('the last rate set before an idle is the one put; a later change is put at the next idle', () => {
+    const r = rig();
+    r.idle(1, 100, 0);
+    r.d.setHz(30);
+    r.d.setHz(60);
+    r.idle(2, 200, 0);
+    r.d.setHz(120);
+    r.idle(3, 300, 0);
+    expect(r.calls).toEqual(['hz 60', 'hz 120']);
   });
 });

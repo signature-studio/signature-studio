@@ -9,6 +9,9 @@ import { newDeskControl } from './desk-link.ts';
 
 export interface ExitInfo { reason: 'finished' | 'stopped' | 'trap'; code: number; message: string; presents: number }
 
+/** Issue #1502: the time the engine has, after the page is left, to close FL and run FL's shutdown (a frame: the engine is ended when it is longer) */
+export const EXIT_FRAME_MS = 4000;
+
 export interface ClientEvents {
   log(level: 'info' | 'warn' | 'error', text: string): void;
   exit(info: ExitInfo): void;
@@ -43,6 +46,8 @@ export interface ClientEvents {
   clipboardWrite?(text: string): void;
   /** #1389: the engine's Paste asks for the operating system's clipboard text; answer with EngineClient.clipboardAnswer(id, text | null) */
   clipboardRead?(id: number): void;
+  /** #1406: a question about the formats asks whether the operating system's clipboard holds text; answer with EngineClient.clipboardProbeAnswer(id, has) */
+  clipboardProbe?(id: number): void;
 }
 
 export class EngineClient {
@@ -52,6 +57,7 @@ export class EngineClient {
   private readonly readbacks = new Map<string, (m: FromWorker) => void>();
   private readyResolve: (() => void) | null = null;
   private exitInfo: ExitInfo | null = null;
+  private exitAsked = false;
   private exitWaiters: ((i: ExitInfo) => void)[] = [];
   private isIdle = false;
   private readonly events: ClientEvents;
@@ -74,6 +80,8 @@ export class EngineClient {
   }
   /** C-6 (#1310, a test aid): the engine's window-API trace on or off (the answer is the engine's stderr, not a message) */
   windowApiTrace(on: boolean): void { this.worker?.postMessage({ cmd: 'window-api-trace', on } satisfies ToWorker); }
+  /** Issue #1402: the page's measured rate of requestAnimationFrame; the engine is paced at it from its next idle */
+  setHz(hz: number): void { this.worker?.postMessage({ cmd: 'hz', hz } satisfies ToWorker); }
   /** decision 0240 (a test aid, when the desktop is shown with WebGL): the scene drawn again and read back from the GL canvas */
   deskGlPixels(): Promise<{ width: number; height: number; data: ArrayBuffer }> {
     return new Promise((res, rej) => {
@@ -130,8 +138,21 @@ export class EngineClient {
   }
 
   start(): void { this.send({ cmd: 'start' }); }
-  /** Issue #1385: the page is left (pagehide): the engine closes the FL main window, so FL closes the files it keeps open (the Worker's onExitRequest; once) */
-  exitRequest(): void { this.worker?.postMessage({ cmd: 'exit-request' } satisfies ToWorker); }
+  /**
+   * Issue #1385: the page is left (pagehide): the engine closes the FL main window, so FL closes the files it keeps open (the Worker's onExitRequest; once).
+   * Issue #1502: the close is followed by FL's shutdown (instance->vtable[0]; a reading: the settings and the Recent list may be written there). The engine has EXIT_FRAME_MS for it;
+   * when it has not ended by then it is ended (an idle engine) or its Worker is terminated. pagehide does not wait: the frame is a timer.
+   */
+  exitRequest(): void {
+    if (this.exitAsked || !this.worker) return;
+    this.exitAsked = true;
+    this.worker.postMessage({ cmd: 'exit-request' } satisfies ToWorker);
+    setTimeout(() => {
+      if (this.exitInfo !== null) return;
+      this.events.log('warn', `the page is left: the engine did not end within ${EXIT_FRAME_MS / 1000} s; it is ended now`);
+      this.stop();
+    }, EXIT_FRAME_MS);
+  }
   /** decision 0193: the person's answer to the engine's file dialog `id` (the File objects go to the Worker, which reads them into the engine's memory) */
   /** Issue #1362: the page's face of the Browser panel has loaded the document of the navigation (the engine fires its events at its next idle) */
   webview2Loaded(): void { this.worker?.postMessage({ cmd: 'webview2-loaded' } satisfies ToWorker); }
@@ -139,6 +160,8 @@ export class EngineClient {
   webview2Message(json: string): void { this.worker?.postMessage({ cmd: 'webview2-message', json } satisfies ToWorker); }
   /** #1389: the operating system's clipboard text the page read for the engine's Paste (null: none, or the page could not read it) */
   clipboardAnswer(id: number, text: string | null): void { this.worker?.postMessage({ cmd: 'clipboard-text', id, text } satisfies ToWorker); }
+  /** #1406: the answer to a clipboardProbe request (whether the clipboard holds text; no content is read for it) */
+  clipboardProbeAnswer(id: number, has: boolean): void { this.worker?.postMessage({ cmd: 'clipboard-probe-answer', id, has } satisfies ToWorker); }
   answerFileDlg(id: number, answer: FileDlgAnswer): void { this.worker?.postMessage({ cmd: 'filedlg-answer', id, answer } satisfies ToWorker); }
   /** a raw input event for the engine (decision 0141); `tPage` is the instant the DOM event was handled */
   sendInput(seq: number, tPage: number, ev: RawInput): void {
@@ -226,6 +249,7 @@ export class EngineClient {
       case 'webview2': this.events.webview2?.(m); break;
       case 'clipboard-write': this.events.clipboardWrite?.(m.text); break;
       case 'clipboard-read': this.events.clipboardRead?.(m.id); break;
+      case 'clipboard-probe': this.events.clipboardProbe?.(m.id); break;
     }
   }
 }

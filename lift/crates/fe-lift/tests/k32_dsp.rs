@@ -46,6 +46,8 @@ fn objs() -> &'static Vec<PathBuf> {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let mut v = Vec::new();
         for s in srcs {
             let o = dir.join(s.file_name().unwrap().to_string_lossy().replace(".c", ".o"));
@@ -277,6 +279,25 @@ fn initialize_critical_section_and_spin_count_on_a_live_section_stops() {
 }
 
 #[test]
+fn critical_sections_are_not_limited_to_32768_live_ones() {
+    // Learn (InitializeCriticalSection): the caller owns the object and deletes it; the page sets no count of the sections a process holds. The runtime's table grows (fle_sys.c), so
+    // 40000 live sections, each entered and left, then deleted in the reverse order, all work (the Sytrus demos of the E2E stopped at 32768: "more than 32768 live critical sections").
+    // The addresses are plain numbers: the runtime keeps the state outside the object and does not read the object.
+    let o = run(
+        "cs-many",
+        r#"
+    enum { N = 40000 };
+    int i;
+    for (i = 0; i < N; i++) { R[1] = 0x200000ull + 16u * (uint64_t)i; fle_imp_InitializeCriticalSection(); }
+    for (i = 0; i < N; i++) { R[1] = 0x200000ull + 16u * (uint64_t)i; fle_imp_EnterCriticalSection(); R[1] = 0x200000ull + 16u * (uint64_t)i; fle_imp_LeaveCriticalSection(); }
+    for (i = N - 1; i >= 0; i--) { R[1] = 0x200000ull + 16u * (uint64_t)i; fle_imp_DeleteCriticalSection(); }
+    printf("done %d\n", 1);
+"#,
+    );
+    assert_eq!(lines(&o), ["done 1"]);
+}
+
+#[test]
 fn slist_head_is_kept_outside_the_object_and_flushes_empty() {
     // Learn (InitializeSListHead): the structure "is for system use only"; (InterlockedFlushSList): "If the list is empty, the
     // return value is NULL". Nothing can push, so an initialized head is empty. The object's bytes are never touched.
@@ -413,8 +434,8 @@ fn get_command_line_a_is_the_ascii_text_of_the_wide_one() {
 
 #[test]
 fn environment_strings_block_has_the_page_format() {
-    // Learn: "Var1=Value1\0 ... VarN=ValueN\0\0". The virtual environment starts empty (decision 0018): the empty block is the
-    // single terminating NUL. After SetEnvironmentVariableW the block holds NAME=value\0 and the final NUL.
+    // Learn: "Var1=Value1\0 ... VarN=ValueN\0\0". The virtual environment starts with the standard session variables (Issue #1412,
+    // fle_env.c env_std), so the first block is not empty; SetEnvironmentVariableW adds NAME=value\0 at the end of the block.
     let o = run(
         "envblock",
         r#"
@@ -426,10 +447,10 @@ fn environment_strings_block_has_the_page_format() {
       R[1] = (uint64_t)(uintptr_t)nm; R[2] = (uint64_t)(uintptr_t)v1; fle_imp_SetEnvironmentVariableW();
       R[1] = (uint64_t)(uintptr_t)nm2; R[2] = (uint64_t)(uintptr_t)v2; fle_imp_SetEnvironmentVariableW(); }
     fle_imp_GetEnvironmentStringsW(); b = (uint16_t *)(uintptr_t)R[0];
-    { const uint16_t *p = b; int k = 0; char got[3][16];
+    { const uint16_t *p = b; int k = 0; static char got[32][96];
       while (*p) { size_t l = fle_w_len(p), j; for (j = 0; j < l; j++) got[k][j] = (char)p[j]; got[k][l] = 0; k++; p += l + 1; }
-      printf("entries %d\n", k); { int i; for (i = 0; i < k; i++) printf("entry %s\n", got[i]); }
-      printf("terminated %d\n", p[0] == 0); n = (size_t)(p - b) + 1; printf("units %zu\n", n); }
+      printf("entries %d\n", k); printf("first %s\n", got[0]); printf("entry %s\n", got[k - 2]); printf("entry %s\n", got[k - 1]);
+      printf("terminated %d\n", p[0] == 0); }
     R[1] = (uint64_t)(uintptr_t)b; fle_imp_FreeEnvironmentStringsW(); printf("free2 %llu\n", U(R[0]));
     printf("rsp_kept %d\n", R[4] == (uint64_t)(uintptr_t)&stk[16]);
 "#,
@@ -437,14 +458,13 @@ fn environment_strings_block_has_the_page_format() {
     assert_eq!(
         lines(&o),
         [
-            "nonnull 1 first_is_nul 1",
+            "nonnull 1 first_is_nul 0",
             "free 1",
-            "entries 2",
+            "entries 24",
+            r"first SystemRoot=C:\Windows",
             "entry FLE_A=x",
             "entry B=yz",
             "terminated 1",
-            // "FLE_A=x\0" 8 + "B=yz\0" 5 + the final NUL 1
-            "units 14",
             "free2 1",
             "rsp_kept 1",
         ]

@@ -407,6 +407,8 @@ fn driver() -> &'static PathBuf {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let exe = dir.join(&tag);
         let mut cmd = Command::new("clang");
         cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt);
@@ -462,7 +464,7 @@ fn shcore_is_the_35th_module_and_loads_by_every_spelling() {
             format!("{s} 5"),
             // the process loaded it at start: count 1 (FreeLibrary page), plus the four LoadLibrary calls
             "refs 5".to_string(),
-            "count 42 name34 shcore.dll".to_string(), // decision 0238: kernelbase.dll appended (decision 0122: 39, dwmapi.dll appended) (decision 0119: 38, wtsapi32.dll and uxtheme.dll appended; old: count 36)
+            "count 43 name34 shcore.dll".to_string(), // decision 0238: kernelbase.dll appended (decision 0122: 39, dwmapi.dll appended) (decision 0119: 38, wtsapi32.dll and uxtheme.dll appended; old: count 36)
         ]
     );
 }

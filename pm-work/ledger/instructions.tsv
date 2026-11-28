@@ -71,3 +71,21 @@ L-069	2026-11-24	依頼者	agent.yml: エージェントの開始の直前に、
 L-070	2026-11-25	依頼者	まだ非常にクラッシュしやすい。積極的に是正する	pm-work/issue-drafts/wave1ak/
 L-071	2026-11-25	依頼者	プラグインのノブの右クリックで、貼り付けのメニューと権限のトーストが出て、トーストが消えない。クリップボードの権限を求める処理が無い。貼り付けの必要が無い操作で出る	pm-work/issue-drafts/wave1al/163-clipboard-query-no-read.md
 L-072	2026-11-25	依頼者	E2E を GitHub Actions 上で、4K 120 Hz のブラウザで、Playwright など何でも使って、実行する	pm-work/issue-drafts/wave1al/164-e2e-foundation-4k-120hz.md・pm-work/issue-drafts/wave1al/165-e2e-regression-scenarios.md
+L-073	2026-11-25	依頼者	perf/windows-browser(#1356)の知見を拾い、性能改善タスクに活かす。そのブランチはマージされず、頃合いを見て削除される	pm-work/findings/perf-windows-browser/(ブランチの台帳の L-073〜L-084 とは番号が重なるが、main の次の番号を使う。ブランチ側の番号は、参照のとき「perf/windows-browser の L-0xx」と書く)
+L-074	2026-11-25	依頼者(そのエージェントへの指示)	各報告で同じ性能指標を示す。1000Hz マウス入力を継続しながら評価用プロジェクトを開いて再生し、音が途切れず画面が最低120fpsで更新されることを最低条件にする	pm-work/findings/perf-windows-browser/(perf/windows-browser の L-081 を写す。指標: 起動時間・実測入力 Hz・平均と 1 秒窓の最低 fps・音声途切れ増分・PCM の異常な反復)
+L-075	2026-11-25	依頼者	マウスカーソルを、HiDPI(devicePixelRatio)を考慮して、大きすぎない大きさで出す	pm-work/issue-drafts/wave1ax/194-cursor-size-hidpi.md
+L-076	2026-11-25	依頼者	Plugin Database を、内蔵プラグインの一覧として出す。Plugin Manager を起動できるようにする	pm-work/issue-drafts/wave1ax/198-plugin-database-manager.md
+L-077	2026-11-25	依頼者	マウスカーソルの Base64 を表示しない。テレメトリに関する情報は依頼者へ連絡しない前提で、ページに HTML のヘッダー・サイドバーを置かない	pm-work/issue-drafts/wave1ax/195-page-no-html-chrome.md
+L-078	2026-11-25	依頼者	言語設定を変更した後、ページを再読み込みして engine が落ちないようにする	pm-work/issue-drafts/wave1x/142-settings-registry-persist.md・pm-work/issue-drafts/wave1ad/154-language-start.md
+L-079	2026-11-25	依頼者	「貼り付け」だけのコンテキストメニューを出さない。クリップボードは Clipboard API だけを使い、フォールバックを持たない。ページ読み込み時に権限を求め、権限が無い時のトーストを出さない	pm-work/issue-drafts/wave1ax/196-clipboard-api-only-no-menu.md
+L-080	2026-11-25	依頼者	ページ読み込み時の描画を、ランダムに不完全にしない(画面の左側が黒いまま残らない)	pm-work/issue-drafts/wave1ax/197-first-paint-complete.md
+L-081	2026-11-25	依頼者	E2E(Playwright)のシナリオを十分な数に用意し、実施する	pm-work/issue-drafts/wave1ay/
+L-082	2026-11-26	依頼者	存在する機能について、考えうる限り全ての E2E テストを追加する	pm-work/issue-drafts/wave1ay/
+L-083	2026-11-27	依頼者(不定期FB)	File→Openをクリックするとネイティブファイル選択ウインドウが出現します。これは明らかに間違った挙動です。OPFSウインドウが出現するよう是正してください。	File→Open で、ブラウザのネイティブのファイル選択を出さず、OPFS のファイル管理の窓を出す
+L-084	2026-11-27	依頼者(不定期FB)	ネイティブのローディングスプラッシュを維持してください。順序としては、1. 黒背景（何も動いていない状態のCanvas）に、画面中央にHTML製モーダルで起動に必要なリソースのダウンロード状況を進捗バーで表示、ダウンロード完了し起動開始直前にモーダルを削除 2. ネイティブのスプラッシュを表示 - ネイティブスプラッシュは、決してネイティブスプラッシュで使用している画像を適当に動かすだけではいけません。ネイティブスプラッシュを表示しているコードをそのままliftする必要があります。	起動の順序は、黒い canvas の上に、画面中央の HTML のモーダルで起動に必要なリソースの進捗バーを出し、起動の直前にモーダルを消してから、FL のネイティブのスプラッシュを出す。スプラッシュは FL の表示のコードを lift して出し、画像を動かすだけにしない
+L-085	2026-11-27	依頼者(不定期FB)	質問: ツールバーメニューに任意の項目を追加することは可能ですか？もし可能である場合、File...メニューの"Revert to last backup"と"Exit"の間に"Manage files"メニューを追加してください。このメニューを開くと、OPFSウインドウが出現します。	条件つきの指示: メニューに項目を足せるなら、File メニューの「Revert to last backup」と「Exit」の間に「Manage files」を足し、開くと OPFS のファイル管理の窓を出す
+L-086	2026-11-27	依頼者(不定期FB)	言語切り替えはまだ正常に動作しません。	是正: 言語切り替えを本番で正常に動かす(#1395 の本文に依頼者の確認を書く)
+L-087	2026-11-27	依頼者(不定期FB)	マウスカーソルはHiDPIに正しく対応しているようです。	動作は無い(依頼者の確認。是正は無い)
+L-088	2026-11-28	依頼者(是正指示)	あなたはインスタンスが再起動してもそれを起点に動き出すことができません。以下のようなsystemd user serviceを作成し、インスタンスが起動したことをこのセッションに通知する仕組みを作成してください。([Unit] Description=Run command at startup / [Service] Type=oneshot, ExecStart=<このセッションに通知する oc-msg.sh コマンド>, RemainAfterExit=yes / [Install] WantedBy=default.target)	例外(AGENTS.md の「リポジトリの外にユニットを作らない」の唯一の例外): ~/.config/systemd/user/signature-studio-boot-notify.service を作り、enable した。起動の時に、oc-msg.sh send で、このセッションへ kind=boot の通知を送る(opencode.service の後。送れるまで 5 秒おきに最大 1 時間 再試行)。通知を受けたら、git pull・gh run list・gh issue list(failed・running)・opencode api session.active で状態を取り直し、.tmp-watch.sh を background で起動し直す
+L-089	2026-11-28	依頼者(是正指示)	あと、今も何もコマンドが動いていません。	待ち(.tmp-watch.sh)は、通知を受けるたびに、最初の操作として、background で起動し直す。常に 1 つ動いている状態にする(動いていない間は、状態を見る者がいない)
+L-090	2026-11-28	依頼者(是正指示)	それと、起動時/読み込み時のスプラッシュ画像がいつも2fpsくらいでしか動いてない問題については認識してる？	是正: 起動の間(モーダルを消した後から最初の idle まで)の FL のスプラッシュの提示を、2 fps 程度から、通常の UI の更新(60 fps 以上。目標 120)へ上げる。起動の間の提示の毎秒の数を E2E で測り、受け入れに入れる(Issue を起票する)

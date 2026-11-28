@@ -1,0 +1,82 @@
+id	kind	name	expected	how
+input/mouse/left-click	mouse	左ボタンのクリック	メニューの見出しを左クリックすると、プルダウン(TQuickPopupMenuWindow)が出る。左の押下と解放が、押した場所でエンジンに届く	見出しの位置は窓の表(TNewMenu)から。CDP の押下と解放
+input/mouse/middle-click	mouse	中ボタンのクリック	中の押下と解放が、押した場所でエンジンに届き、窓が hit を受ける(hit 行の final が 0 でない)	CDP の middle。エンジンの windowApiTrace の hit: 行
+input/mouse/right-click	mouse	右ボタンのクリック	ミキサーの上で右を押すと、FL の文脈のプルダウンが出る。右の押下がエンジンに届く	窓の矩形の (20, 60) で右を押し、プルダウンの出現を窓の表で見る
+input/mouse/double-click	mouse	ダブルクリック	二度の押下と解放が、間を置かずに同じ場所でエンジンに届く(二重の判定はエンジン内。その結果は読まない)	clickCount 1 と 2 の押下と解放。hit 行でも数える
+input/mouse/drag-start	mouse	ドラッグの開始	左を押した場所が、ドラッグの始点としてエンジンに届く	guest.drag の最初の押下。記録の画面の座標
+input/mouse/drag-middle	mouse	ドラッグの途中	押したままの移動が、途中の場所でエンジンに届く	guest.drag の 12 段の移動。途中の移動の記録
+input/mouse/drag-end	mouse	ドラッグの終了	離した場所への移動と解放が、終点でエンジンに届く(同じ場所の押下と解放も含む)	guest.drag の終点の移動と解放
+input/mouse/wheel-vertical	mouse	ホイールの縦	縦のホイールが、エンジンに wheel として届き、ピアノロールの画素が変わる(上下の両方)	ピアノロールの上で 3 段(deltaY ±100)。矩形の画素のハッシュ
+input/mouse/wheel-horizontal	mouse	ホイールの横	横のホイール(deltaX)がエンジンに届き、ピアノロールの表示が横へ動く。現状は届かない(既知の欠陥。印 new)	deltaX の wheel。ページは deltaY だけを読む(app/src/input/pointer.ts)
+input/mouse/move	mouse	移動	移動がエンジンに届き、hit 行の位置が続く。プルダウンの上で動かすと、強調の画素が変わる	CDP の mouseMoved。hit 行の ptr と、プルダウンの矩形の画素
+input/mouse/move-1khz	mouse	移動(1000 Hz 相当)	約 1 ms 間隔の 200 回の移動は、全て処理されるか落とされ、最後の位置がエンジンに届く(音声の途切れは #1491)	200 回の mouseMoved を続けて送る。処理の記録で数える
+input/mouse/focus-desktop	mouse	左クリックで、デスクトップが入力のフォーカスを得る	押下で #desktop が activeElement になる	フォーカスを外してから、デスクの中央を左クリック
+input/key/alnum-letter	key	英字(小文字)	入力欄で英字が入り、ゲストのメモリの文字列に現れる	F2 で名前の箱を開き、小文字を打って確定する
+input/key/alnum-digit	key	数字(上段)	入力欄で数字が入り、ゲストのメモリの文字列に現れる	8 桁の数字を打って確定する
+input/key/numpad	key	テンキー	テンキーの押下と解放がエンジンに届く(数字は NumLock の状態に依り、読まない)	Numpad1 から Numpad3 の押下と解放
+input/key/punctuation	key	記号(ハイフン)	ハイフンが入力欄に入り、ゲストのメモリの文字列に現れる	Minus の押下
+input/key/shift	key	Shift と英字	Shift を押したままの英字で大文字が入る	Shift の押下(rawKeyDown, modifiers 8)と英字
+input/key/shift-arrow	key	Shift+矢印	Shift+左で末尾の一字が選ばれ、打った字がそれを置き換える	Shift+ArrowLeft
+input/key/ctrl	key	Ctrl+A	Ctrl+A で全部が選ばれ、打った字が全体を置き換える	Ctrl+A(guest.ctrl)
+input/key/ctrl-arrow	key	Ctrl+矢印	Ctrl+左で一つ前の語の先頭へ挿入位置が動く	Ctrl+ArrowLeft の後に字を打つ
+input/key/alt	key	Alt+F8	Alt を押したままの F8 で、プラグインの一覧(TPlugListForm)が出る。現状は両方のキーがエンジンに届くが一覧が出ない(印 new)	Alt の押下、F8(modifiers 1)
+input/key/f1	key	F1	F1 の押下と解放がエンジンに届き、エンジンは待機のまま(表示の結果は読まない)	F1
+input/key/f2	key	F2	選んだチャンネルの名前の箱(新しい窓)が出る	F2 の後の窓の表の差分
+input/key/f3	key	F3	F3 の押下と解放がエンジンに届き、エンジンは待機のまま(表示の結果は読まない)	F3
+input/key/f4	key	F4	F4 の押下と解放がエンジンに届き、エンジンは待機のまま(表示の結果は読まない)	F4
+input/key/f5	key	F5	F5 で、デスクの画素が変わる(プレイリストの表示)。もう一度押すと元に戻る	F5 を 1 回と 2 回。デスク全体の画素のハッシュ
+input/key/f6	key	F6	F6 で、デスクの画素が変わる(チャンネルラックの表示。窓の題名は TStepSeqForm)。もう一度押すと元に戻る	F6 を 1 回と 2 回。デスク全体の画素と、窓の一覧の差分
+input/key/f7	key	F7	F7 で、題名が Piano roll の窓が出る	F7(開いていれば Escape の後に)
+input/key/f8	key	F8	F8 で、プラグインの一覧の窓(TPlugListForm)が出る	F8 の後に窓の表を読み、Escape で閉じる
+input/key/f9	key	F9	F9 で、デスクの画素が変わる(ミキサーの表示)。もう一度押すと元に戻る	F9 を 1 回と 2 回
+input/key/f10	key	F10	F10 で、設定の窓(TMIDIForm)が出る	F10 の後に窓の表を読む
+input/key/f11	key	F11	F11 で、題名が Settings の設定の窓(TMIDIForm)が出る	F11 の後に窓の表の題名を読む
+input/key/f12	key	F12	F12 の押下と解放がエンジンに届き、エンジンは待機のまま(表示の結果は読まない)	F12
+input/key/arrow-up	key	矢印(上)	プルダウンの強調が一つ戻る(下、下、上の後の画素は、下の一回目の後と同じ)	File のプルダウンで Down、Down、Up
+input/key/arrow-down	key	矢印(下)	プルダウンの強調が一つ進み、その画素が変わる	File のプルダウンで Down(一回と二回)
+input/key/arrow-left	key	矢印(左)	入力欄の挿入位置が左へ動き、後で打った字がその位置に入る	名前の箱で字を打ち、Left を二回、字を打つ
+input/key/arrow-right	key	矢印(右)	入力欄の挿入位置が右へ動き、後で打った字がその位置に入る	Home の後に Right を二回、字を打つ
+input/key/home	key	Home	挿入位置が先頭へ動き、後で打った字が先頭に入る	Home の後に字を打つ
+input/key/end	key	End	挿入位置が末尾へ動き、後で打った字が末尾に入る	Home、End の後に字を打つ
+input/key/tab	key	Tab	Tab でデスクの外へフォーカスが移り、キーはエンジンに届かない(Shift+Tab も同じ)	Tab と Shift+Tab。activeElement と、キーの記録
+input/key/escape	key	Escape	Escape でプルダウンが閉じ、名前の箱が取り消され、F8 の一覧と F10 の設定の窓が閉じる	Escape。窓の表の差分
+input/key/enter	key	Enter	Enter で名前が確定して箱が閉じる(空の箱でも閉じる)。プルダウンでは項目を選ぶ	Enter。箱の有無と、ゲストのメモリの文字列
+input/key/space	key	Space	空白が入力欄に入り、ゲストのメモリの文字列に現れる	Space を挟んだ二つの語
+input/key/backspace	key	Backspace	Backspace で最後の字が消え、確定した名前は残りの字になる	字を打ち、Backspace、Enter
+input/key/delete	key	Delete	Delete で挿入位置の後ろの字が消える	Home の後に Delete、Enter
+input/key/repeat	key	キーの繰り返し(押しっぱなし)	押しっぱなしの三回の押下が、三回分の動きになる(キャレットは三字、プルダウンは三項目)	autoRepeat の rawKeyDown を三回、続けて keyUp
+input/key/ime-compose	ime	IME の合成	日本語の合成文字が入力欄に入る。現状は届かない(既知の欠陥。印 new)	Input.imeSetComposition(にほん)
+input/key/ime-convert	ime	IME の変換	変換後の文字が入力欄に入る。現状は届かない(既知の欠陥。印 new)	合成を別の文字(日本)に差し替える
+input/key/ime-commit	ime	IME の確定	確定した文字が入力欄に入る。現状は届かない(既知の欠陥。印 new)	Input.insertText(日本)
+input/key/ime-cancel	ime	IME の取り消し	合成を取り消すと、入力欄に文字が残らない。現状は合成の文字が届かない(印 new)	合成(ゑ)の後に空の合成で取り消す
+input/key/ctrl-n	key	Ctrl+N	空の曲で Ctrl+N: キーがエンジンに届き、箱は出ず、デスクの画素は変わらない。現状は「名前を付けて保存」(TNewProjForm)が出る(印 new)	Ctrl+N(guest.ctrl)
+input/key/release	key	キーを離す	キーの押下と解放の組が、両方エンジンに届く	F12 の押下と解放
+input/clipboard/copy-prompt	clipboard	コピー(権限 prompt)	Ctrl+C が選んだ文字をページの Clipboard API へ渡す。書けない時は理由が記録に残る	Ctrl+A、Ctrl+C。権限は Browser.setPermission で prompt
+input/clipboard/copy-granted	clipboard	コピー(権限 granted)	選んだ文字がクリップボードに入り、読み戻しで同じ文字になる	Ctrl+A、Ctrl+C。権限は granted
+input/clipboard/copy-denied	clipboard	コピー(権限 denied)	writeText は呼ばれず、記録に clipboard-write: denied が残る	Ctrl+A、Ctrl+C。権限は denied
+input/clipboard/paste-prompt	clipboard	貼り付け(権限 prompt)	Ctrl+V が読む要求を出し(readText の呼び出しが増える)、結果(文字または理由)が記録に残る	granted で文字を書いてから、prompt にして Ctrl+V
+input/clipboard/paste-granted	clipboard	貼り付け(権限 granted)	クリップボードの文字が入力欄に入る	granted で文字を書き、Ctrl+V
+input/clipboard/paste-denied	clipboard	貼り付け(権限 denied)	readText は呼ばれず、入力欄に文字は入らない。記録に clipboard-read: denied が残る	granted で文字を書いてから denied にして Ctrl+V
+input/clipboard/cut-granted	clipboard	切り取り	Ctrl+X の文字がクリップボードに渡り、読み戻しで同じ文字になる	Ctrl+A、Ctrl+X。権限は granted
+input/clipboard/permission-change	clipboard	権限の変化	prompt から granted へ変えると、次の貼り付けで readText が呼ばれ、文字が入る	二回の Ctrl+V の間に権限を変える
+input/clipboard/notice-none	clipboard	拒否の通知	denied で貼り付けと複写をしても、通知の表示(role=status などの文字)と #clipboard-status が出ない	貼り付けと複写の後の、表示の要素の走査
+input/menu/context-menu-fl	menu	FL の文脈メニュー	右クリックで FL のプルダウンが出る(ブラウザの標準のメニューは出ない)	ミキサーとチャンネルラックの右押下。窓の表の差分
+input/menu/browser-menu-canvas	menu	ブラウザの右クリックメニューの抑止(キャンバス)	キャンバスの上の contextmenu は、全て既定の動作が止められている	キャンバスの中で右を 6 回押す
+input/menu/browser-menu-desktop	menu	ブラウザの右クリックメニューの抑止(デスクトップ)	デスクトップ(#desktop)の上の contextmenu は、全て既定の動作が止められている	デスクの中で右を 6 回押す
+input/menu/browser-menu-toolbar	menu	ブラウザの右クリックメニューの抑止(ツールバー)	非表示のツールバーで発行された contextmenu は止められている	#toolbar で contextmenu を 6 回発行する
+input/menu/browser-menu-sidebar	menu	ブラウザの右クリックメニューの抑止(サイドバー)	非表示のサイドバーで発行された contextmenu は止められている	aside で contextmenu を 6 回発行する
+input/tooltip/hint-bar-shows	tooltip	ヒントが出る	上部バーの上でポインタを止めると、ヒントバーの画素が変わる	上部バー(TQuickControlBar)の上の幾つかの点で 1.6 秒ずつ止める
+input/tooltip/hint-bar-hides	tooltip	ヒントが消える	ポインタを離すと、上部バーの画素が出る前の画素に戻る	ヒントが出た後、ポインタをデスクの下へ動かす
+input/cursor/text-field	cursor	テキスト欄のカーソル	入力欄の上のカーソルは I ビーム(CSS の text)	名前の箱の中央で、カーソルの読み(#desktop の cursor)
+input/cursor/resize-ns	cursor	リサイズ(上下)	窓の上と下の端で、カーソルは縦のリサイズ(ゲストの資源の画像。CSS の ns-resize ではない)。上と下は同じ画像	設定の窓(F10)の上下の端の 2 px 内側の点。窓が前面にあることを確かめる
+input/cursor/resize-ew	cursor	リサイズ(左右)	窓の左と右の端で、カーソルは横のリサイズ(ゲストの資源の画像)。左と右は同じ画像で、上下とは別の画像	設定の窓(F10)の左右の端の 2 px 内側の点
+input/cursor/resize-diag-ne-sw	cursor	リサイズ(斜め 北東・南西)	北東と南西の角で、カーソルは nesw-resize。現状は斜めの端が上の端と同じ画像(印 new)	同上
+input/cursor/resize-diag-nw-se	cursor	リサイズ(斜め 北西・南東)	北西と南東の角で、カーソルは nwse-resize。現状は斜めの端が上の端と同じ画像(印 new)	同上
+input/cursor/window-edge	cursor	窓の端のカーソル(八方向)	八方向のすべてで、対応するリサイズのカーソルになる。現状は斜めの 4 方向が上下の画像と同じで、画像は 2 種(印 new)	窓の八つの点。通常の画面と、乱数の DPR の画面
+input/cursor/pencil-picture	cursor	ピアノロールの鉛筆	描く道具の鉛筆のカーソルが、画像(image-set)として出る	F7 でピアノロール、D で描く道具、グリッドの上
+input/cursor/picture-size-dpr	cursor	カーソルの大きさが DPR に合う	画像の倍率は DPR(image-set の 1x などの値)。CSS の大きさは画素 ÷ DPR で 128 以下。ホットスポットも同じ割り方	鉛筆の画像の寸法とホットスポットを、DPR から計算して比べる
+input/cursor/palm	cursor	手のひらのカーソル	未覆い: 手のひらの道具の確かな操作を見つけられなかった	—
+input/touch/tap	touch	タップ	タップ(触れて離す)が左ボタンの押下と解放としてエンジンに届き、見出しならプルダウンが出る	CDP の touch(touchStart、touchEnd)
+input/touch/long-press	touch	長押し	900 ms の押下が、押下と解放としてエンジンに届き、ブラウザの右クリックメニューは出ない	touchStart の後 900 ms、touchEnd。contextmenu の記録
+input/touch/drag	touch	ドラッグ	指の移動がドラッグとしてエンジンに届く(始点の押下、終点への移動と解放)	8 段の touchMove
+input/touch/pinch	touch	2 本指のピンチ	2 本目の指はエンジンに届かず、1 本目の指の移動だけが届く	二本の touchPoints。1 本目の移動の座標だけを数える

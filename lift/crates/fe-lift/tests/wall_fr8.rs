@@ -214,9 +214,9 @@ fn each_new_thunk_is_answered_under_its_own_dll_and_no_other_dll() {
         let (st, c) = gen(&[(dll, name), (other, name), (dll, "SendMessageA"), ("kernel32.dll", "GetProcAddress")]);
         assert_eq!(st.handled[format!("jmp_imp:{name}").as_str()], 1, "{dll}!{name}");
         assert_eq!(c.matches(&format!("fle_imp_{name}(); return;")).count(), 1, "{dll}!{name}: only the thunk of its own dll is answered");
-        for k in [1u64, 2] {
+        for (k, want) in [(1u64, format!("{other}!{name}")), (2, format!("{dll}!SendMessageA"))] {
             let va = IB + 0x1040 + 0x10 * k;
-            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{name}: thunk {k} stays unsupported");
+            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{want}\"); }}")), "{dll}!{name}: thunk {k} stops by name");
         }
     }
 }
@@ -237,8 +237,8 @@ fn the_names_that_stay_unanswered_are_not_rows() {
 // 2. The driver: real fle_thread.c and the files it works with, a stub fle_dispatch_table
 // ---------------------------------------------------------------------------------------------
 
-const RT_FILES: [&str; 14] = [
-    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
+const RT_FILES: [&str; 15] = [
+    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_glob.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
     "fle_time.c",
 ];
 const RT_EXTRA: [&str; 4] = ["fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c"];
@@ -352,6 +352,7 @@ fn run_src_with(name: &str, top: &str, body: &str, more: &[&str]) -> Out {
     std::fs::write(&c, src).unwrap();
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pthread", "-I"]).arg(src_dir()).arg("-I").arg(rt_dir());
+    cmd.arg(manifest().join("tests/support/mutex_real_stub.c"));
     for o in objs() {
         cmd.arg(o);
     }
@@ -1415,6 +1416,7 @@ fn dll_thread_attach_and_detach_are_delivered_to_the_real_modules_in_the_new_thr
     static uint16_t nm[] = { 's','t','u','b','d','l','l','.','d','l','l', 0 };
     if (img == MAP_FAILED) { printf("mmap failed\n"); return 1; }
     img[0] = 'M'; img[1] = 'Z'; *(uint32_t *)(img + 0x3c) = 0x80; *(uint32_t *)(img + 0x80) = 0x4550;
+    *(uint16_t *)(img + 0x80 + 22) = 0x2000; /* FileHeader.Characteristics: IMAGE_FILE_DLL (without it the image is a program, fle_realmod.c) */
     *(uint16_t *)(img + 0x80 + 24) = 0x20b; *(uint32_t *)(img + 0x80 + 24 + 16) = 0x1000;
     CALL4(fle_imp_LoadLibraryW, A(nm), 0, 0, 0);
     printf("loaded %llx notices %u\n", U(R[0]), nn);
@@ -1450,11 +1452,12 @@ fn dwmapi_is_virtual_module_39_with_the_handle_of_the_formula_and_dwm_flush_is_i
     let list = &t[a..a + t[a..].find("};").unwrap()];
     let stripped = strip_comments(list);
     let names: Vec<&str> = stripped.split('"').enumerate().filter(|(i, _)| i % 2 == 1).map(|(_, s)| s).collect();
-    assert_eq!(names.len(), 41);   // decision 0238: kernelbase.dll (N = 40) and combase.dll (N = 41) are appended after dwmapi.dll (old: 39)
+    assert_eq!(names.len(), 43);   // Issue #1370: imm32.dll (N = 43, index 42) is appended after webview2loader.dll (N = 42). decision 0238: kernelbase.dll (N = 40) and combase.dll (N = 41) are appended after dwmapi.dll (old: 39)
     assert_eq!(names[38], "dwmapi.dll");
     assert_eq!(names[37], "uxtheme.dll");
     assert_eq!(names[39], "kernelbase.dll");
     assert_eq!(names[40], "combase.dll");
+    assert_eq!(names[42], "imm32.dll");
 }
 
 #[test]

@@ -16,10 +16,10 @@ import { percentile, STAGE_KEYS, toAnyFrame, toEventRaf, toLateRaf, stagesOf, ty
 /** the numbers the page compares its measurements with (docs/milestones/performance-targets.md) */
 export const TARGETS = { startupSeconds: 10, updatesPerSecond: 120, inputToUpdateP95Ms: 17 } as const;
 /**
- * The upper limit of the engine's wasm memory (decision 0170): the memory section of the engine's wasm says initial 640 MB, maximum 2,048 MB (read from fl-engine-b1-D's wasm; build_nmod_wasm.sh sets no MAXIMUM_MEMORY, so it is Emscripten's
- * default). A page cannot read the maximum of a WebAssembly.Memory, so it is a constant here: a build with another maximum needs another number. The engine's memory only grows; when it cannot grow the engine's allocations fail.
+ * The upper limit of the engine's wasm memory: the engine's link sets MAXIMUM_MEMORY to 4 GiB (lift/harness/web/link.rsp, #1382; 2 GiB before, decision 0170). A page cannot read the maximum of a
+ * WebAssembly.Memory, so it is a constant here: a build with another maximum needs another number. The engine's memory only grows; when it cannot grow the engine's allocations fail.
  */
-export const WASM_MEMORY_LIMIT_BYTES = 2048 * 1024 * 1024;
+export const WASM_MEMORY_LIMIT_BYTES = 4096 * 1024 * 1024;
 export const RECENT_WINDOW_MS = 10_000;
 export const LATENCY_LAST = 20;
 

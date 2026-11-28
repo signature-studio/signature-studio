@@ -130,6 +130,7 @@ void fle_imp_DefWindowProcW(void);
  * of WM_SETICON, say nothing about a NULL or invalid hWnd; System Error Codes lists 1400 "Invalid window handle." without naming an API). */
 #define FLE_ERROR_INVALID_WINDOW_HANDLE 1400u
 #define FLE_GCLP_HICON (-14)   /* Learn SetClassLongPtrW: GCLP_HICON -14 "Replaces a handle to the icon associated with the class" */
+void fle_imp_GetClassLongPtrW(void);   /* Issue #1538: GCLP_HICON only (fle_win.c) */
 void fle_imp_SendMessageW(void);
 void fle_imp_SendMessageA(void);
 void fle_imp_SetClassLongPtrW(void);
@@ -144,6 +145,15 @@ void fle_imp_WTSRegisterSessionNotification(void);
  * functions are not answered. fle_win_buffered_paint_init_count: inspection (for tests and tools). */
 void fle_imp_BufferedPaintInit(void);
 uint32_t fle_win_buffered_paint_init_count(void);
+
+/* Issue #1370 (provisional): imm32.dll (virtual module N = 43), the seven delay-loaded IME functions, answered as a Windows with no IME does (NULL or FALSE; fle_win.c). */
+void fle_imp_ImmGetContext(void);
+void fle_imp_ImmReleaseContext(void);
+void fle_imp_ImmAssociateContextEx(void);
+void fle_imp_ImmIsIME(void);
+void fle_imp_ImmGetConversionStatus(void);
+void fle_imp_ImmSetConversionStatus(void);
+void fle_imp_ImmSetOpenStatus(void);
 
 /* Decision 0122 (PROVISIONAL): the message queue of each guest thread (fle_thread.c holds the queues; docs/decisions/0122-cooperative-threads.md). The window table gives every window an owner, the
  * thread that created it (Learn: "the thread that created the window"), and these functions use the queue of that thread. No message is made up: a queue holds only what the guest posts

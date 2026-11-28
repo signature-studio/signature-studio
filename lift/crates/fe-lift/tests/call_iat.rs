@@ -10,7 +10,7 @@
 //! every runtime/fle_*.c, and run natively: the value must come out of the runtime function (77), the code after
 //! each call must run (+1, +3), the stack pointer must be what it was before, and the return address of the last
 //! call must be in the slot below the guest stack top (the same shape as a direct call and the jmp thunk).
-//! The unanswered variant calls k.dll!Fn: it stays `fle_unsupported`, counted as before, and stops the run.
+//! The unanswered variant calls k.dll!Fn: it is counted as before, and stops the run by name (`fle_import_stop`, Issue #1538).
 
 mod etxt_common;
 
@@ -170,6 +170,8 @@ fn runtime_objs() -> &'static Vec<PathBuf> {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let mut v = Vec::new();
         for s in srcs {
             let o = dir.join(s.file_name().unwrap().to_string_lossy().replace(".c", ".o"));
@@ -289,12 +291,13 @@ fn call_through_iat_slot_without_a_row_stays_unsupported_and_stops_the_run() {
     assert_eq!(st.unsupported["Call: indirect through IAT slot (not lifted)"], 1);
     assert_eq!(st.unsupported_total, 1);
     assert!(!st.handled.keys().any(|k| k.starts_with("call_imp:")));
-    assert!(c.contains(&format!("L_{:x}: {{ /* {:#x} Call */ fle_unsupported(UINT64_C({:#x})); }}", IB + 0x1000, IB + 0x1000, IB + 0x1000)));
+    // Issue #1538: the stop names the import (counted as before, under the same reason)
+    assert!(c.contains(&format!("L_{:x}: {{ /* {:#x} Call */ fle_import_stop(\"k.dll!Fn\"); }}", IB + 0x1000, IB + 0x1000)));
 
     let r = run("call-iat-unanswered", &c);
     assert!(!r.ok && !r.stdout.contains("returned"), "{}", r.stdout);
     assert_eq!(r.signal, Some(6));
-    assert!(r.stderr.contains(&format!("fle: unsupported instruction at {:#x}", IB + 0x1000)), "{}", r.stderr);
+    assert!(r.stderr.contains("fle: import k.dll!Fn is not modeled"), "{}", r.stderr);
 }
 
 #[test]

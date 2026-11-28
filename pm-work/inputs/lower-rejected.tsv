@@ -1,2 +1,9 @@
 va	module	理由	日付
 0x37ca8f0	dsp	listed but not emitted	2026-11-21
+0x11fc770	fle	listed but not emitted: bit test on memory with a register bit offset	2026-11-26
+0x6a2180	fle	listed but not emitted: 32-bit addressing	2026-11-26
+0x38e6d90	dsp	listed but not emitted: calls a function that is opaque	2026-11-26
+0x4776f60	b2d	listed but not emitted: RSP at a return or tail jump is not its entry value	2026-11-26
+0x47ec670	fle	not listed: no row in the fe-wasmgen report of fle (n0-fle.tsv), so a list entry would fail check_listed; the C unit gen/src/m2-00.c has it	2026-11-26
+0x47eeec0	fle	not listed: no row in the fe-wasmgen report of fle (n0-fle.tsv), so a list entry would fail check_listed; the C unit gen/src/m2-00.c has it	2026-11-26
+0x482e8a0	fle	not listed: no row in the fe-wasmgen report of fle (n0-fle.tsv), so a list entry would fail check_listed; the C unit gen/src/m2-00.c has it	2026-11-26

@@ -26,6 +26,7 @@ const HEADER = ['key', 'guest', 'role', 'sha256', 'size', 'hook', 'args', 'omit'
 const SHA_BALANCE = 'a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064';
 const SHA_FILTER = 'f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c';
 const SHA_DELAY = 'c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc';
+const SHA_REVERB = '892423bcce3d516eb42d303566e8a15a23a9ae9014fbc589c79afa542019ba40';
 const GUEST = 'C:\\Program Files\\Image-Line\\FL Studio 21\\';
 const BALANCE_ROW = ['effects.fruity-balance.fruity_balance_x64.dll', 'Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll', '本体', SHA_BALANCE, '3718656', 'existing', '--pdata', '0x2c13a0'].join('\t');
 
@@ -57,6 +58,12 @@ try {
     rb.extract.map((r) => r.join('\t')), [`fruity balance_x64.dll\tlift/out-plugins/effects.fruity-balance.fruity_balance_x64.dll\t${SHA_BALANCE}`]);
   ok('Balance: seed の行は、guest の絶対パス・host の先(末尾が鍵)・SHA-256',
     rb.seed.map((r) => r.join('\t')), [`${GUEST}Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/effects.fruity-balance.fruity_balance_x64.dll\t${SHA_BALANCE}`]);
+
+  // 1b. Shared\Reverb_x64.dll(#1429): 親のフォルダが無いので、seed の先は inputs/install の直下(鍵の名前)。補助の行
+  const rv = pluginRows(plugins({ reverb: `${HEADER}\nreverb_x64.dll\tShared\\Reverb_x64.dll\t補助\t${SHA_REVERB}\t492544\tnone\t--pdata\t-\n` }));
+  ok('Shared: 抽出の行は、installer の名前・host の先(鍵)・SHA-256。seed の先は inputs/install の直下',
+    [rv.extract.map((r) => r.join('\t')), rv.seed.map((r) => r.join('\t'))],
+    [[`reverb_x64.dll\tlift/out-plugins/reverb_x64.dll\t${SHA_REVERB}`], [`${GUEST}Shared\\Reverb_x64.dll\tlift/out-idle1/inputs/install/reverb_x64.dll\t${SHA_REVERB}`]]);
 
   // 2. 2 つのフォルダ。鍵の順に並ぶ(zeta は alpha の後)。補助の DLL も行になる
   const two = plugins({
@@ -124,6 +131,35 @@ try {
 
   // 5. 実物の lift/plugins(あれば)が検査を通る
   ok('実物の lift/plugins(無ければ空)は検査を通る', (() => { try { pluginRows(path.join(ROOT, 'lift/plugins')); return 'pass'; } catch (e) { return e.message; } })(), 'pass');
+
+  // 6. data.tsv(Issue #1478): a Data row is a seed row (@lazy-file:, host = plugins/ and the guest path, \ as /, a space as _), and its name and size are the installer list's
+  const DATA_HEAD = 'guest\tinstaller\tsha256\tsize\n';
+  const SHA_BLUR = '5840b4347a0fdbc0dfe37d2fc372a2d181ea00b1fed6c9073268b729ca225030';
+  const BLUR = 'Plugins\\Fruity\\Effects\\Edison\\Data\\Maps\\Blur - alt.fnv';
+  const dataDir = (dataText) => {
+    const dir = plugins({ edison: `${HEADER}\neffects.edison.edison_x64.dll\tPlugins\\Fruity\\Effects\\Edison\\Edison_x64.dll\t本体\t${SHA_BALANCE}\t1\tnone\t\t-\n` });
+    fs.writeFileSync(path.join(dir, 'edison', 'data.tsv'), dataText);
+    return dir;
+  };
+  const good = dataDir(`${DATA_HEAD}${BLUR}\t${BLUR}\t${SHA_BLUR}\t152\n`);
+  const rd = pluginRows(good);
+  ok('Data: 1 行は seed の行の後ろに、@lazy-file: と host(空白は _)と SHA-256 の行になる',
+    rd.seed.slice(1).map((r) => r.join('\t')), [`${GUEST}${BLUR}\t@lazy-file:plugins/Plugins/Fruity/Effects/Edison/Data/Maps/Blur_-_alt.fnv\t${SHA_BLUR}`]);
+  ok('Data: 抽出の行は増えない(DLL だけ)', rd.extract.length, 1);
+  ok('Data: data.tsv の無いフォルダは、行が無い', pluginRows(plugins({ a: `${HEADER}\n${BALANCE_ROW}\n` })).seed.length, 1);
+  ok('Data: 大きさが一覧と違えば、例外', fails(dataDir(`${DATA_HEAD}${BLUR}\t${BLUR}\t${SHA_BLUR}\t153\n`), /installer list says 152/), 'yes');
+  ok('Data: sha256 が一覧と違えば、例外', fails(dataDir(`${DATA_HEAD}${BLUR}\t${BLUR}\t${SHA_BALANCE}\t152\n`), /installer list/), 'yes');
+  ok('Data: 一覧に無い installer は、例外', fails(dataDir(`${DATA_HEAD}${BLUR}\tPlugins\\Fruity\\Effects\\Edison\\Data\\Maps\\Nope.fnv\t${SHA_BLUR}\t152\n`), /not a row of/), 'yes');
+  ok('Data: DLL の行は、data.tsv に書けない', fails(dataDir(`${DATA_HEAD}Plugins\\Fruity\\Effects\\Edison\\Data\\Scripts\\Examples\\testdll_x64.dll\tPlugins\\Fruity\\Effects\\Edison\\Data\\Scripts\\Examples\\testdll_x64.dll\t${SHA_BLUR}\t152\n`), /DLL/), 'yes');
+  ok('Data: 見出しが違えば、例外', fails(dataDir(`guest\tsha256\tsize\n${BLUR}\t${SHA_BLUR}\t152\n`), /header/), 'yes');
+  ok('Data: 同じ guest の行が 2 つなら、例外', fails(dataDir(`${DATA_HEAD}${BLUR}\t${BLUR}\t${SHA_BLUR}\t152\n${BLUR}\t${BLUR}\t${SHA_BLUR}\t152\n`), /not unique/), 'yes');
+  ok('Data: 実物の lift/plugins/sytrus/data.tsv の 109 行は、Sytrus の seed の行(@lazy-file:)になる',
+    pluginRows(path.join(ROOT, 'lift/plugins')).seed.filter((r) => r[1].startsWith('@lazy-file:plugins/Plugins/Fruity/Generators/Sytrus/Data/')).length, 109);
+  const SHA_EXE = '66100a71d04bddf340bc8f56a1823846662ad44f4b422c7059dad4b2eb32f1e7';
+  const EXE_ROW = ['plugin-manager.pluginmanager.dll', 'System\\Tools\\Plugin Manager\\PluginManager.exe', '補助', SHA_EXE, '7158856', 'none', '', '-'].join('\t');
+  const exe = pluginRows(plugins({ 'plugin-manager': `${HEADER}\n${EXE_ROW}\n` }));
+  ok('exe(#1499): 抽出の行は取り出し先の鍵の名。seed の行は無い(VFS は固定の表の行)', [exe.extract, exe.seed], [[['pluginmanager.exe', 'lift/out-plugins/plugin-manager.pluginmanager.dll', SHA_EXE]], []]);
+  ok('exe(#1499): 鍵が .exe で終わるなら、例外', fails(plugins({ 'plugin-manager': `${HEADER}\n${EXE_ROW.replace('.dll\t', '.exe\t')}\n` }), /ends with \.dll/), 'yes');
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

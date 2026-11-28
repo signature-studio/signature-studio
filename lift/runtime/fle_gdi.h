@@ -363,6 +363,7 @@ void fle_imp_StretchBlt(void);
 void fle_imp_MaskBlt(void);
 void fle_imp_CreateDIBitmap(void);
 void fle_imp_ExtTextOutW(void);
+void fle_imp_TextOutW(void);
 void fle_imp_GetTextMetricsW(void);
 void fle_imp_GetTextExtentPoint32W(void);
 void fle_imp_GetTextExtentPointW(void);

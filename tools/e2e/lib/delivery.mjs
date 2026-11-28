@@ -5,6 +5,7 @@
 // Access: the Worker's own check runs. ACCESS_TEAM_DOMAIN, ACCESS_AUD and ACCESS_CERTS_URL are given on the wrangler command line only (lib/access.mjs makes them for this run).
 // The bucket name and the account of the product are read from app/wrangler.jsonc at run time (the bucket's binding name, ASSETS_BUCKET, is the only name written here).
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
@@ -69,8 +70,37 @@ async function pollUntil(fn, ms, what) {
 }
 
 /**
+ * The Access in front of the Worker, as the test makes it: a proxy that adds the token to each request that comes without one. The production's Access gate does this for
+ * every request it forwards, the worklet's module request included; Chromium sends a page's extra headers with the page's requests only, so the worklet's request
+ * (no token) would be refused by the Worker's own check. The Worker's check is the same (it reads Cf-Access-Jwt-Assertion); the requests that carry a token pass unchanged.
+ */
+function startAccessProxy(upstreamPort, newToken) {
+  const server = http.createServer((req, res) => {
+    const headers = { ...req.headers };
+    if (!headers['cf-access-jwt-assertion']) headers['cf-access-jwt-assertion'] = newToken();
+    const up = http.request({ host: '127.0.0.1', port: upstreamPort, method: req.method, path: req.url, headers }, (ur) => {
+      res.writeHead(ur.statusCode ?? 502, ur.headers);
+      ur.pipe(res);
+    });
+    up.on('error', (e) => {
+      if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain' });
+      res.end(`${e?.message ?? e}\n`);
+    });
+    req.pipe(up);
+  });
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address();
+      resolve({ port, close: () => new Promise((r) => { server.closeAllConnections?.(); server.close(() => r()); }) });
+    });
+  });
+}
+
+/**
  * Starts the delivery: seeds the bucket, runs `wrangler dev --local` on the Worker (app/), waits until the Worker answers with a token.
- * Returns { origin, token, delivery: 'a', access, close(), wranglerLog() }.
+ * Returns { origin, upstream, token, delivery: 'a', access, close(), wranglerLog() }: origin is the page's (the Access proxy in front of the Worker),
+ * upstream is the Worker's own address (the served-headers probe asks it directly: its gate check needs a request without a token).
  */
 export async function startDelivery({ appDir, workDir, objects, log }) {
   const access = makeAccess();
@@ -104,15 +134,22 @@ export async function startDelivery({ appDir, workDir, objects, log }) {
     await stopChild(child, jwks, out);
     throw new Error(`${e.message}\n--- wrangler log (tail) ---\n${tail(logFile)}`);
   }
-  log(`delivery a: wrangler dev --local on ${origin}`);
-  return {
-    origin, delivery: 'a', token: access.token(),
+  const proxy = await startAccessProxy(port, () => access.token());
+  const pageOrigin = `http://127.0.0.1:${proxy.port}`;
+  log(`delivery a: wrangler dev --local on ${origin}, the page on ${pageOrigin} (Access in front)`);
+  live = {
+    origin: pageOrigin, upstream: origin, delivery: 'a', token: access.token(),
     accessEnv: { ACCESS_TEAM_DOMAIN: access.team, ACCESS_AUD: access.aud, ACCESS_CERTS_URL: jwks.url },
     newToken: () => access.token(),
-    close: async () => { await stopChild(child, jwks, out); },
+    close: async () => { live = null; await proxy.close().catch(() => {}); await stopChild(child, jwks, out); },
     wranglerLog: () => tail(logFile),
   };
+  return live;
 }
+
+/** the delivery of this run while it runs (null before and after): the delivery area's scenarios read the test Access settings and the Worker's own address from it */
+let live = null;
+export const liveDelivery = () => live;
 
 function tail(file, n = 4000) {
   try { const s = fs.readFileSync(file, 'utf8'); return s.slice(-n); } catch { return ''; }

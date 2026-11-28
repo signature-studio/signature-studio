@@ -3,7 +3,7 @@ use fe_pe::Pe;
 use std::process::ExitCode;
 
 fn usage() -> ExitCode {
-    eprintln!("usage: fe-decode closure FILE [--mnemonics] [--pdata [--adjustors]] [--reloc-seeds] | fe-decode reloc-seeds FILE [--not-function] | fe-decode vcall-thunks FILE | fe-decode jmp-reg FILE");
+    eprintln!("usage: fe-decode closure FILE [--mnemonics] [--pdata [--adjustors]] [--reloc-seeds] | fe-decode reloc-seeds FILE [--not-function] | fe-decode vcall-thunks FILE | fe-decode jmp-reg FILE | fe-decode setjmp-entries FILE");
     ExitCode::from(64)
 }
 
@@ -136,8 +136,31 @@ fn vcall_thunks(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// `setjmp-entries FILE`: the function entries that hold a `call` of the guest's setjmp (decision 0100), one `0x` VA per line on stdout.
+/// The `omit` list of a plug-in takes them (Issue #1370): their code is lifted in C, where the landing is registered.
+fn setjmp_entries(path: &str) -> Result<(), String> {
+    let data = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
+    let pe = Pe::parse(&data).map_err(|e| format!("{path}: {e}"))?;
+    let text = Text::from_pe(&pe)?;
+    let a = analyze_with_pdata(&pe)?;
+    let landings = fe_decode::setjmp::landings(&text, &a.insns);
+    for va in fe_decode::setjmp::caller_entries(&a.functions, &landings) {
+        println!("{va:#x}");
+    }
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() == 3 && args[1] == "setjmp-entries" {
+        return match setjmp_entries(&args[2]) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     if args.len() == 3 && args[1] == "vcall-thunks" {
         return match vcall_thunks(&args[2]) {
             Ok(()) => ExitCode::SUCCESS,

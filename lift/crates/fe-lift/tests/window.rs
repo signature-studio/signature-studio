@@ -67,7 +67,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-win"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for (name, ours) in [("fle_win.c", true), ("fle_class.c", true), ("fle_callback.c", false), ("fle_imports.c", false), ("fle_env.c", false)] {
+        for (name, ours) in [("fle_win.c", true), ("fle_class.c", true), ("fle_callback.c", false), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false)] {
             let base = if ours { src_dir() } else { runtime_dir() };
             let o = dir.join(name.replace(".c", ".o"));
             clang_c(&base.join(name), &o, ours);
@@ -1096,6 +1096,22 @@ fn def_window_proc_answers_zero_for_a_message_whose_learn_page_names_no_default_
 }
 
 #[test]
+fn def_window_proc_answers_zero_for_wm_undo() {
+    // Learn WM_UNDO (desktop-src/Controls/wm-undo.md): "An application sends a WM_UNDO message to an edit control"; the page does not mention DefWindowProc, so it is class C of decision 0222 and answers 0
+    // (WM_CUT, WM_COPY, WM_PASTE and WM_CLEAR, the same family, are answered already). Before this it stopped: the E2E's resilience/random-ops-09 stopped with "DefWindowProcW: message 0x304" after its 30th operation.
+    let l = lines(
+        "win-def-undo",
+        r#"
+    uint64_t h;
+    REGP("TPUtilWindow", VA_REC);
+    h = CW_OK("TPUtilWindow");
+    printf("%llx\n", U(DEF(h, 0x304, 0, 0)));
+"#,
+    );
+    assert_eq!(l, ["0"]);
+}
+
+#[test]
 fn def_window_proc_stops_for_every_other_message_a_true_nccalcsize_and_a_null_lparam() {
     let setup = "REGP(\"TPUtilWindow\", VA_REC); { uint64_t h = CW_OK(\"TPUtilWindow\"); (void)h; } { static uint8_t buf[80]; (void)buf; }";
     let msgs: Vec<(String, String)> = [
@@ -1267,14 +1283,15 @@ fn source_uses_no_host_window_display_queue_clock_thread_process_or_file_and_cal
     );
     assert!(code.contains("fle_set_last_error(FLE_ERROR_INVALID_WINDOW_HANDLE)"));
     assert!(code.contains("fle_set_last_error(FLE_ERROR_NOT_ENOUGH_QUOTA_W)"));
-    // `long` is not portable (32 bits on wasm32 and on Windows, 64 on Linux): fixed-width integers only
+    // `long` is not portable (32 bits on wasm32 and on Windows, 64 on Linux): fixed-width integers only. `long long` is 64 bits on every target (C99) and is allowed (the trace casts)
     let b = code.as_bytes();
     let mut i = 0;
     while let Some(p) = code[i..].find("long") {
         let at = i + p;
         let before = at == 0 || !(b[at - 1].is_ascii_alphanumeric() || b[at - 1] == b'_');
         let after = at + 4 >= b.len() || !(b[at + 4].is_ascii_alphanumeric() || b[at + 4] == b'_');
-        assert!(!(before && after), "fle_win.c uses `long` near byte {at}");
+        let long_long = code[at + 4..].trim_start().starts_with("long") || code[..at].trim_end().ends_with("long");
+        assert!(!(before && after && !long_long), "fle_win.c uses `long` near byte {at}");
         i = at + 4;
     }
     // exactly the three messages, one call site each, in this order, through fle_call_guest; the class table through fle_class_lookup
@@ -1437,7 +1454,8 @@ fn the_dll_name_and_the_api_name_are_part_of_the_match() {
             assert!(!st.handled.contains_key(format!("jmp_imp:{n}").as_str()) && !c.contains(&format!("fle_imp_{n}")), "{dll}!{api}");
         }
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        // Issue #1538: a thunk that no row answers stops by name
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
     }
 }
 

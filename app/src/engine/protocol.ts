@@ -41,6 +41,8 @@ export type ToWorker =
   | { cmd: 'settings-redraw'; lid: number }
   /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines on its stderr) on or off; off at the start */
   | { cmd: 'window-api-trace'; on: boolean }
+  /** Issue #1402: the rate the page measured for requestAnimationFrame (24..1000); the engine is paced at it from its next idle (IdleDriver.setHz) */
+  | { cmd: 'hz'; hz: number }
   /** Issue #1362: the page's face of the Browser's WebView2 has loaded the document of the navigation that the engine asked for: the engine fires the navigation's events at its next idle */
   | { cmd: 'webview2-loaded' }
   /** Issue #1362: a message the page posted to the engine's WebView2 (window.chrome.webview.postMessage in the face's document) */
@@ -49,6 +51,8 @@ export type ToWorker =
   | { cmd: 'clipboard-text'; id: number; text: string | null }
   /** Issue #1385: the page is left (pagehide): the engine asks the FL main window to close, so FL closes the files it keeps open (the Worker's onExitRequest) */
   | { cmd: 'exit-request' }
+  /** #1406: the page's answer to a clipboard-probe request (whether the clipboard holds text; no content is read for it) */
+  | { cmd: 'clipboard-probe-answer'; id: number; has: boolean }
   | { cmd: 'ping'; id: number };
 
 /** C-2: the messages the page sends the render Worker (the canvas is drawn only here) */
@@ -78,7 +82,7 @@ export type FromWorker =
   | { t: 'mark'; name: string; /** performance.timeOrigin + performance.now() of the Worker */ abs: number; detail?: Record<string, unknown> }
   | { t: 'engine-log'; stream: 'out' | 'err'; lines: string[] }
   /** the engine entered its idle: its number, the virtual clock and its next deadline in ticks, how long it ran since it was last resumed (null: first idle), what the Worker did with the input so far */
-  | { t: 'idle'; n: number; now: number; next: number; busyMs: number | null; abs: number; stats: DriverStats; queued: number; caps: { input: boolean; appview: boolean; display?: boolean }; trace?: { n: number; hash: number }[]; memBytes?: number; /** decision 0221: what the engine has asked of its host files so far (a bundle of the current format; the reads all happen before the first idle) */ hostFiles?: HostFileStats; /** decision 0187 (only with ?dedupe=1): rectangles omitted as unchanged / sent, pixels compared */ dedupe?: { omitted: number; sent: number; comparedPixels: number } }
+  | { t: 'idle'; n: number; now: number; next: number; busyMs: number | null; abs: number; stats: DriverStats; queued: number; caps: { input: boolean; appview: boolean; display?: boolean }; trace?: { n: number; hash: number }[]; memBytes?: number; /** Issue #1402: the number of DwmFlush calls so far (null: a build without the count) */ dwm?: number | null; /** decision 0221: what the engine has asked of its host files so far (a bundle of the current format; the reads all happen before the first idle) */ hostFiles?: HostFileStats; /** decision 0187 (only with ?dedupe=1): rectangles omitted as unchanged / sent, pixels compared */ dedupe?: { omitted: number; sent: number; comparedPixels: number } }
   /** the engine was resumed (it computes until its next idle) */
   | { t: 'resume'; abs: number; why: ResumeWhy }
   /** events the engine has processed (it is idle again): when the page made them, when the Worker gave them to the engine, when the engine was idle again (all performance.timeOrigin-based ms) */
@@ -119,4 +123,6 @@ export type FromWorker =
   | { t: 'clipboard-write'; text: string }
   /** #1389: the engine's Paste asks for the operating system's text (GetClipboardData); the page answers with {cmd: 'clipboard-text'} (the same id) */
   | { t: 'clipboard-read'; id: number }
+  /** #1406: a question about the formats (IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats) asks whether the clipboard holds text; the page answers with {cmd: 'clipboard-probe-answer'} (the same id) */
+  | { t: 'clipboard-probe'; id: number }
   | { t: 'desk'; stats: { presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** C-2: compose requests made by the render Worker's frame loop (its animation frames) / compose requests made while the picture did not move (its wake-up poll, render-worker.ts DESK_WAKE_MS) */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number; displayFrames?: number | null }; at: number[]; /** render-worker display timestamps (abs ms) */ displayAt?: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };

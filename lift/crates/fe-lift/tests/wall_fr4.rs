@@ -195,7 +195,7 @@ fn the_nine_new_rows_are_the_last_nine_in_the_order_they_were_reached_and_no_pse
     // (tests/wall_fr5.rs) were appended after those: LATER_ROWS is how many there are now (1 until decision 0119, which appended 8 more: tests/wall_fr6.rs; decision 0122 appended 15 more:
     // tests/wall_fr8.rs; decision 0123 appended 73 more: tests/wall_fr9.rs; decision 0125 appended 2 more: tests/wall_fr10.rs; old value 9 + 15 + 73).
     // decision 0126 appended 33 more (tests/wall_fr11.rs; old value 9 + 15 + 73 + 2: it ended at decision 0125's rows).
-    const LATER_ROWS: usize = 9 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len() + rows_0372::ROWS_0372.len() + 4 + 1; // Issue #1391: + the K32GetProcessMemoryInfo row (the last of TABLE); Issue #1355: + the 4 rows of webview2loader.dll; // decision 0372: + the row of tests/rows_0372/mod.rs after that of decision 0267; decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
+    const LATER_ROWS: usize = 9 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len() + rows_0372::ROWS_0372.len() + 4 + 1 + 1 + 7 + 13; // Issue #1538: + the 13 rows of the second wave (the last rows of TABLE); Issue #1382 appends 1 more (kernel32!CompareStringOrdinal, after the row of #1391); Issue #1370 appends 7 more (the imm32.dll rows) after that; Issue #1391: + the K32GetProcessMemoryInfo row (the last of TABLE); Issue #1355: + the 4 rows of webview2loader.dll; // decision 0372: + the row of tests/rows_0372/mod.rs after that of decision 0267; decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
     // decision 0129 (old: ... + 33): + 4 rows (tests/wall_fr12.rs); decision 0132: + tests/rows_0132/mod.rs
     assert_eq!((rows[n - LATER_ROWS - 10].0.as_str(), rows[n - LATER_ROWS - 10].1.as_str()), ("shell32.dll", "SHGetPathFromIDListW"));
     for (k, (dll, name)) in NEW_ROWS.iter().enumerate() {
@@ -230,9 +230,9 @@ fn the_wintrust_and_crypt32_thunks_are_answered_under_their_own_dll_and_no_other
     assert_eq!(st.handled["jmp_imp:CertGetNameStringW"], 1);
     assert_eq!(c.matches("fle_imp_WinVerifyTrust(); return;").count(), 1, "only the wintrust thunk is answered");
     assert_eq!(c.matches("fle_imp_CertGetNameStringW(); return;").count(), 1);
-    for k in [2u64, 3] {
+    for (k, name) in [(2u64, "user32.dll!WinVerifyTrust"), (3, "crypt32.dll!CertGetNameStringA")] {
         let va = IB + 0x1040 + 0x10 * k;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "thunk {k} (user32! / the ANSI form) stays unsupported");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{name}\"); }}")), "thunk {k} (user32! / the ANSI form) stops by name");
     }
 }
 
@@ -678,6 +678,8 @@ fn driver() -> &'static PathBuf {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let exe = dir.join(&tag);
         let mut cmd = Command::new("clang");
         cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt);
@@ -966,7 +968,7 @@ fn compile_and_run_claims_selftest() -> (bool, String) {
     let h = harness_dir();
     let mut cmd = Command::new("clang");
     cmd.args(["-std=gnu11", "-O0", "-Wall", "-Wextra", "-Werror", "-fPIE", "-I"]).arg(&rt).arg("-I").arg(&h);
-    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_modules.c", "fle_string.c"] {
+    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_modules.c", "fle_string.c"] {
         cmd.arg(rt.join(f));
     }
     let cc = cmd.arg(h.join("seeds/authenticode_claims_selftest.c")).arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");

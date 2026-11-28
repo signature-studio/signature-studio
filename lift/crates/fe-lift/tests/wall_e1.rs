@@ -225,7 +225,7 @@ fn the_four_imported_flengine_thunks_are_answered_under_their_own_dll() {
     }
     assert_eq!(c.matches("fle_imp_GetComputerNameExW(); return;").count(), 1, "the user32 thunk is not answered");
     let va = IB + 0x1040 + 0x10 * 4;
-    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "the thunk of user32!GetComputerNameExW stays unsupported");
+    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"user32.dll!GetComputerNameExW\"); }}")), "the thunk of user32!GetComputerNameExW stops by name");
     // the two rows that no module imports are handled when a module does import them, and not under another DLL
     let (st, _) = gen(&[("advapi32.dll", "GetUserNameW"), ("kernel32.dll", "GetComputerNameExA"), ("kernel32.dll", "GetUserNameW"), ("advapi32.dll", "GetComputerNameExA")]);
     assert_eq!(st.handled["jmp_imp:GetUserNameW"], 1);
@@ -485,6 +485,8 @@ fn driver() -> &'static PathBuf {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let exe = dir.join(&tag);
         let mut cmd = Command::new("clang");
         cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt);
@@ -719,8 +721,14 @@ fn get_file_version_info_w_fails_like_the_size_call_for_a_path_that_is_not_in_th
 #[test]
 fn what_get_file_version_info_w_does_not_define_stops_by_name() {
     aborts(&["fvi", "null", "buf"], "GetFileVersionInfoW: lptstrFilename is NULL");
-    // f_44ada0 asks for "comctl32.dll": a name with no directory part needs the LoadLibrary search sequence, which is not modelled (the size call stops first there)
-    aborts(&["fvi", "comctl32.dll", "buf"], "GetFileVersionInfoW: a file name with no directory part");
+    // f_44ada0 asks for "comctl32.dll": a name with no directory part is searched in the LoadLibrary order (#1415). comctl32.dll is a virtual module with no file on the volume: not found (decision 0098)
+    assert_eq!(lines(&["fvi", "comctl32.dll", "buf"]), ["ret 0 le 2 data untouched"]);
+    // #1415: a bare name that the search finds in the application folder is stopped with that path (the file's version is not modelled)
+    aborts(&["fvi", "appmod.dll", "buf", "mkdir=C:\\Program Files", "mkdir=C:\\Program Files\\Image-Line", "mkdir=C:\\Program Files\\Image-Line\\FL Studio 21", "mkfile=C:\\Program Files\\Image-Line\\FL Studio 21\\appmod.dll"], "GetFileVersionInfoW: the path exists in the virtual file system: \"C:\\Program Files\\Image-Line\\FL Studio 21\\appmod.dll\"");
+    // and a bare name that no folder of the search holds is not found: 0 and ERROR_FILE_NOT_FOUND (the handle is ignored)
+    assert_eq!(lines(&["fvi", "ILSvg_x64.dll", "buf"]), ["ret 0 le 2 data untouched"]);
+    // Issue #1418: an empty name is ERROR_BAD_PATHNAME (Wine, dlls/kernelbase/version.c, GetFileVersionInfoSizeExW)
+    assert_eq!(lines(&["fvi", "", "buf"]), ["ret 0 le 161 data untouched"]);
     // a path that exists in the virtual file system (a directory or a file): no version resource of a virtual file is modelled
     aborts(&["fvi", "C:\\d\\f.dll", "buf", "mkdir=C:\\d", "mkfile=C:\\d\\f.dll"], "GetFileVersionInfoW: the path exists in the virtual file system");
     aborts(&["fvi", "C:\\d", "buf", "mkdir=C:\\d"], "GetFileVersionInfoW: the path exists in the virtual file system");

@@ -5,6 +5,7 @@
 #include "fle_imports.h"
 #include "fle_modules.h"
 #include "fle_realmod.h"
+#include "fle_env.h"
 
 /* Virtual module table (decision 0015). The handle of entry i is FLE_MODULE_HANDLE_BASE +
  * FLE_MODULE_HANDLE_STEP * (i + 1), so the order below fixes the handles: append new names at the
@@ -99,6 +100,10 @@ static const char *const fle_modules[] = {
      * rows of the response table (fle_imports.c's TABLE) answered by fle_webview2.c, which models the COM interfaces behind them and writes what the guest hands to them. Appended after
      * combase.dll (decision 0015: append only). It was the one name of fle_load_absent[] (decision 0126 wall 86); that name is withdrawn from the list. */
     "webview2loader.dll",
+    /* N = 43, Issue #1370 (provisional): imm32.dll. FLEngine delay-loads seven IME functions (rows of fle_imports.c's TABLE, fle_win.c). An earlier run (run 45452762437)
+     * took LoadLibraryW 126 for it and then ExitProcess; not seen again on main 7fc24d8f, so the cause is not confirmed. Windows has the DLL (decision 0014), so it is a
+     * module, and its seven functions answer as a Windows with no IME does. Appended after webview2loader.dll (decision 0015: append only). */
+    "imm32.dll",
 };
 #define FLE_MODULE_N (sizeof fle_modules / sizeof fle_modules[0])
 /* The deferred modules (decision 0096) are the FLE_DEFERRED_N entries from index FLE_DEFERRED_FIRST (blend2d.dll, quickfontcache_x64.dll).
@@ -186,7 +191,9 @@ static void get_module_handle(const char *api, int wide)
     uint64_t i;
 
     if (p == 0) {
-        R[0] = FLE_EXE_HANDLE;
+        /* Issue #1499 (段 B): on the thread of a program started by ShellExecute, the file that made the process is the program's image */
+        uint64_t prog = FLE_REALMOD_PRESENT() ? fle_realmod_running_base() : 0;
+        R[0] = prog != 0 ? prog : FLE_EXE_HANDLE;
         return;
     }
     for (;;) {
@@ -440,8 +447,20 @@ void fle_imp_GetProcAddress(void)
                 rname[n] = (char)fle_ld(np + n, 1);
                 if (rname[n] == 0) break;
             }
+            if (!fle_realmod_loaded(rm)) {
+                /* Issue #1418: a handle that is not a live module gives NULL and ERROR_MOD_NOT_FOUND (126) (Wine, dlls/kernel32/tests/module.c, testGetProcAddress_Wrong) */
+                fle_warn("GetProcAddress", 0);
+                fle_set_last_error(FLE_ERROR_MOD_NOT_FOUND);
+                R[0] = 0;
+                return;
+            }
             R[0] = fle_realmod_getproc("GetProcAddress", rm, rname);
-            if (R[0] == 0) fle_set_last_error(FLE_ERROR_PROC_NOT_FOUND);
+            if (R[0] == 0) {
+                char fname[260];
+                fle_realmod_file_name("GetProcAddress", rm, fname, sizeof fname);
+                fprintf(stderr, "missing-proc: GetProcAddress %s \"%s\" %u\n", fname, rname, (unsigned)FLE_ERROR_PROC_NOT_FOUND);
+                fle_set_last_error(FLE_ERROR_PROC_NOT_FOUND);
+            }
             return;
         }
     }
@@ -476,6 +495,7 @@ void fle_imp_GetProcAddress(void)
             }
         }
     }
+    fprintf(stderr, "missing-proc: GetProcAddress %s \"%s\" %u\n", mod, name, (unsigned)FLE_ERROR_PROC_NOT_FOUND);
     fle_set_last_error(FLE_ERROR_PROC_NOT_FOUND);
     R[0] = 0;
 }

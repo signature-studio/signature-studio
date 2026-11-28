@@ -82,7 +82,7 @@ fn objs() -> &'static Vec<PathBuf> {
             ("fle_gdi.c", false),
             ("fle_raster.c", false),
             ("fle_gdc.c", false),
-            ("fle_imports.c", false),
+            ("fle_imports.c", false), ("fle_glob.c", false),
             ("fle_env.c", false),
             ("fle_modules.c", false),
             ("fle_string.c", false),
@@ -91,6 +91,17 @@ fn objs() -> &'static Vec<PathBuf> {
             clang_c(name, &o, strict);
             v.push(o);
         }
+        let o = dir.join("win_trace_off.o");
+        let cc = Command::new("clang")
+            .args(["-O0", "-std=gnu11", "-w", "-fPIE", "-c"])
+            .arg(manifest().join("tests/support/win_trace_off.c"))
+            .arg("-o")
+            .arg(&o)
+            .env("TMPDIR", work_dir().join("tmp"))
+            .output()
+            .expect("clang not found");
+        assert!(cc.status.success(), "clang failed for win_trace_off.c: {}", String::from_utf8_lossy(&cc.stderr));
+        v.push(o);
         let o = dir.join("image.o");
         let cc = Command::new("clang")
             .args(["-O0", "-std=gnu11", "-w", "-fPIE", "-c", "-I"])
@@ -842,7 +853,7 @@ fn the_dll_name_and_the_api_name_are_part_of_the_match() {
         assert!(!st.handled.contains_key("jmp_imp:LoadImageW"), "{dll}!{api}");
         assert!(!c.contains("fle_imp_LoadImageW"), "{dll}!{api}");
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
     }
 }
 

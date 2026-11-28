@@ -40,6 +40,8 @@ fn objs() -> &'static Vec<PathBuf> {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let mut v = Vec::new();
         for s in srcs {
             let o = dir.join(s.file_name().unwrap().to_string_lossy().replace(".c", ".o"));
@@ -283,8 +285,9 @@ fn get_startup_info_a_zeroes_the_structure_and_sets_cb() {
     stops("gsia-null", "GetStartupInfoA", "call1(fle_imp_GetStartupInfoA, 0);");
 }
 
-/// The virtual environment starts empty, so the block is the single terminating NUL; after SetEnvironmentVariableW("AB", "cd") it is
-/// "AB=cd\0\0" (Learn: "Var1=Value1\0 ... VarN=ValueN\0\0"). Free takes only a pointer the Get returned.
+/// The block starts with the standard session variables (Issue #1412), so its first entry is SystemRoot and its last is the one Set adds:
+/// after SetEnvironmentVariableW("AB", "cd") the block has 23 entries and ends with "AB=cd\0\0" (Learn: "Var1=Value1\0 ... VarN=ValueN\0\0").
+/// Free takes only a pointer the Get returned.
 #[test]
 fn get_environment_strings_is_the_ansi_block_and_free_takes_only_its_own_blocks() {
     let o = run(
@@ -292,15 +295,15 @@ fn get_environment_strings_is_the_ansi_block_and_free_takes_only_its_own_blocks(
         r#"
     static const uint16_t nm[] = { 'A', 'B', 0 }, vl[] = { 'c', 'd', 0 };
     char *e = (char *)call1(fle_imp_GetEnvironmentStrings, 0);
-    printf("empty %d %d\n", e[0], e[1] == 0 || 1);
+    printf("first %.21s\n", e);
     printf("free %llu\n", U(call1(fle_imp_FreeEnvironmentStringsA, P(e))));
     R[1] = P(nm); R[2] = P(vl); fle_imp_SetEnvironmentVariableW();
     e = (char *)call1(fle_imp_GetEnvironmentStrings, 0);
-    printf("block %s|%d %d\n", e, e[5], e[6]);
+    { const char *p = e, *last = NULL; int k = 0; while (*p) { last = p; p += strlen(p) + 1; k++; } printf("entries %d last %s\n", k, last); }
     printf("free %llu\n", U(call1(fle_imp_FreeEnvironmentStringsA, P(e))));
 "#,
     );
-    assert_eq!(lines(&o), ["empty 0 1", "free 1", "block AB=cd|0 0", "free 1"]);
+    assert_eq!(lines(&o), [r"first SystemRoot=C:\Windows", "free 1", "entries 23 last AB=cd", "free 1"]);
     stops("envA-free-unknown", "FreeEnvironmentStringsA", "uint8_t x[4]; call1(fle_imp_FreeEnvironmentStringsA, P(x));");
     stops(
         "envA-free-twice",

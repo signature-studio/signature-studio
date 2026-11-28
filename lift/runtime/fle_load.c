@@ -52,7 +52,10 @@
 /* Names (lower-case, with extension) that are not loaded in the virtual process and that this environment is
  * defined to lack: exactly the nine DLLs that the PE only delay-loads, which decision 0015 (PM) already says are
  * "not loaded" (GetModuleHandleW gives 126 for them): dwmapi, imm32, msimg32, propsys, rpcrt4, shcore, uxtheme,
- * windowscodecs, wtsapi32. Nothing else is added here: a Windows DLL that decision 0015 does not name (ws2_32,
+ * windowscodecs, wtsapi32. Issue #1370 reviews the decision for imm32: a Windows has imm32.dll (the IME library). An earlier run
+ * (run 45452762437) took LoadLibraryW 126 for it and then ExitProcess; that was not seen again on main 7fc24d8f (the Balance scene
+ * ends engine-idle), so the cause is not confirmed. imm32.dll is virtual module N = 43 now (fle_modules.c), with its seven
+ * delay-loaded functions answered as a Windows with no IME does (fle_win.c), so it is taken out of this list. Nothing else is added here: a Windows DLL that decision 0015 does not name (ws2_32,
  * mswsock, psapi, riched20, urlmon, ...) and every plug-in or tool DLL stops the run (case 3 above), because a
  * "does not exist" answer for it would be a claim about the environment that nobody has decided.
  * (Decision 0088 made avrt.dll and powrprof.dll virtual modules, N = 31, 32; the other ten names it lists, these
@@ -68,7 +71,7 @@
  * WebView2Loader.dll" differs from a real installation (where the loader is in the application directory). Withdrawn when a module lane (M2) loads the product's DLLs or a WebView2 model exists.
  * Issue #1355 withdrew it: webview2loader.dll is a virtual module now (fle_modules.c, N = 42), and its exports are modelled by fle_webview2.c (the record of what FLEngine hands to WebView2).) */
 static const char *const fle_load_absent[] = {
-    "imm32.dll", "msimg32.dll", "propsys.dll",
+    "msimg32.dll", "propsys.dll",
     "windowscodecs.dll",
 };
 #define LOAD_ABSENT_N (sizeof fle_load_absent / sizeof fle_load_absent[0])
@@ -230,10 +233,37 @@ static void ascii_of(const uint16_t *w, char *out, size_t cap)
     out[i] = 0;
 }
 
-/* The search of the virtual volume (decision 0233). rel is the NUL-terminated name as the page searches it: a full path (full != 0) is looked at alone; a relative path or a bare name (with the extension rule applied) is
- * looked at in the current directory and appended to the folders of the standard search order that this environment has: the application folder (the folder of FLE_VIRTUAL_EXE_PATH), the system folder, the Windows folder,
- * and SetDllDirectoryW's folder when it is a full path on C:. (The 16-bit system folder and PATH name folders that the volume does not have.) Returns 1 with `shown` set to the path of a file that was found. */
-static int search_volume(const char *api, const uint16_t *rel, size_t rn, int full, char *shown, size_t cap)
+/* #1415: the lifted engine's own file (FLE_VIRTUAL_DLL_PATH, in the application folder) is a file of the search for the version functions (own != 0 below): a real install has it there,
+ * and the volume does not hold it. Compared without case, as fle_vfs.c compares the path (ASCII folding). */
+static int is_own_file(const uint16_t *w)
+{
+    static const char want[] = FLE_VIRTUAL_DLL_PATH;
+    size_t i;
+    for (i = 0; i < sizeof want; i++) {
+        uint16_t c = w[i], e = (uint8_t)want[i];
+        if (c >= 'A' && c <= 'Z') c = (uint16_t)(c + 32);
+        if (e >= 'A' && e <= 'Z') e = (uint16_t)(e + 32);
+        if (c != e) return 0;
+    }
+    return 1;
+}
+
+/* the candidate w (n units) is a file of the search: it is copied to found (NUL-terminated) and 1 returned */
+static int hit(const char *api, const uint16_t *w, size_t n, int own, uint16_t *found)
+{
+    size_t i;
+    if (!volume_file(api, w) && !(own && is_own_file(w))) return 0;
+    for (i = 0; i < n; i++) found[i] = w[i];
+    found[n] = 0;
+    return 1;
+}
+
+/* The search of the virtual volume (decision 0233; #1415 fixes its order to the page's). rel is the NUL-terminated name as the page searches it: a full path (full != 0) is looked at alone; a relative path or a bare
+ * name (with the extension rule applied) is appended to the folders of the search order that this environment has, in the order of "Dynamic-link library search order" (Microsoft Learn, 2023): the application folder (the
+ * folder of FLE_VIRTUAL_EXE_PATH), then SetDllDirectoryW's folder when it is a full path on C: (the page's alternate order; the directory "" and any other directory take the current folder out of the search), the system
+ * folder, the Windows folder, and last the current folder (position 11 of the standard order, safe DLL search mode). (The 16-bit system folder and PATH name folders that the volume does not have.) Returns 1 with `found` set
+ * (NUL-terminated) to the path of the first file that was found. own: see is_own_file (#1415). */
+static int search_volume(const char *api, const uint16_t *rel, size_t rn, int full, int own, uint16_t *found)
 {
     uint16_t cand[LOAD_PATH_MAX + 1];
     static const char *const dirs[] = { FLE_VIRTUAL_SYSTEM_DIR, FLE_VIRTUAL_WINDOWS_DIR };
@@ -242,14 +272,11 @@ static int search_volume(const char *api, const uint16_t *rel, size_t rn, int fu
     char *ad;
     size_t k;
 
-    if (volume_file(api, rel)) { ascii_of(rel, shown, cap); return 1; }
-    if (full) return 0;
+    if (full) return hit(api, rel, rn, own, found);
     strcpy(appdir, FLE_VIRTUAL_EXE_PATH);
     ad = strrchr(appdir, '\\');
     if (ad) *ad = 0;
-    if (join_ascii_dir(cand, appdir, rel, rn) && volume_file(api, cand)) { ascii_of(cand, shown, cap); return 1; }
-    for (k = 0; k < sizeof dirs / sizeof dirs[0]; k++)
-        if (join_ascii_dir(cand, dirs[k], rel, rn) && volume_file(api, cand)) { ascii_of(cand, shown, cap); return 1; }
+    if (join_ascii_dir(cand, appdir, rel, rn) && hit(api, cand, fle_w_len(cand), own, found)) return 1;
     dd = fle_load_dll_directory();
     if (dd && dd[0] && dd[1] == ':' && (dd[0] == 'C' || dd[0] == 'c')) {
         size_t dn = fle_w_len(dd);
@@ -258,10 +285,13 @@ static int search_volume(const char *api, const uint16_t *rel, size_t rn, int fu
             cand[dn] = '\\';
             memcpy(cand + dn + 1, rel, rn * sizeof *rel);
             cand[dn + 1 + rn] = 0;
-            if (volume_file(api, cand)) { ascii_of(cand, shown, cap); return 1; }
+            if (hit(api, cand, dn + 1 + rn, own, found)) return 1;
         }
     }
-    return 0;
+    for (k = 0; k < sizeof dirs / sizeof dirs[0]; k++)
+        if (join_ascii_dir(cand, dirs[k], rel, rn) && hit(api, cand, fle_w_len(cand), own, found)) return 1;
+    if (dd) return 0;
+    return hit(api, rel, rn, own, found);
 }
 
 /* the volume holds a module file that this build cannot run (the boundary (b)) */
@@ -308,6 +338,7 @@ static int in_windows_dir(const uint16_t *u, size_t base)
 static void load_with_path(const char *api, const uint16_t *u, size_t n)
 {
     char name[LOAD_NAME_MAX + 8], shown[LOAD_PATH_MAX + 1], why[LOAD_PATH_MAX + 240];
+    uint16_t found[LOAD_PATH_MAX + 1];
     int full = 0, rooted_other = 0, rm;
     size_t i, base = 0;
 
@@ -342,7 +373,10 @@ static void load_with_path(const char *api, const uint16_t *u, size_t n)
             return;
         }
     }
-    if (!rooted_other && search_volume(api, u, n, full, shown, sizeof shown)) stop_file_not_a_module(api, shown);   /* 2. */
+    if (!rooted_other && search_volume(api, u, n, full, 0, found)) {   /* 2. */
+        ascii_of(found, shown, sizeof shown);
+        stop_file_not_a_module(api, shown);
+    }
     {   /* 3. the base name is a virtual module or a DLL on the roster, in a folder where Windows keeps its DLLs */
         size_t bn = n - base;
         if (bn > 0 && bn <= LOAD_NAME_MAX && in_windows_dir(u, base)) {
@@ -396,6 +430,26 @@ static int api_set_load(const char *api, const char *name, const uint16_t *u, si
     default:
         return 0;
     }
+}
+
+/* #1415 (decision 0233): the name as the search looks for it, for a name with no directory part: the name as the guest wrote it, ".dll" appended when it has no '.', and a trailing '.' removed (the rule of
+ * load_by_name, which the version functions share). rel gets the NUL-terminated result; returns its length in units. */
+static size_t bare_rel(const uint16_t *u, size_t n, uint16_t *rel)
+{
+    size_t k, rn = n;
+    int dot = 0;
+    memcpy(rel, u, n * sizeof *u);
+    for (k = 0; k < n; k++)
+        if (u[k] == '.') dot = 1;
+    if (n > 0 && u[n - 1] == '.') {
+        rn--;
+    } else if (!dot) {
+        static const uint16_t ext[4] = { '.', 'd', 'l', 'l' };
+        memcpy(rel + n, ext, sizeof ext);
+        rn += 4;
+    }
+    rel[rn] = 0;
+    return rn;
 }
 
 /* LoadLibrary after the arguments are read: table name -> handle and one more reference; absent name -> NULL and
@@ -455,24 +509,38 @@ static void load_by_name(const char *api, const uint16_t *u, size_t n)
     {   /* decision 0233: no module of the build claims the bare name, so "the function uses a standard search strategy" over the volume (search_volume): a file of the volume that this run cannot load stops by name,
          * and a search that ends without a module fails ("If the function cannot find the module, the function fails"; NULL and ERROR_MOD_NOT_FOUND). Replaces decision 0178's exploration switch FLE_LOADLIB_MISSING and the
          * soft stop of decision 0209 at this place: the failure is the page's, not an exploration. */
-        uint16_t rel[LOAD_NAME_MAX + 8];
+        uint16_t rel[LOAD_NAME_MAX + 8], found[LOAD_PATH_MAX + 1];
         char shown[LOAD_PATH_MAX + 1];
-        size_t rn = n, k;
-        int dot = 0;
-        memcpy(rel, u, n * sizeof *u);
-        for (k = 0; k < n; k++)
-            if (u[k] == '.') dot = 1;
-        if (n > 0 && u[n - 1] == '.') {
-            rn--;
-        } else if (!dot) {
-            static const uint16_t ext[4] = { '.', 'd', 'l', 'l' };
-            memcpy(rel + n, ext, sizeof ext);
-            rn += 4;
+        size_t rn = bare_rel(u, n, rel);
+
+        if (search_volume(api, rel, rn, 0, 0, found)) {
+            ascii_of(found, shown, sizeof shown);
+            stop_file_not_a_module(api, shown);
         }
-        rel[rn] = 0;
-        if (search_volume(api, rel, rn, 0, shown, sizeof shown)) stop_file_not_a_module(api, shown);
         not_found(api, u, n);
     }
+}
+
+/* #1415 (decision 0098 and 0112): the file that the LoadLibrary search finds for a name with no directory part, for GetFileVersionInfoSizeW and GetFileVersionInfoW (their page: "The function uses the search sequence
+ * specified by the LoadLibrary function"). The same search as load_by_name, in the same order (search_volume: the current folder, the application folder, the system folder, the Windows folder, SetDllDirectoryW's folder),
+ * with the same name rule (bare_rel). The engine's own file is a file of the search (is_own_file). The module table, the API set schema, fle_load_absent and the roster are not searched: they name modules, and a
+ * module has no file on this volume (decision 0018). A name that the volume holds no file for has no version information (decision 0098: the answer of a path that does not name a file here; the guest's callers take a
+ * size of 0 as "no version information", f_44ada0). Returns a malloc'd NUL-terminated UTF-16 path of the first file that the search finds, or NULL when it finds none. */
+uint16_t *fle_load_find_file(const char *api, const uint16_t *u, size_t n)
+{
+    uint16_t rel[LOAD_NAME_MAX + 8], found[LOAD_PATH_MAX + 1];
+    uint16_t *out;
+    size_t rn, k;
+
+    if (n == 0 || name_has_path(u, n)) fle_stop(api, "internal: the search of a version call takes a name with no directory part (the caller checks an empty name)");
+    rn = bare_rel(u, n, rel);
+    if (!search_volume(api, rel, rn, 0, 1, found)) return NULL;
+    k = 0;
+    while (found[k]) k++;
+    out = malloc((k + 1) * sizeof *out);
+    if (out == NULL) fle_stop(api, "out of memory for a path of the search");
+    memcpy(out, found, (k + 1) * sizeof *out);
+    return out;
 }
 
 /* kernel32!LoadLibraryW: lpLibFileName in rcx. Success: the module handle, last error untouched (the page does not

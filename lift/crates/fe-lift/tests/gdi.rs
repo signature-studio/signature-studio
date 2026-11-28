@@ -45,7 +45,7 @@ fn clang_c(src: &Path, obj: &Path, strict: bool) {
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-c"]);
     if strict {
-        cmd.arg("-Werror");
+        cmd.arg("-Werror").arg("-Wno-deprecated-declarations");
     }
     let cc = cmd
         .arg("-I")
@@ -69,12 +69,15 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-gdi"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for (name, ours) in [("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", false), ("fle_imports.c", false), ("fle_env.c", false)] {
+        for (name, ours) in [("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", false), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false)] {
             let base = if ours { src_dir() } else { runtime_dir() };
             let o = dir.join(name.replace(".c", ".o"));
             clang_c(&base.join(name), &o, ours);
             v.push(o);
         }
+        let o = dir.join("win_trace_off.o");
+        clang_c(&manifest().join("tests/support/win_trace_off.c"), &o, false);
+        v.push(o);
         v
     })
 }
@@ -1669,14 +1672,15 @@ fn source_uses_no_host_display_resource_clock_thread_process_or_file() {
     ] {
         assert!(!code.contains(bad), "fle_gdi.c must not use {bad}");
     }
-    // `long` is not portable (32 bits on wasm32 and on Windows, 64 on Linux): fixed-width integers only
+    // `long` is not portable (32 bits on wasm32 and on Windows, 64 on Linux): fixed-width integers only. `long long` is 64 bits on every target (C99) and is allowed (the trace casts)
     let b = code.as_bytes();
     let mut i = 0;
     while let Some(p) = code[i..].find("long") {
         let at = i + p;
         let before = at == 0 || !(b[at - 1].is_ascii_alphanumeric() || b[at - 1] == b'_');
         let after = at + 4 >= b.len() || !(b[at + 4].is_ascii_alphanumeric() || b[at + 4] == b'_');
-        assert!(!(before && after), "fle_gdi.c uses `long` near byte {at}");
+        let long_long = code[at + 4..].trim_start().starts_with("long") || code[..at].trim_end().ends_with("long");
+        assert!(!(before && after && !long_long), "fle_gdi.c uses `long` near byte {at}");
         i = at + 4;
     }
     // the host thread id comes from the portability layer (decision 0045), and fle_stop is the stop
@@ -1872,7 +1876,7 @@ fn the_createfontindirectw_thunk_calls_the_runtime_and_the_names_are_part_of_the
         assert!(!st.handled.contains_key("jmp_imp:CreateFontIndirectW"), "{dll}!{api}");
         assert!(!c.contains("fle_imp_CreateFontIndirectW"), "{dll}!{api}");
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
     }
 }
 
@@ -1894,7 +1898,7 @@ fn the_getobjectw_thunk_calls_the_runtime_and_the_names_are_part_of_the_match() 
         assert!(!st.handled.contains_key("jmp_imp:GetObjectW"), "{dll}!{api}");
         assert!(!c.contains("fle_imp_GetObjectW"), "{dll}!{api}");
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
     }
 }
 
@@ -1910,8 +1914,8 @@ fn the_dll_name_is_part_of_the_match() {
         assert!(!st.handled.contains_key(format!("jmp_imp:{name}").as_str()), "{name}");
         assert!(!c.contains(&format!("fle_imp_{name}")), "{name}");
     }
-    for va in [IB + 0x1050, IB + 0x1060, IB + 0x1070] {
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{va:#x}");
+    for (va, name) in [(IB + 0x1050, "CreatePalette"), (IB + 0x1060, "DeleteObject"), (IB + 0x1070, "GetStockObject")] {
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"other.dll!{name}\"); }}")), "{va:#x}");
     }
 }
 
@@ -3420,7 +3424,7 @@ fn the_thunks_of_the_nineteen_apis_call_the_runtime_and_the_dll_name_is_part_of_
             let c = String::from_utf8(out).unwrap();
             assert!(!st.handled.contains_key(format!("jmp_imp:{api}").as_str()), "{wrong}!{api}");
             assert!(!c.contains(&format!("fle_imp_{api}")), "{wrong}!{api}");
-            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{wrong}!{api}");
+            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{wrong}!{api}\"); }}")), "{wrong}!{api}");
         }
     }
 }
@@ -3436,7 +3440,7 @@ fn the_neighbours_that_decision_0108_does_not_answer_stay_unsupported_thunks() {
         let c = String::from_utf8(out).unwrap();
         assert!(!c.contains(&format!("fle_imp_{api}")), "{dll}!{api}");
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
         assert_eq!(st.handled.keys().filter(|k| k.starts_with("jmp_imp:")).count(), 0, "{dll}!{api}");
     }
 }

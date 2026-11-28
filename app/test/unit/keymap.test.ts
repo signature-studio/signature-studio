@@ -66,6 +66,8 @@ describe('what the desktop does with a key', () => {
   it('forwards a key and suppresses the browser action (Space would scroll, Backspace would navigate)', () => {
     for (const c of ['Space', 'Enter', 'Escape', 'Backspace', 'ArrowDown', 'KeyS', 'F1', 'F3', 'F5']) expect(keyPolicy(ev(c)), c).toMatchObject({ forward: true, prevent: true });
     expect(keyPolicy(ev('KeyS', { ctrlKey: true }))).toMatchObject({ forward: true, prevent: true });   // Ctrl+S: no save dialog
+    expect(keyPolicy(ev('KeyV'))).toMatchObject({ forward: true, prevent: true });
+    expect(keyPolicy(ev('KeyV', { ctrlKey: true }))).toMatchObject({ forward: true, prevent: true });   // Ctrl+V: forwarded, and the browser's paste is cancelled: no paste event (#1482)
     expect(keyPolicy(ev('KeyP', { ctrlKey: true }))).toMatchObject({ forward: true, prevent: true });
   });
   it('sends F5 to the engine and cancels the browser reload (a reload loses the project); Ctrl+F5 / Shift+F5 are the same key', () => {

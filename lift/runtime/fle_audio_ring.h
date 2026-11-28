@@ -20,8 +20,8 @@
 #define FLE_AUDIO_RING_FRAMES     32768u        /* capacity in frames (a power of two): 0.74 s at 44.1 kHz. A limit of this environment. */
 #define FLE_AUDIO_RING_CHANNELS   2u            /* interleaved L R; a mono buffer is copied to both */
 #define FLE_AUDIO_BLOCK_LOG       256u          /* the last 256 appends */
-#define FLE_AUDIO_LEAD_MS         60u           /* S-audio-lead (PM decision on decision 0139): the DEFAULT lead of the write cursor over the play cursor, in ms. Learn gives "typically about 15 milliseconds' worth of audio data" (GetCurrentPosition; the value 15 is still
-                                                 * selectable); 60 ms rides out a 60 ms stall of the engine (0.2% of the output quanta missing in the S2 test where 15 ms loses 8.4%). Adjustable: FLE_AUDIO_LEAD_MS (native environment), leadMs of fleAudioSab (page), 1..1000 */
+#define FLE_AUDIO_LEAD_MS         300u          /* S-audio-lead (PM decision on decision 0139, raised by #1432): the DEFAULT lead of the write cursor over the play cursor, in ms. Learn gives "typically about 15 milliseconds' worth of audio data" (GetCurrentPosition; the value 15 is still
+                                                 * selectable); 300 ms rides out the stalls of the engine after its first idle (#1432: under load 150 to 280 ms with no audio refill; 60 ms let a 60 ms stall through as an underrun). Adjustable: FLE_AUDIO_LEAD_MS (native environment), leadMs of fleAudioSab (page), 1..1000 */
 
 /* state */
 #define FLE_AUDIO_CLOSED  0u   /* no device object yet */
@@ -97,7 +97,8 @@ int fle_audio_external(void);
 void fle_audio_unlock_note(double first_frame, uint32_t frames);
 /* S-ds-late-write (decision 0241, PROVISIONAL): a region of a playing buffer was written (Unlock) after the device had already handed the frames of that region to the output ring. Hands the frames [first, first + frames) that
  * the output has NOT read yet to the output again, over the ones handed before, without moving the write position of the ring; the frames within fle_audio_rewrite_guard_frames() of the read position (and the ones already read) are
- * left alone. External consumer only: a no-op without one (the virtual clock never moves while guest code runs, so nothing is ever published stale there). */
+ * left alone. External consumer only: a no-op without one. Natively the frames are handed over up to `lead` ahead of the play cursor before the guest writes them, so a native run is exact only while the lead does not exceed the write-ahead of the mixer
+ * (one block; wall_fr15 rt_mixer). */
 void fle_audio_ring_rewrite(const float *lr, uint32_t frames, uint64_t first);
 /* The distance in frames from the consumed position within which a rewrite is not made (S-ds-rewrite-guard: two 128-frame quanta of the AudioWorklet, the one it may be reading and the next). */
 uint32_t fle_audio_rewrite_guard_frames(void);

@@ -309,7 +309,7 @@ fn build_c(name: &str, src: &str) -> (PathBuf, PathBuf) {
         .args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-I"])
         .arg(&rt)
         .arg(rt.join("fle_osver.c"))
-        .arg(rt.join("fle_imports.c"))
+        .arg(rt.join("fle_imports.c")).arg(rt.join("fle_glob.c")).arg(rt.join("fle_env.c"))
         .arg(rt.join("fle_string.c"))
         .arg("-o")
         .arg(&exe)

@@ -465,6 +465,17 @@ void fle_imp_RegOpenKeyExW(void)
     size_t len = 0;
     if (R[2] != 0) s = fle_w_read_alloc(api, R[2], KEY_NAME_MAX * 512u, &len);
     open_common(api, R[1], s, len, (uint32_t)R[8], (uint32_t)R[9], fle_arg(5));
+    /* Issue #1409: the read side of the registry (a trace line only: the subkey asked for and the result) */
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) {
+        uint32_t bacc = 0;
+        reg_key *b = key_arg(api, R[1], &bacc);
+        fprintf(stderr, "window-api: RegOpenKeyExW \"");
+        if (b != NULL) trace_path(b);
+        else fprintf(stderr, "(no key %#llx)", (unsigned long long)R[1]);
+        fprintf(stderr, "\" \"");
+        trace_put_units(s != NULL ? s : empty_w, s != NULL ? len : 0, KEY_NAME_MAX * 512u);
+        fprintf(stderr, "\" -> %u\n", (unsigned)(uint32_t)R[0]);
+    }
     free(s);
 }
 
@@ -671,7 +682,12 @@ void fle_imp_RegSetValueExW(void)
     if ((uint32_t)R[8] != 0) fle_stop(api, "Reserved is not 0");
     if (!type_ok(type)) fle_stop(api, "value type is not implemented (REG_DWORD_BIG_ENDIAN, REG_LINK, others)");
     if (cb > VALUE_DATA_MAX) fle_stop(api, "value larger than 1 MiB");
-    if (pd == 0 && cb != 0) fle_stop(api, "lpData is NULL but cbData is not 0");
+    if (pd == 0 && cb != 0) {
+        /* Issue #1418: Wine's advapi32 tests (dlls/advapi32/tests/registry.c, RegSetValueExW with NULL data and cbData 4) give ERROR_NOACCESS (998) */
+        fle_warn(api, FLE_W32_ERR_NOACCESS);
+        ret(FLE_W32_ERR_NOACCESS);
+        return;
+    }
     if (type == FLE_REG_SZ || type == FLE_REG_EXPAND_SZ) {
         if (cb < 2 || cb % 2 || fle_ld(pd + cb - 2, 2) != 0) fle_stop(api, "string data is not NUL-terminated within cbData");
     } else if (type == FLE_REG_MULTI_SZ) {
@@ -931,11 +947,21 @@ void fle_imp_RegEnumValueW(void)
     uint32_t st;
 
     if (fle_arg(5) != 0) fle_stop(api, "lpReserved is not NULL");
-    if (pname == 0 || pcch == 0) fle_stop(api, "lpValueName or lpcchValueName is NULL");
+    if (pname == 0 || pcch == 0) {
+        /* Issue #1418: Wine's advapi32 tests (dlls/advapi32/tests/registry.c, RegEnumValueW with no value name or no count) give ERROR_INVALID_PARAMETER (87) */
+        fle_warn(api, FLE_W32_ERR_INVALID_PARAMETER);
+        ret(FLE_W32_ERR_INVALID_PARAMETER);
+        return;
+    }
     k = key_arg(api, R[1], &acc);
     if (!k) {
         ret(FLE_W32_ERR_INVALID_HANDLE);
         return;
+    }
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) {   /* Issue #1409: the read side of the registry (a trace line only) */
+        fprintf(stderr, "window-api: RegEnumValueW \"");
+        trace_path(k);
+        fprintf(stderr, "\" #%u of %u\n", idx, (unsigned)k->nvals);
     }
     if (!(acc & FLE_KEY_QUERY_VALUE)) {
         ret(FLE_W32_ERR_ACCESS_DENIED);

@@ -93,6 +93,13 @@ static inline FLE_AI void fle_unsupported(uint64_t va) {
     fle_unsupported_fail(va);
 }
 
+/* A call or jump through an IAT slot that no row of the import table answers (pm-work/findings/second-wave-imports.md, Issue #1538): the stop
+ * names the import, "dll!name" (the DLL name in lower case, as the import table gives it). */
+static inline FLE_AI void fle_import_stop(const char *dll_name) {
+    fprintf(stderr, "fle: import %s is not modeled\n", dll_name);
+    abort();
+}
+
 #include "fle_rmw.h"   /* mt4 stage A: fle_cas, fle_xchg, fle_xadd, fle_cmpxchg16b: the guest's atomic read-modify-write instructions (they use fle_addr, fle_ld and fle_st above) */
 
 #endif

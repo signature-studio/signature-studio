@@ -1,0 +1,8 @@
+# LAMEenc_x64.dll (Issue #1512): the MP3 encoder DLL of the installer's Shared folder (465,720 B). File > Export > MP3 loads it by its bare name (LoadLibraryW "LAMEEnc_x64.dll", the 126 that stopped the engine
+# before this row), so the key is the bare name in lower case: fle_realmod_find compares it with the normalized name. A helper (補助): a library that the engine's host loads, not a plugin of the Browser (no Plugin database entry).
+# fe-pe: no CreatePlugInstance export (the exports are the LAME encoder API, beCloseStream .. beWriteVBRHeader), so it is a helper. Imports: kernel32, user32 and advapi32 only (no VirtualProtect, no Delphi mark).
+# hook none: no Delphi runtime, so no hook point. args --pdata --reloc-seeds --rva-tables rva-tables.txt: the MSVC jump and size tables (their targets are leaf functions without .pdata, e.g. 0x5a4d). omit -: no setjmp caller and no function that the C part keeps (the lists stage reports omit 0). seeds.tsv: 8 functions that only a data pointer reaches.
+# Its imports: GetPrivateProfileIntA (called at RVA 0x137c, in the function at 0x1350 that beInitStream reaches) and MessageBoxA (beWriteInfoTag) are the last two rows of lift/harness/seeds/ship6-imports.txt, answered by runtime/fle_wall_ia2v.c and fle_wall_ia2.c (Issue #1512).
+# SystemFunction036 (advapi32) is imported too, but no code of the DLL reaches its import thunk (no reference to the thunk), so it is not answered.
+key	guest	role	sha256	size	hook	args	omit
+lameenc_x64.dll	Shared\LAMEenc_x64.dll	補助	0703adcd734071c74e938d9e6dd5e075594823ff376ca5d96df7dd8a1e880843	465720	none	--pdata --reloc-seeds --rva-tables lift/plugins/lameenc/rva-tables.txt	-

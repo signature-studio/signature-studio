@@ -39,6 +39,7 @@ fn run(name: &str, files: &[&str], src: &str) -> (i32, Vec<String>, String) {
     for f in files {
         cmd.arg(rt().join(f));
     }
+    cmd.arg(manifest().join("tests/support/glob_fixed_stub.c"));
     let cc = cmd.arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed for {name}: {}", String::from_utf8_lossy(&cc.stderr));
     let r = Command::new(&exe).output().expect("run failed");
@@ -735,6 +736,118 @@ int main(void)
             "sections-trunc ret 4 err 99 opened 'C:\\x\\a.ini': I n t e | |",
         ]
     );
+}
+
+/// Issue #1512: GetPrivateProfileIntA (LAMEenc_x64.dll's beInitStream reads Debug / WriteLogFile of lame_enc.ini; the file is not on the volume, so the default answers).
+/// It reads the same file as GetPrivateProfileStringW: a key that is not found answers nDefault, and the text of a found key is read as a decimal integer.
+#[test]
+fn get_private_profile_int_a_follows_the_page() {
+    let src = format!(
+        "{INI_PRE}{}",
+        r#"
+static void gi(const char *label, const char *app, const char *key, int32_t def, const char *file)
+{
+    R[1] = app ? P(app) : 0; R[2] = key ? P(key) : 0; R[8] = (uint64_t)(int64_t)def; R[9] = P(file); R[4] = P(st); last_err = 99; R[0] = 0xDEAD;
+    fle_imp_GetPrivateProfileIntA();
+    printf("%s ret %u err %u opened '%s'\n", label, (unsigned)R[0], last_err, opened);
+}
+int main(void)
+{
+    setvbuf(stdout, NULL, _IONBF, 0);
+    gi("shortcut", "InternetShortcut", "ShowCommand", 9, "C:\\x\\a.ini");
+    gi("third", "Third", "z", 9, "C:\\x\\a.ini");
+    gi("missing-key", "Other", "nokey", 7, "C:\\x\\a.ini");
+    gi("not-a-number", "Other", "K2", 9, "C:\\x\\a.ini");
+    gi("negative-default", "Other", "nokey", -1, "C:\\x\\a.ini");
+    gi("no-section", "Nope", "url", 5, "C:\\x\\a.ini");
+    gi("missing-file", "Debug", "WriteLogFile", 0, "lame_enc.ini");
+    return 0;
+}
+"#
+    );
+    let (rc, out, err) = run("ia2-iniint", &["fle_wall_ia2v.c"], &src);
+    assert_eq!(rc, 0, "{out:?} {err}");
+    assert_eq!(
+        out,
+        [
+            "shortcut ret 3 err 99 opened 'C:\\x\\a.ini'",
+            "third ret 1 err 99 opened 'C:\\x\\a.ini'",
+            "missing-key ret 7 err 99 opened 'C:\\x\\a.ini'",
+            "not-a-number ret 0 err 99 opened 'C:\\x\\a.ini'",
+            "negative-default ret 4294967295 err 99 opened 'C:\\x\\a.ini'",
+            "no-section ret 5 err 99 opened 'C:\\x\\a.ini'",
+            "missing-file ret 0 err 2 opened 'C:\\Windows\\lame_enc.ini'",
+        ]
+    );
+}
+
+/// Issue #1512: MessageBoxA (LAMEenc_x64.dll's beWriteInfoTag) answers like MessageBoxW: no window, the default button, and one line on stderr that names MessageBoxA.
+#[test]
+fn message_box_a_answers_the_default_button_like_w() {
+    let src = r#"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include "fle_runtime.h"
+#include "fle_imports.h"
+#include "fle_wall_ia2.h"
+uint64_t R[16];
+void fle_stop(const char *api, const char *why) { printf("STOP %s: %s\n", api, why); fflush(stdout); exit(3); }
+#define P(x) ((uint64_t)(uintptr_t)(x))
+static uint64_t stk[4] = { 0x1234 };
+static void mba(uint32_t type) { R[4] = P(stk); R[1] = 0; R[2] = P("Hello"); R[8] = P("Cap"); R[9] = type; fle_imp_MessageBoxA(); printf("type %#x -> %d\n", type, (int)R[0]); }
+int main(void)
+{
+    setvbuf(stdout, NULL, _IONBF, 0);
+    mba(0x0); mba(0x1); mba(0x2); mba(0x3); mba(0x4); mba(0x5); mba(0x6);
+    mba(0x104); mba(0x203); mba(0x103); mba(0x301);
+    return 0;
+}
+"#;
+    let (rc, out, err) = run("ia2-msgbox-a", &["fle_wall_ia2.c"], src);
+    assert_eq!(rc, 0, "{out:?} {err}");
+    assert_eq!(
+        out,
+        [
+            "type 0 -> 1", "type 0x1 -> 1", "type 0x2 -> 3", "type 0x3 -> 6", "type 0x4 -> 6", "type 0x5 -> 4", "type 0x6 -> 2",
+            "type 0x104 -> 7", "type 0x203 -> 2", "type 0x103 -> 7", "type 0x301 -> 1",
+        ]
+    );
+    assert_eq!(err.matches("MessageBoxA NOT SHOWN").count(), 11, "{err}");
+    assert!(err.contains("caller 0x1234, caption \"Cap\", text \"Hello\""), "{err}");
+}
+
+/// Issue #1512: the two rows of the MP3 encoder's imports are the last rows of harness/seeds/ship6-imports.txt (a row file is only appended to, so the earlier rows keep
+/// their pseudo VAs). Each names a runtime function that is declared in its header and defined in its runtime file, and is in no other row and not in the lift's own table.
+#[test]
+fn lameenc_rows_are_appended_to_ship6_and_defined() {
+    let ship = std::fs::read_to_string(manifest().join("../../harness/seeds/ship6-imports.txt")).unwrap();
+    let rows: Vec<&str> = ship.lines().map(|l| l.split('#').next().unwrap().trim()).filter(|l| !l.is_empty()).collect();
+    let n = rows.len();
+    assert_eq!(rows[n - 2], "kernel32.dll GetPrivateProfileIntA fle_imp_GetPrivateProfileIntA");
+    assert_eq!(rows[n - 1], "user32.dll MessageBoxA fle_imp_MessageBoxA");
+    let table = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
+    let header = std::fs::read_to_string(rt().join("fle_wall_ia2.h")).unwrap();
+    let ia2 = std::fs::read_to_string(rt().join("fle_wall_ia2.c")).unwrap();
+    let ia2v = std::fs::read_to_string(rt().join("fle_wall_ia2v.c")).unwrap();
+    for (api, source) in [("GetPrivateProfileIntA", &ia2v), ("MessageBoxA", &ia2)] {
+        assert_eq!(rows.iter().filter(|r| r.split_whitespace().nth(1) == Some(api)).count(), 1, "{api}: one row");
+        assert!(!table.contains(&format!("\"{api}\"")), "{api}: in the lift's own TABLE");
+        assert!(header.contains(&format!("void fle_imp_{api}(void);")), "{api}: not declared in fle_wall_ia2.h");
+        assert!(source.contains(&format!("void fle_imp_{api}(void)\n")), "{api}: not defined in its runtime file");
+    }
+}
+
+/// Issue #1512: the MP3 encoder's three imports are names of the C import table too (harness/hyb/c-imports-engine.txt): a function that calls an import
+/// that the table does not name is not lowered in the C mode ("is not modelled by the C runtime"), and the plugin's functions are lowered in that mode.
+#[test]
+fn lameenc_imports_are_in_the_c_import_table() {
+    let table = std::fs::read_to_string(manifest().join("../../harness/hyb/c-imports-engine.txt")).unwrap();
+    let names: Vec<&str> = table.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+    for api in ["GetPrivateProfileIntA", "MessageBoxA", "OutputDebugStringA"] {
+        assert_eq!(names.iter().filter(|n| **n == api).count(), 1, "{api}: one row in c-imports-engine.txt");
+    }
 }
 
 #[test]

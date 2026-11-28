@@ -800,7 +800,7 @@ fn extract_steps() -> Vec<Step> {
             "--dlls".into(),
             format!("{}/extract-dlls.tsv", plugins::OUT_DIR),
             "--seed".into(),
-            format!("{}/vfs-seed-idle1.tsv", plugins::OUT_DIR),
+            format!("{}/vfs-seed-extract.tsv", plugins::OUT_DIR),
         ]),
     ]
 }

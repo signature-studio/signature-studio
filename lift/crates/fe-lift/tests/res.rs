@@ -237,7 +237,7 @@ fn run_with(name: &str, image: &PathBuf, body: &str) -> Out {
     std::fs::write(&c, src).unwrap();
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rd).arg("-I").arg(&rt).arg("-I").arg(&harness);
-    for f in ["fle_env.c", "fle_imports.c", "fle_modules.c", "fle_string.c"] {
+    for f in ["fle_env.c", "fle_imports.c", "fle_glob.c", "fle_modules.c", "fle_string.c"] {
         cmd.arg(rt.join(f));
     }
     cmd.arg(rd.join("fle_res.c")).arg(harness.join("image.c"));

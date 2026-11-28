@@ -74,6 +74,8 @@ void fle_host_on_idle(void) __attribute__((weak));
  * (at most to `next`: the scheduler never skips a deadline): the scheduler goes on. A weak symbol that no link defines is NULL: a link
  * without the host's idle is unchanged. */
 int fle_thread_idle_hook(uint64_t now, uint64_t next, uint64_t *advance_to) __attribute__((weak));
+/* Issue #1418: the counts of the calls that are answered without a model (fle_env.c), printed at the idle reports; weak as the hook above */
+void fle_warn_idle(void) __attribute__((weak));
 /* Decision 0234 (mt3, PROVISIONAL): the priority level that SetThreadPriority kept for the first thread (fle_proc.c; the other threads keep theirs in `ps`). Weak: a link without fle_proc.c has only NORMAL. */
 int32_t fle_proc_first_thread_priority(void) __attribute__((weak));
 /* Decision 0280 (PROVISIONAL): harness/fruity_idle.c (wasm, FRUITY on): takes the input events that the page has put into its ring since the last look and queues them with fle_input_host_* (the same functions as the exports fle_g3_mouse / fle_g3_key that the Worker calls at the idle). Called from the scheduler only (schedule_ex), where the idle hook also runs. Weak: other links have no ring. */
@@ -153,6 +155,7 @@ typedef struct {
 #endif
     twait w;
     fle_tqueue q;
+    uint64_t tr_site;   /* Issue #1502: the return address of the last traced wait of this thread (the trace prints a wait when its call site changes) */
 } thr;
 
 static thr T[FLE_THREAD_MAX];
@@ -183,6 +186,7 @@ int fle_thread_is_done(unsigned idx) { return idx < nthr && T[idx].state == T_DO
 int fle_thread_in_message_wait(unsigned idx) { return idx < nthr && T[idx].state == T_WAITING && (T[idx].w.kind == W_MSG_GET || T[idx].w.kind == W_MSG_WAIT || (T[idx].w.kind == W_OBJECTS && T[idx].w.msg)); }
 void fle_thread_set_idle_stop(int on) { idle_stop = on; }
 void fle_thread_set_trace(int on) { trace_on = on; }
+int fle_thread_trace_on(void) { return trace_on; }
 
 uint64_t *fle_thread_tls_values(void) { return nthr && cur ? T[cur].tls : NULL; }
 uint32_t *fle_thread_slot_last_error(void) { return nthr && cur ? &T[cur].last_error : NULL; }
@@ -817,9 +821,9 @@ static void pick_ui_pacing(double headroom_ms, double *budget_ms, double *min_cd
 {
     if (headroom_ms >= 20.0) {
         *budget_ms = 4.2;
-        *min_cd_ms = 1.0;
-        *ratio = 1.25;
-        *max_cd_ms = 6.0;
+        *min_cd_ms = 0.6;
+        *ratio = 0.65;
+        *max_cd_ms = 2.8;
     } else if (headroom_ms >= 8.0) {
         *budget_ms = 3.6;
         *min_cd_ms = 1.4;
@@ -837,9 +841,9 @@ static void arm_ui_cooldown(double now_ms)
 {
     if (now_ms >= 0.0) {
         double ui_used = now_ms - ui_turn_start_ms;
-        double min_cd = ui_turn_active_min_cd_ms > 0.0 ? ui_turn_active_min_cd_ms : 1.0;
-        double ratio = ui_turn_active_ratio > 0.0 ? ui_turn_active_ratio : 1.25;
-        double max_cd = ui_turn_active_max_cd_ms > 0.0 ? ui_turn_active_max_cd_ms : 6.0;
+        double min_cd = ui_turn_active_min_cd_ms > 0.0 ? ui_turn_active_min_cd_ms : 0.6;
+        double ratio = ui_turn_active_ratio > 0.0 ? ui_turn_active_ratio : 0.65;
+        double max_cd = ui_turn_active_max_cd_ms > 0.0 ? ui_turn_active_max_cd_ms : 2.8;
         double cd = ui_used > 0.0 ? ui_used * ratio : min_cd;
         if (cd < min_cd) cd = min_cd;
         if (cd > max_cd) cd = max_cd;
@@ -950,7 +954,7 @@ static int schedule_ex(int slice)
             headroom > 0.0 &&
             (now_ms >= 0.0 ? now_ms >= ui_turn_cooldown_ms : now_ticks() >= ui_turn_cooldown) &&
             pick_other_ui() >= 0) {
-            double budget_ms = 4.2, min_cd_ms = 1.0, ratio = 1.25, max_cd_ms = 6.0;
+            double budget_ms = 4.2, min_cd_ms = 0.6, ratio = 0.65, max_cd_ms = 2.8;
 
             pick_ui_pacing(headroom, &budget_ms, &min_cd_ms, &ratio, &max_cd_ms);
             ui_turn_active = 1;
@@ -1001,6 +1005,7 @@ static int schedule_ex(int slice)
             int hr, have = next_deadline(&nx);
             double after_ms;
 
+            if (fle_warn_idle) fle_warn_idle();
             if (fle_host_on_idle) fle_host_on_idle();
             if (fle_audio_idle_begin) fle_audio_idle_begin(cur);
             audio_block_update(now_ms, 0);
@@ -1057,13 +1062,93 @@ static void park(void)
     T[cur].state = T_RUNNING;
 }
 
+/* the top of the guest stack of thread idx: the StackBase of its TEB (fle_teb for the first thread, registered by fle_teb_set_stack; the others get theirs in create_thread_core). 0 when none is registered */
+static uint64_t stack_top(unsigned idx)
+{
+    uint8_t *teb = idx ? T[idx].teb : fle_teb;
+    uint64_t top = 0;
+
+    if (teb) memcpy(&top, teb + FLE_TEB_STACKBASE, sizeof top);
+    return top;
+}
+
+/* Issue #1502: the guest stack words at rsp: " rsp top-<d> stack <the 8 words from rsp>", d = top - rsp (the distance below the top of the thread's stack). rsp is not printed as an address:
+ * under native the stack lies in host memory, and its address moves from run to run. The word at rsp is the return address of the call into the lifted caller */
+static void words_at(char *buf, size_t n, uint64_t rsp, uint64_t top)
+{
+    size_t len;
+    unsigned k;
+    int m;
+
+    if (n == 0) return;
+    if (top && rsp <= top) m = snprintf(buf, n, " rsp top-%#llx stack", (unsigned long long)(top - rsp));
+    else m = snprintf(buf, n, " rsp ? stack");
+    len = (m < 0) ? 0 : ((size_t)m < n ? (size_t)m : n - 1);
+    for (k = 0; k < 8u && len + 1 < n; k++) {
+        m = snprintf(buf + len, n - len, " %#llx", (unsigned long long)fle_ld(rsp + 8u * k, 8));
+        if (m < 0 || (size_t)m >= n - len) break;
+        len += (size_t)m;
+    }
+}
+
+/* Issue #1502: one "fle-event:" line for an event call while the trace is on (fle_event.c calls it through the hook; the line is written here, so fle_event.c reads no host output) */
+void fle_thread_trace_event(const char *what, uint64_t h, uint32_t v)
+{
+    char buf[480], w[320] = "";
+    int n;
+
+    if (!trace_on) return;
+    words_at(w, sizeof w, R[4], stack_top(cur));
+    n = snprintf(buf, sizeof buf, "fle-event: %s %#llx %u thread %u%s\n", what, (unsigned long long)h, (unsigned)v, fle_thread_current(), w);
+    if (n > 0 && (size_t)n < sizeof buf && write(2, buf, (size_t)n) < 0) { /* the line is lost; the event is the same */ }
+}
+
+/* Issue #1502: true (and the site is kept) when the running call's site differs from the thread's last traced one; only with the trace on */
+static int trace_site_changed(void)
+{
+    uint64_t site;
+
+    if (!trace_on) return 0;
+    site = fle_ld(R[4], 8);
+    if (site == T[cur].tr_site) return 0;
+    T[cur].tr_site = site;
+    return 1;
+}
+
+/* Issue #1502: one line per thread of the table (its state, its start address, what it waits for and its stack words) when the trace is on */
+void fle_thread_trace_table(void)
+{
+    unsigned i;
+    char buf[480], w[320];
+    int n;
+
+    if (!trace_on) return;
+    for (i = 0; i < nthr; i++) {
+        thr *t = &T[i];
+        uint64_t rsp = i == cur ? R[4] : t->g.r[4];
+
+        if (t->state == T_DONE) continue;
+        words_at(w, sizeof w, rsp, stack_top(i));
+        n = snprintf(buf, sizeof buf, "fle-thread: table %u state %d start %#llx wait %s%s\n", i, t->state, (unsigned long long)t->start,
+                     t->state == T_WAITING ? t->w.api : "-", w);
+        if (n > 0 && (size_t)n < sizeof buf && write(2, buf, (size_t)n) < 0) { /* the line is lost; the table is the same */ }
+    }
+}
+
 static void begin_wait(int kind, const char *api, uint32_t ms)
 {
     twait *w = &T[cur].w;
+    char buf[480], sw[320];
+    int n;
 
     memset(w, 0, sizeof *w);
     w->kind = kind;
     w->api = api;
+    if (trace_site_changed()) {   /* Issue #1502: the wait of each thread, with its kind, time-out and call site (a loop of Sleep at one site is one line; the trace is on with the window-API trace) */
+        words_at(sw, sizeof sw, R[4], stack_top(cur));
+        n = snprintf(buf, sizeof buf, "fle-thread: wait %s thread %u kind %d ms %u%s\n", api, cur, kind, ms, sw);
+        if (n > 0 && (size_t)n < sizeof buf && write(2, buf, (size_t)n) < 0) { /* the line is lost; the wait is the same */ }
+    }
     if (ms != INFINITE_ && (kind == W_SLEEP || kind == W_OBJECTS)) {
         w->has_deadline = 1;
         w->deadline = ms_deadline(ms);
@@ -1171,6 +1256,69 @@ void fle_spin_slice(void)
     if (schedule()) pst.switches++;
 }
 
+/* #1382: the libc's pthread mutexes (dlmalloc's global lock, and the others of the libc and Blend2D; lift/harness/web/link.rsp wraps pthread_mutex_lock and pthread_mutex_unlock). Every guest
+ * thread runs on the ONE host thread, so all of them have its tid, and musl's debug check (pthread_mutex_timedlock.c: "pthread mutex deadlock detected") traps when a thread takes a mutex
+ * that another thread holds. A mutex that another guest thread holds is waited for as Sleep(1) waits: the holder runs and releases it. A mutex that the same guest thread holds is not taken
+ * twice (the libc's mutexes are not recursive): that is a release that was skipped, and the run stops with the guest's rsp and the return address at it. */
+#include <errno.h>
+#include <pthread.h>
+#define FLE_MUTEX_HOLDERS    64u
+#define FLE_MUTEX_WAIT_LIMIT 100000u   /* Sleep(1) rounds (100 virtual seconds) before a wait is a deadlock */
+int __real_pthread_mutex_unlock(pthread_mutex_t *m);
+static struct { const pthread_mutex_t *m; unsigned thread; } mutex_held[FLE_MUTEX_HOLDERS];
+
+static int mutex_find(const pthread_mutex_t *m)
+{
+    unsigned k;
+    for (k = 0; k < FLE_MUTEX_HOLDERS; k++)
+        if (mutex_held[k].m == m) return (int)k;
+    return -1;
+}
+
+static void mutex_put(const pthread_mutex_t *m)
+{
+    unsigned k;
+    for (k = 0; k < FLE_MUTEX_HOLDERS; k++)
+        if (!mutex_held[k].m) {
+            mutex_held[k].m = m;
+            mutex_held[k].thread = cur;
+            return;
+        }
+    fle_stop("pthread_mutex_lock", "more mutexes held at once than the table keeps");
+}
+
+int __wrap_pthread_mutex_lock(pthread_mutex_t *m)
+{
+    unsigned waits = 0;
+    int r = pthread_mutex_trylock(m);
+
+    while (r == EBUSY) {
+        int k = mutex_find(m);
+
+        if (k < 0 || mutex_held[k].thread == cur) {
+            char why[200];
+            uint64_t rsp = R[4];
+
+            snprintf(why, sizeof why, "the mutex is held by this guest thread (%s): the libc's mutexes are not recursive, so a release was skipped (rsp %#llx, the return address at it %#llx)",
+                     k < 0 ? "not taken through the wrapper" : "taken through the wrapper", (unsigned long long)rsp, (unsigned long long)fle_ld(rsp, 8));
+            fle_stop("pthread_mutex_lock", why);
+        }
+        if (++waits > FLE_MUTEX_WAIT_LIMIT) fle_stop("pthread_mutex_lock", "deadlock: the mutex stays held by another thread");
+        fle_thread_sleep("pthread_mutex_lock", 1);
+        r = pthread_mutex_trylock(m);
+    }
+    if (r == 0) mutex_put(m);
+    return r;
+}
+
+int __wrap_pthread_mutex_unlock(pthread_mutex_t *m)
+{
+    int k = mutex_find(m);
+
+    if (k >= 0) mutex_held[k].m = NULL;
+    return __real_pthread_mutex_unlock(m);
+}
+
 void fle_thread_preempt_stats(fle_preempt_stats *out)
 {
     *out = pst;
@@ -1185,6 +1333,24 @@ static void preempt_arm(void)
     preempt_armed = 1;
     fle_progress_limit = fle_progress_count + slice_dispatches;
     fle_loop_limit = fle_loop_count + FLE_LOOP_SLICE_BACKEDGES;
+}
+
+/* Issue #1402: the rate the page measured for requestAnimationFrame, put in at an idle (fle_g3_hz, lift/harness/fruity_idle.c). 0 = none put: the environment's rate stands. */
+static uint32_t display_hz_put;
+
+int fle_display_hz_put(uint32_t hz)
+{
+    if (hz < 24u || hz > 1000u) return 0;
+    display_hz_put = hz;
+    return 1;
+}
+
+/* Issue #1402: the number of DwmFlush calls so far (the page reads it at each idle; fle_g3_dwm_count). */
+static uint64_t dwm_flushes;
+
+uint64_t fle_thread_dwm_flushes(void)
+{
+    return dwm_flushes;
 }
 
 /* ui1 (decision 0166): the refresh rate of the virtual display. FLE_DWM_HZ in the environment (read once) overrides the compile-time default FLE_DWM_HZ (60); 24..1000 are accepted. */
@@ -1205,7 +1371,7 @@ uint32_t fle_display_hz(void)
             else fprintf(stderr, "fle: FLE_DWM_HZ=\"%s\" is not a number of hertz in 24..1000: ignored, %u Hz\n", e, (unsigned)hz);
         }
     }
-    return hz;
+    return display_hz_put ? display_hz_put : hz;
 }
 
 /* ui1 (decision 0166): the number EnumDisplaySettingsW reports (fle_monitor.c calls this through a weak reference). FLE_DISPLAYSETTINGS_FREQUENCY in the environment (24..1000) if set, else the same value as DwmFlush (fle_display_hz), else the compile-time default
@@ -1215,6 +1381,7 @@ uint32_t fle_display_settings_hz(void)
 {
     static uint32_t hz;
 
+    if (display_hz_put) return display_hz_put;
     if (!hz) {
         const char *e = getenv("FLE_DISPLAYSETTINGS_FREQUENCY");
         uint32_t dwm = fle_display_hz();
@@ -1247,6 +1414,7 @@ void fle_imp_DwmFlush(void)
     uint64_t dl = fle_thread_next_frame_tick(now_ticks());
 
     if (nthr) T[cur].is_dwm = 1;
+    dwm_flushes++;
     if (nthr < 2) {
         fle_sys_clock_advance_to(dl);
         R[0] = 0;
@@ -1593,6 +1761,12 @@ void fle_imp_ExitThread(void)
     thread_finish(code);
 }
 
+void fle_thread_end_running(uint32_t code)
+{
+    if (!nthr || cur == 0) fle_stop("ExitProcess", "the first thread would end the process (not modelled)");
+    thread_finish(code);
+}
+
 void fle_imp_GetExitCodeThread(void)
 {
     static const char api[] = "GetExitCodeThread";
@@ -1641,6 +1815,15 @@ uint32_t fle_thread_wait_objects(const char *api, uint32_t n, const uint64_t *h,
     if (ms == 0) {
         if (msg) T[cur].q.changebits = 0;
         return FLE_WAIT_TIMEOUT_RESULT;
+    }
+    if (trace_site_changed()) {   /* Issue #1502: the objects of the wait (a thread's handle is one of the pseudo handles of fle_thread), at a call site that changed */
+        char buf[480], sw[320];
+        int m;
+
+        words_at(sw, sizeof sw, R[4], stack_top(cur));
+        m = snprintf(buf, sizeof buf, "fle-thread: wait-objects %s thread %u n %u all %d h0 %#llx h1 %#llx ms %u%s\n", api, cur, n, all,
+                     (unsigned long long)(n > 0 ? h[0] : 0), (unsigned long long)(n > 1 ? h[1] : 0), ms, sw);
+        if (m > 0 && (size_t)m < sizeof buf && write(2, buf, (size_t)m) < 0) { /* the line is lost; the wait is the same */ }
     }
     if (nthr < 2) {
         fle_stop(api, ms == INFINITE_ ? "INFINITE time-out on objects that are not signaled would never return (no other thread exists)"

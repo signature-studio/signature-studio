@@ -233,7 +233,7 @@ fn each_of_the_33_thunks_is_answered_under_its_own_dll_and_no_other_dll() {
         assert_eq!(c.matches(&format!("fle_imp_{name}(); return;")).count(), own, "{dll}!{name}: answered only under the dll of its row");
         if dll != "kernel32.dll" {
             let va = IB + 0x1040 + 0x10;
-            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{name}: the thunk of kernel32!{name} stays unsupported");
+            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"kernel32.dll!{name}\"); }}")), "{dll}!{name}: the thunk of kernel32!{name} stops by name");
         }
     }
 }
@@ -252,6 +252,8 @@ fn runtime_sources() -> Vec<PathBuf> {
         })
         .collect();
     v.sort();
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
     v
 }
 
@@ -259,7 +261,7 @@ fn clang_c(src: &Path, obj: &Path, strict: bool) {
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-c"]);
     if strict {
-        cmd.arg("-Werror");
+        cmd.arg("-Werror").arg("-Wno-deprecated-declarations");
     }
     let cc = cmd.arg("-I").arg(src_dir()).arg("-I").arg(rt_dir()).arg(src).arg("-o").arg(obj).env("TMPDIR", work_dir().join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed for {}: {}", src.display(), String::from_utf8_lossy(&cc.stderr));
@@ -272,7 +274,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-fr11"));
         std::fs::create_dir_all(&dir).unwrap();
         let ours = [
-            "fle_raster.c", "fle_gdi.c", "fle_win.c", "fle_monitor.c", "fle_user_nowin.c", "fle_vfs.c", "fle_env.c", "fle_locale.c", "fle_proc.c", "fle_imports.c", "fle_reg.c", "fle_winmm.c", "fle_dsound.c",
+            "fle_raster.c", "fle_gdi.c", "fle_win.c", "fle_monitor.c", "fle_user_nowin.c", "fle_vfs.c", "fle_env.c", "fle_locale.c", "fle_proc.c", "fle_imports.c", "fle_glob.c", "fle_reg.c", "fle_winmm.c", "fle_dsound.c",
             "fle_wininet.c", "fle_spi.c", "fle_ole.c", "fle_sys.c", "fle_thread.c", "fle_load.c", "fle_modules.c",
         ];
         let mut v = Vec::new();

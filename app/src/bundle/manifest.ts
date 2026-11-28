@@ -133,7 +133,7 @@ export const MANIFEST_SCHEMA: Schema = {
     },
     seedPack: packSchema,
     dllPack: packSchema,
-    lazy: { type: 'array', maxItems: 256, items: lazySchema },
+    lazy: { type: 'array', maxItems: 1536, items: lazySchema },
   },
 };
 
@@ -168,12 +168,10 @@ export function validateManifest(input: unknown): ManifestResult {
       const root = m.engine.options.root;
       if (!(m.engine.args[0] as string).startsWith(`${root}/`)) errors.push({ path: '/engine/args/0', message: `must be a path under the file root ${root}/ (the engine DLL)` });
     }
-    // a lazy file is named once, and its path under the root is one file of the engine
-    const names = new Set<string>(), paths = new Set<string>();
+    // a lazy file's path under the root is one file of the engine (Issue #1478: the names need not be unique, the Data files of the plugins share file names)
+    const paths = new Set<string>();
     (m.lazy ?? []).forEach((l, i) => {
-      if (names.has(l.name)) errors.push({ path: `/lazy/${i}/name`, message: 'is listed twice' });
       if (paths.has(l.path)) errors.push({ path: `/lazy/${i}/path`, message: 'is listed twice' });
-      names.add(l.name);
       paths.add(l.path);
     });
   }

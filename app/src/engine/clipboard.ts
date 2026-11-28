@@ -1,26 +1,39 @@
-// The page's side of the engine's clipboard (#1389). The engine's Copy (SetClipboardData, CF_UNICODETEXT) comes here as text and is written to the operating system's clipboard
-// with navigator.clipboard.writeText. The engine's Paste (GetClipboardData) asks for the text, which is read with navigator.clipboard.readText. The browser decides what the
-// page may do: navigator.permissions gives the state of 'clipboard-read' and 'clipboard-write'. When the browser says no ('denied'), there is no Clipboard API, or a call fails,
-// the page shows the reason in a status line of its own (role="status", outside the engine's picture) and goes on: the engine gets no text (its clipboard reads as empty)
-// and is not stopped.
+// The page's side of the engine's clipboard (#1389, #1406, #1482). The Clipboard API is the only way the page touches the clipboard: navigator.clipboard.writeText (the engine's Copy)
+// and navigator.clipboard.readText (the engine's Paste). There is no paste event, no hidden input, no execCommand and no notice: a refused read or write is silent (the reason is kept in state.refusal).
+// The engine asks three kinds of question, and the page answers each one by what it is:
+//  - a paste: Ctrl+V reaches the engine as a key (keymap.ts cancels the browser's own paste), and a paste from the menu is a click; both are a GetClipboardData, which reads
+//    navigator.clipboard.readText() and answers with its text (or nothing when the browser refuses).
+//  - a question about the formats (IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats: probe()) reads nothing (#1406): the text the page knows decides.
+//  - a GetClipboardData right after a right button release is FL's right-click question (the knob's menu checks its value): it reads nothing either (#1406). It gets the text
+//    the page knows; with none it gets PLACEHOLDER (a 'denied' page gets no text).
+// The permission (#1482): at the page's load the browser's state of 'clipboard-read' is read; under 'prompt' (and under 'granted', which keeps the text the page knows up to date)
+// readText is called once, which asks the person under 'prompt'. A request the browser refuses (the document has no focus, ...) is made again at the first left press or key.
+// Under 'granted' the text is read again when the window gets the focus, unless the right button is down. A right click never reads or asks (#1503).
+// The browser decides what the page may do: navigator.permissions gives the state of 'clipboard-read' and 'clipboard-write'. The engine is not stopped by any of this.
 
 export type ClipboardPermission = 'clipboard-read' | 'clipboard-write';
 
-/** what the page knows of the clipboard: the browser's state of each permission ('unknown' when the browser does not tell), the calls made, the text last written and last read (and when the last read was asked, performance.now() of the page), and the reason the page last showed (null: the last call worked) */
+/** what the page knows of the clipboard: the browser's state of each permission ('unknown' when the browser does not tell), the calls made, the text last written and last read
+ *  (and when the last read was asked, performance.now() of the page), and the reason of the last refusal (kept, never shown; null: none) */
 export interface ClipboardState {
   readPermission: string;
   writePermission: string;
   writes: number;
   reads: number;
+  probes: number;
   lastWritten: string | null;
   lastRead: string | null;
   lastReadAt: number | null;
-  message: string | null;
+  refusal: string | null;
 }
 
-const NO_API = 'This browser has no Clipboard API (navigator.clipboard). Copy and Paste do not reach the system clipboard.';
-const WRITE_DENIED = 'The browser does not allow this page to write the clipboard (clipboard-write: denied). Copy did not reach the system clipboard. Allow it in the browser\'s site settings.';
-const READ_DENIED = 'The browser does not allow this page to read the clipboard (clipboard-read: denied). Paste gets no text. Allow it in the browser\'s site settings.';
+const NO_API = 'This browser has no Clipboard API (navigator.clipboard).';
+const WRITE_DENIED = 'clipboard-write: denied';
+const READ_DENIED = 'clipboard-read: denied';
+/** the text a question's answer gets when the page knows no text and reads none: a number, which FL's value check takes */
+const PLACEHOLDER = '0';
+/** a GetClipboardData this soon after a right button release is FL's right-click question, not a paste */
+const QUESTION_MS = 1500;
 
 const describe = (e: unknown): string => (e instanceof Error ? `${e.name}: ${e.message}` : String(e));
 
@@ -35,11 +48,30 @@ async function permissionState(name: ClipboardPermission): Promise<string> {
 }
 
 export class PageClipboard {
-  readonly state: ClipboardState = { readPermission: 'unknown', writePermission: 'unknown', writes: 0, reads: 0, lastWritten: null, lastRead: null, lastReadAt: null, message: null };
-  private status: HTMLElement | null = null;
-  private readonly doc: Document;
+  readonly state: ClipboardState = { readPermission: 'unknown', writePermission: 'unknown', writes: 0, reads: 0, probes: 0, lastWritten: null, lastRead: null, lastReadAt: null, refusal: null };
+  /** the text the page knows: a read's text, a Copy's text (null: none yet) */
+  private known: string | null = null;
+  private lastButton: { button: number; at: number } | null = null;
+  /** the request made at the load was refused by the browser: the first left press or key makes it again (once) */
+  private askAgain = false;
+  /** the right button is down (pressed, not yet released): nothing is read meanwhile (#1503) */
+  private rightDown = false;
 
-  constructor(doc: Document) { this.doc = doc; }
+  /** the page's listeners: the right button's release (the question's clock), a press or key that ends a question, and the window's focus */
+  attach(win: Window): void {
+    win.addEventListener('pointerdown', (e) => { this.lastButton = null; this.rightDown = e.button === 2; if (!this.rightDown) void this.firstAction(); }, true);
+    win.addEventListener('pointerup', (e) => { this.lastButton = { button: e.button, at: performance.now() }; this.rightDown = false; }, true);
+    win.addEventListener('keydown', () => { this.lastButton = null; void this.firstAction(); }, true);
+    win.addEventListener('focus', () => { void this.onFocus(); });
+  }
+
+  /** at the page's load: the state of 'clipboard-read'; under 'prompt' or 'granted' readText is called (under 'prompt' the browser asks the person) */
+  async start(): Promise<void> {
+    this.state.readPermission = await permissionState('clipboard-read');
+    if (this.state.readPermission !== 'prompt' && this.state.readPermission !== 'granted') return;
+    const ok = await this.readKnown();
+    this.askAgain = !ok && this.state.readPermission === 'prompt';
+  }
 
   /** the browser's state of both permissions, for the record (each call asks again when it needs the answer) */
   async refresh(): Promise<void> {
@@ -52,53 +84,82 @@ export class PageClipboard {
     this.state.writes++;
     this.state.lastWritten = text;
     const api = navigator.clipboard;
-    if (!api || typeof api.writeText !== 'function') { this.say(NO_API); return; }
+    if (!api || typeof api.writeText !== 'function') { this.state.refusal = NO_API; return; }
     this.state.writePermission = await permissionState('clipboard-write');
-    if (this.state.writePermission === 'denied') { this.say(WRITE_DENIED); return; }
+    if (this.state.writePermission === 'denied') { this.state.refusal = WRITE_DENIED; return; }
     try {
       await api.writeText(text);
-      this.say(null);
+      this.known = text;
+      this.state.refusal = null;
     } catch (e) {
-      this.say(`The browser did not take the text for the clipboard (${describe(e)}). Copy did not reach the system clipboard.`);
+      this.state.refusal = `the browser did not take the text (${describe(e)})`;
     }
   }
 
-  /** the engine's Paste: the operating system's clipboard text, or null when the browser does not give it (the reason is shown) */
+  /** a question about the formats: whether the clipboard holds text. It reads no content: the text the page knows decides, else the permission */
+  async probe(): Promise<boolean> {
+    this.state.probes++;
+    const api = navigator.clipboard;
+    if (!api || typeof api.readText !== 'function') return false;
+    if (this.known !== null) return this.known.length > 0;
+    this.state.readPermission = await permissionState('clipboard-read');
+    return this.state.readPermission !== 'denied';
+  }
+
+  /** the engine's GetClipboardData of the text: FL's right-click question (the known text, or PLACEHOLDER: nothing is read), else a paste: readText. null when the browser
+   *  gives no text (the reason is kept in state.refusal) */
   async read(): Promise<string | null> {
     this.state.reads++;
     this.state.lastReadAt = performance.now();
+    if (this.isQuestion()) {
+      if (this.known !== null) return this.known.length > 0 ? this.known : null;
+      return (await permissionState('clipboard-read')) === 'denied' ? null : PLACEHOLDER;
+    }
     const api = navigator.clipboard;
-    if (!api || typeof api.readText !== 'function') { this.say(NO_API); return null; }
+    if (!api || typeof api.readText !== 'function') { this.state.refusal = NO_API; return null; }
     this.state.readPermission = await permissionState('clipboard-read');
-    if (this.state.readPermission === 'denied') { this.say(READ_DENIED); this.state.lastRead = null; return null; }
+    if (this.state.readPermission === 'denied') { this.state.lastRead = null; this.state.refusal = READ_DENIED; return null; }
     try {
       const text = await api.readText();
       this.state.lastRead = text;
-      this.say(null);
+      this.known = text;
+      this.state.refusal = null;
       return text;
     } catch (e) {
       this.state.lastRead = null;
-      this.say(`The browser did not give the clipboard text (${describe(e)}). Paste gets no text.`);
+      this.state.refusal = `the browser did not give the clipboard text (${describe(e)})`;
       return null;
     }
   }
 
-  /** the reason in the page's status line, or the line hidden (null) */
-  private say(message: string | null): void {
-    this.state.message = message;
-    if (message === null) {
-      if (this.status) this.status.hidden = true;
-      return;
+  /** the last button released was the right one, a moment ago, and no press or key came since: the engine asks for the text as FL's right-click menu does */
+  private isQuestion(): boolean {
+    return this.lastButton !== null && this.lastButton.button === 2 && performance.now() - this.lastButton.at < QUESTION_MS;
+  }
+
+  /** readText: the answer is the text the page knows. false: the browser refused it (the reason is kept) */
+  private async readKnown(): Promise<boolean> {
+    const api = navigator.clipboard;
+    if (!api || typeof api.readText !== 'function') return false;
+    try {
+      this.known = await api.readText();
+      return true;
+    } catch (e) {
+      this.state.refusal = `the browser did not give the clipboard text (${describe(e)})`;
+      return false;
     }
-    if (!this.status) {
-      const el = this.doc.createElement('div');
-      el.id = 'clipboard-status';
-      el.setAttribute('role', 'status');
-      el.style.cssText = 'position:fixed;left:8px;bottom:8px;max-width:560px;padding:6px 10px;background:#fff3cd;color:#222;border:1px solid #d6b656;font:12px system-ui,sans-serif;z-index:50';
-      this.doc.body.append(el);
-      this.status = el;
-    }
-    this.status.textContent = message;
-    this.status.hidden = false;
+  }
+
+  /** the first left press or key of the page: a request the browser refused at the load is made again, once, when the permission is still 'prompt' */
+  private async firstAction(): Promise<void> {
+    if (!this.askAgain) return;
+    this.askAgain = false;
+    if ((await permissionState('clipboard-read')) === 'prompt') await this.readKnown();
+  }
+
+  /** the window got the focus: under 'granted' the text the page knows is read again, unless the right button is down (a right click reads nothing, #1503) */
+  private async onFocus(): Promise<void> {
+    this.state.readPermission = await permissionState('clipboard-read');
+    if (this.state.readPermission === 'granted' && !this.rightDown) await this.readKnown();
   }
 }

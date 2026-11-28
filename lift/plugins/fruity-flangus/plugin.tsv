@@ -1,0 +1,2 @@
+key	guest	role	sha256	size	hook	args	omit
+effects.fruity-flangus.fruity_flangus_x64.dll	Plugins\Fruity\Effects\Fruity Flangus\Fruity Flangus_x64.dll	本体	ae7ae502f1216df476a25c4433ff8ce418d1ef910ba8aaece37f0d66823052ee	3686912	rva:0x17bc0,0x31d80,0x31da0	--pdata	-

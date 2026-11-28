@@ -1,0 +1,57 @@
+# 機能の表(手で書く)。領域 menus の、一覧(features/generated/menus.tsv)に無い項目: サブメニューの中の項目(Issue #1489)。
+# 一覧の項目(File・Edit・Add・Patterns・View・Options・Tools・Help の 157 件)は、一覧の行に ID がある。この表に同じ ID を書くと、網羅率の重複の検査で落ちる(tools/e2e/test)ので、書かない。
+# expected は crash-hunt(pm-work/findings/crash-hunt-2026-11-25.json。この実行では未確認)の観測。項目の効果は、各シナリオが窓の表で確かめる(scenarios/menus/)。
+id	kind	name	expected	how
+menus/item/file-2-1	item	File > #2 > #1	window: TMsgForm[Confirm]	File (label); Down x 2, Enter; Down x 1, Enter
+menus/item/file-2-2	item	File > #2 > #2	window: TMsgForm[Confirm]	File (label); Down x 2, Enter; Down x 2, Enter
+menus/item/file-2-3	item	File > #2 > #3	a change in the table or the title	File (label); Down x 2, Enter; Down x 3, Enter
+menus/item/file-2-4	item	File > #2 > #4	window: TMsgForm[Confirm]	File (label); Down x 2, Enter; Down x 4, Enter
+menus/item/file-2-5	item	File > #2 > #5	window: TMsgForm[Confirm]	File (label); Down x 2, Enter; Down x 5, Enter
+menus/item/file-8-1	item	File > #8 > #1	no effect seen	File (label); Down x 8, Enter; Down x 1, Enter
+menus/item/file-9-1	item	File > #9 > #1	no effect seen	File (label); Down x 9, Enter; Down x 1, Enter
+menus/item/file-9-2	item	File > #9 > #2	no effect seen	File (label); Down x 9, Enter; Down x 2, Enter
+menus/item/file-9-3	item	File > #9 > #3	no effect seen	File (label); Down x 9, Enter; Down x 3, Enter
+menus/item/file-9-4	item	File > #9 > #4	window: TWAVRenderForm[Rendering to ?untitled.mid]	File (label); Down x 9, Enter; Down x 4, Enter
+menus/item/file-9-5	item	File > #9 > #5	no effect seen	File (label); Down x 9, Enter; Down x 5, Enter
+menus/item/file-9-6	item	File > #9 > #6	no effect seen	File (label); Down x 9, Enter; Down x 6, Enter
+menus/item/file-9-7	item	File > #9 > #7	no effect seen	File (label); Down x 9, Enter; Down x 7, Enter
+menus/item/file-9-8	item	File > #9 > #8	no effect seen	File (label); Down x 9, Enter; Down x 8, Enter
+menus/item/file-9-9	item	File > #9 > #9	no effect seen	File (label); Down x 9, Enter; Down x 9, Enter
+menus/item/file-9-10	item	File > #9 > #10	no effect seen	File (label); Down x 9, Enter; Down x 10, Enter
+menus/item/file-9-11	item	File > #9 > #11	no effect seen	File (label); Down x 9, Enter; Down x 11, Enter
+menus/item/file-9-12	item	File > #9 > #12	no effect seen	File (label); Down x 9, Enter; Down x 12, Enter
+menus/item/file-9-13	item	File > #9 > #13	window: TWAVRenderForm[Rendering to ?untitled.wav]	File (label); Down x 9, Enter; Down x 13, Enter
+menus/item/file-9-9-1	item	File > #9 > #9 > #1	no effect seen	File (label); Down x 9, Enter; Down x 9, Enter; Down x 1, Enter
+menus/item/file-9-9-2	item	File > #9 > #9 > #2	no effect seen	File (label); Down x 9, Enter; Down x 9, Enter; Down x 2, Enter
+menus/item/file-9-10-1	item	File > #9 > #10 > #1	no effect seen	File (label); Down x 9, Enter; Down x 10, Enter; Down x 1, Enter
+menus/item/file-9-10-2	item	File > #9 > #10 > #2	no effect seen	File (label); Down x 9, Enter; Down x 10, Enter; Down x 2, Enter
+menus/item/add-5-1	item	Add > #5 > #1	a change in the table or the title	Add (label); Down x 5, Enter; Down x 1, Enter
+menus/item/add-5-2	item	Add > #5 > #2	no effect seen	Add (label); Down x 5, Enter; Down x 2, Enter
+menus/item/add-5-3	item	Add > #5 > #3	no effect seen	Add (label); Down x 5, Enter; Down x 3, Enter
+menus/item/add-5-4	item	Add > #5 > #4	no effect seen	Add (label); Down x 5, Enter; Down x 4, Enter
+menus/item/add-5-5	item	Add > #5 > #5	window: TPluginListForm[Select effect plugin]	Add (label); Down x 5, Enter; Down x 5, Enter
+menus/item/view-11-1	item	View > #11 > #1	crash-hunt: stopped (stop)	View (label); Down x 11, Enter; Down x 1, Enter
+menus/item/view-11-2	item	View > #11 > #2	no effect seen	View (label); Down x 11, Enter; Down x 2, Enter
+menus/item/view-11-3	item	View > #11 > #3	no effect seen	View (label); Down x 11, Enter; Down x 3, Enter
+menus/item/view-11-4	item	View > #11 > #4	no new window seen in the crash-hunt (a change in the table or the title is to be checked)	View (label); Down x 11, Enter; Down x 4, Enter
+menus/item/view-11-5	item	View > #11 > #5	no effect seen	View (label); Down x 11, Enter; Down x 5, Enter
+menus/item/view-11-6	item	View > #11 > #6	no effect seen	View (label); Down x 11, Enter; Down x 6, Enter
+menus/item/view-11-7	item	View > #11 > #7	a change in the table or the title	View (label); Down x 11, Enter; Down x 7, Enter
+menus/item/view-11-8	item	View > #11 > #8	no new window seen in the crash-hunt (a change in the table or the title is to be checked)	View (label); Down x 11, Enter; Down x 8, Enter
+menus/item/view-11-9	item	View > #11 > #9	no new window seen in the crash-hunt (a change in the table or the title is to be checked)	View (label); Down x 11, Enter; Down x 9, Enter
+menus/item/view-11-10	item	View > #11 > #10	no effect seen	View (label); Down x 11, Enter; Down x 10, Enter
+menus/item/view-11-11	item	View > #11 > #11	no effect seen	View (label); Down x 11, Enter; Down x 11, Enter
+menus/item/view-11-12	item	View > #11 > #12	a change in the table or the title	View (label); Down x 11, Enter; Down x 12, Enter
+menus/item/view-11-13	item	View > #11 > #13	no new window seen in the crash-hunt (a change in the table or the title is to be checked)	View (label); Down x 11, Enter; Down x 13, Enter
+menus/item/view-11-14	item	View > #11 > #14	no effect seen	View (label); Down x 11, Enter; Down x 14, Enter
+menus/item/view-11-15	item	View > #11 > #15	a change in the table or the title	View (label); Down x 11, Enter; Down x 15, Enter
+menus/item/view-11-16	item	View > #11 > #16	no effect seen	View (label); Down x 11, Enter; Down x 16, Enter
+menus/item/view-11-17	item	View > #11 > #17	no new window seen in the crash-hunt (a change in the table or the title is to be checked)	View (label); Down x 11, Enter; Down x 17, Enter
+menus/item/view-11-18	item	View > #11 > #18	a change in the table or the title	View (label); Down x 11, Enter; Down x 18, Enter
+menus/item/view-19-1	item	View > #19 > #1	no effect seen (the submenu of View > #19 is seen at DPR 1.7 only)	View (label); Down x 19, Enter; Down x 1, Enter
+menus/item/view-19-2	item	View > #19 > #2	no effect seen (the submenu of View > #19 is seen at DPR 1.7 only)	View (label); Down x 19, Enter; Down x 2, Enter
+menus/item/view-19-3	item	View > #19 > #3	no effect seen (the submenu of View > #19 is seen at DPR 1.7 only)	View (label); Down x 19, Enter; Down x 3, Enter
+menus/item/view-19-4	item	View > #19 > #4	no effect seen (the submenu of View > #19 is seen at DPR 1.7 only)	View (label); Down x 19, Enter; Down x 4, Enter
+menus/item/view-19-5	item	View > #19 > #5	no effect seen (the submenu of View > #19 is seen at DPR 1.7 only)	View (label); Down x 19, Enter; Down x 5, Enter
+menus/item/view-19-6	item	View > #19 > #6	no effect seen (the submenu of View > #19 is seen at DPR 1.7 only)	View (label); Down x 19, Enter; Down x 6, Enter
+menus/item/view-19-7	item	View > #19 > #7	no effect seen (the submenu of View > #19 is seen at DPR 1.7 only)	View (label); Down x 19, Enter; Down x 7, Enter

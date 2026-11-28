@@ -204,8 +204,8 @@ fn each_new_thunk_is_answered_under_its_own_dll_and_no_other_dll() {
 // 3. The driver: the real runtime files and a stub guest
 // ---------------------------------------------------------------------------------------------
 
-const RT_FILES: [&str; 24] = [
-    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
+const RT_FILES: [&str; 25] = [
+    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_glob.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
     "fle_time.c", "fle_gdc.c", "fle_gdi.c", "fle_cursor.c", "fle_res.c", "fle_modules.c", "fle_realmod.c", "fle_raster.c", "fle_monitor.c", "fle_ole.c", "fle_reg.c",
 ];
 const RT_EXTRA: [&str; 4] = ["fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c"];
@@ -214,7 +214,7 @@ fn clang_c(src: &Path, obj: &Path, strict: bool) {
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-c"]);
     if strict {
-        cmd.arg("-Werror");
+        cmd.arg("-Werror").arg("-Wno-deprecated-declarations");
     }
     let cc = cmd.arg("-I").arg(src_dir()).arg("-I").arg(rt_dir()).arg(src).arg("-o").arg(obj).env("TMPDIR", work_dir().join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed for {}: {}", src.display(), String::from_utf8_lossy(&cc.stderr));
@@ -226,7 +226,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-fr12"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        let ours = ["fle_thread.c", "fle_win.c", "fle_class.c", "fle_gdi.c", "fle_gdc.c", "fle_cursor.c", "fle_res.c", "fle_vmap.c", "fle_vfs.c", "fle_raster.c", "fle_monitor.c", "fle_ole.c", "fle_modules.c", "fle_imports.c", "fle_proc.c", "fle_locale.c"];
+        let ours = ["fle_thread.c", "fle_win.c", "fle_class.c", "fle_gdi.c", "fle_gdc.c", "fle_cursor.c", "fle_res.c", "fle_vmap.c", "fle_vfs.c", "fle_raster.c", "fle_monitor.c", "fle_ole.c", "fle_modules.c", "fle_imports.c", "fle_glob.c", "fle_proc.c", "fle_locale.c"];
         for name in RT_FILES.iter().chain(RT_EXTRA.iter()) {
             let is_ours = ours.contains(name);
             let base = if is_ours { src_dir() } else { rt_dir() };
@@ -234,6 +234,9 @@ fn objs() -> &'static Vec<PathBuf> {
             clang_c(&base.join(name), &o, is_ours);
             v.push(o);
         }
+        let mo = dir.join("mutex_real_stub.o");
+        clang_c(&manifest().join("tests/support/mutex_real_stub.c"), &mo, true);
+        v.push(mo);
         v
     })
 }
@@ -524,7 +527,7 @@ fn run_idle(name: &str, body: &str) -> Vec<String> {
     );
     std::fs::write(&c, src).unwrap();
     let cc = Command::new("clang")
-        .args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-fPIE", "-I"])
+        .args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-deprecated-declarations", "-fPIE", "-I"])
         .arg(harness_dir())
         .arg(harness_dir().join("idle/idle.c"))
         .arg("-o")

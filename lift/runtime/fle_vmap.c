@@ -21,6 +21,7 @@
 #include "fle_sys.h"
 #include "fle_vfs.h"
 #include "fle_vmap.h"
+#include "fle_realmod.h"
 
 static long fle_vmap_owner_tid;
 
@@ -159,7 +160,8 @@ static void write_mbi(uint64_t out, uint64_t base, uint64_t alloc_base, uint32_t
 }
 
 /* ---- Decision 0123 (PROVISIONAL), wall 25: images and other registered ranges ---- */
-#define VQ_MAX_IMAGES 16u
+/* the FLEngine's image and one image per real module (RM_MAX 192 of fle_realmod.c, each mapped when the guest loads it): with 16, a session with more images stops at the next one (#1537) */
+#define VQ_MAX_IMAGES 193u
 #define VQ_MAX_RANGES 16u
 #define VQ_MAX_SECTIONS 24u
 #define MEM_FREE_  0x10000u
@@ -396,10 +398,11 @@ void fle_imp_VirtualQuery(void)
 
 /* ---- Inline hook points (decision 0105) ----
  * A module whose generated unit has hook points registers its image (base, SizeOfImage) and a table of the function entries whose first
- * 5 bytes the guest may overwrite with `jmp rel32` (fe-lift --hook-points). Single guest thread, as everything in this file. */
+ * 5 bytes the guest may overwrite with `jmp rel32` (fe-lift --hook-points). Single guest thread, as everything in this file.
+ * The two limits are constants, not options: 512 modules and 4096 pages (the two static tables are about 80 KB). */
 #define IH_SIZE      5u  /* jmp rel32 */
-#define IH_MAX_MODS  8u
-#define IH_MAX_PAGES 64u
+#define IH_MAX_MODS  512u
+#define IH_MAX_PAGES 4096u
 
 typedef struct {
     uint64_t base;
@@ -422,7 +425,14 @@ static unsigned ih_npages;
 
 void fle_hook_register(uint64_t base, uint64_t size, const fle_hook_point *pts, uint64_t n)
 {
-    if (ih_nmods >= IH_MAX_MODS) fle_stop("inline hook", "more modules with hook points than the runtime holds");
+    char why[200];
+
+    if (ih_nmods >= IH_MAX_MODS) {
+        snprintf(why, sizeof why,
+                 "more modules with hook points than the runtime holds: the module at base %#llx; %u modules are registered and the limit is %u",
+                 (unsigned long long)base, ih_nmods, IH_MAX_MODS);
+        fle_stop("inline hook", why);
+    }
     ih_mods[ih_nmods].base = base;
     ih_mods[ih_nmods].size = size;
     ih_mods[ih_nmods].pts = pts;
@@ -526,7 +536,11 @@ static void ih_protect(const char *api, const ih_mod *m, uint64_t addr, uint64_t
         for (i = 0; i < ih_npages; i++)
             if (ih_pages[i].page == pg) break;
         if (i == ih_npages) {
-            if (ih_npages >= IH_MAX_PAGES) fle_stop(api, "more pages of inline hook points than the runtime records");
+            if (ih_npages >= IH_MAX_PAGES) {
+                snprintf(why, sizeof why, "more pages of inline hook points than the runtime records: %u pages are recorded and the limit is %u",
+                         ih_npages, IH_MAX_PAGES);
+                fle_stop(api, why);
+            }
             ih_pages[ih_npages++].page = pg;
         }
         ih_pages[i].prot = np;
@@ -561,6 +575,9 @@ void fle_imp_VirtualProtect(void)
         ih_protect(api, m, addr, size, np, pold);
         return;
     }
+    /* Issue #1499 (段 B): a page of a program's image (fle_realmod.c) is not a registered image here, so its protection change stops by name (decision 0105) */
+    if (FLE_REALMOD_PRESENT() && fle_realmod_program_protect(addr, size) != 0)
+        fle_stop(api, "a protection change of a program's image: the program's code is patched by an inline hook (decision 0105); not modelled for a program's image (S-ia2-program-vprotect)");
     if (pold == 0) {
         fail(FLE_ERR_INVALID_PARAMETER_A, 0);
         return;
@@ -687,6 +704,19 @@ static void hook_once(void)
     if (hook_registered) return;
     fle_vfs_add_close_hook(vmap_close_hook);
     hook_registered = 1;
+}
+
+/* kernel32!OpenFileMappingW (Issue #1501,段 B: the Plugin Manager's start asks for a named mapping). HANDLE f(DWORD dwDesiredAccess ecx, BOOL bInheritHandle edx, LPCWSTR lpName r8). Learn: the function opens
+ * a named file mapping object; on failure the return value is NULL and GetLastError gives the reason (the page names no code for an unknown name; ERROR_FILE_NOT_FOUND (2) is the reading).
+ * A READING: a named object is never made by this runtime (CreateFileMappingW stops for a name), so no object of any name exists here and the call fails with ERROR_FILE_NOT_FOUND. The
+ * access mask and the inherit flag are not looked at. lpName NULL stops (the page does not define it). */
+void fle_imp_OpenFileMappingW(void)
+{
+    static const char api[] = "OpenFileMappingW";
+
+    fle_vmap_check_thread(api);
+    if (R[8] == 0) fle_stop(api, "lpName is NULL: the page does not define it");
+    fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);
 }
 
 /* kernel32!CreateFileMappingW: HANDLE f(hFile rcx, lpFileMappingAttributes rdx, flProtect r8d, dwMaximumSizeHigh r9d,

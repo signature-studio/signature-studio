@@ -199,6 +199,24 @@ EMSCRIPTEN_KEEPALIVE int fle_app_open_state(int request) { return fle_appfile_st
 
 /* ---- the APIs that opening a project reaches (decision 0144, in the order the walls came) ---- */
 
+/* Issue #1409: the page's trace of the call (the window-API trace; nothing is written: the call has no effect the guest can see). The path forms are shown as ASCII, the other units as ? */
+static void recent_doc_trace(uint32_t flags, uint64_t pv)
+{
+    char s[261];
+    size_t i;
+    if (!(fle_win_api_trace_on && fle_win_api_trace_on())) return;
+    s[0] = 0;
+    if (pv != 0 && (flags == 2 || flags == 3)) {
+        for (i = 0; i < sizeof s - 1; i++) {
+            uint64_t c = flags == 3 ? fle_ld(pv + 2 * (uint64_t)i, 2) : fle_ld(pv + i, 1);
+            if (c == 0) break;
+            s[i] = c >= 0x20 && c < 0x7f ? (char)c : '?';
+        }
+        s[i] = 0;
+    }
+    fprintf(stderr, "shell-api: SHAddToRecentDocs flags=%u path=\"%s\"\n", (unsigned)flags, pv == 0 ? "(NULL)" : s);
+}
+
 /* shell32!SHAddToRecentDocs (Learn): void f(UINT uFlags ecx, LPCVOID pv rdx). "Notifies the system that an item has been accessed"; "Set this parameter to NULL to clear all usage data"; "Return value: None".
  * The forms of pv are the SHARD values (shlobj_core.h: SHARD_PIDL 1, SHARD_PATHA 2, SHARD_PATHW 3; the AppUserModelID forms 4-7 and the IShellLink form 8 are Windows 7 additions). The virtual machine has no
  * Recent folder, jump list or Start menu to update, so the call has no effect the guest can see (S-g8a-recentdocs); the arguments are checked: a path form must point at a NUL-terminated string that can be read, a form
@@ -209,6 +227,7 @@ void fle_imp_SHAddToRecentDocs(void)
     uint32_t flags = (uint32_t)R[1];
     uint64_t pv = R[2];
 
+    recent_doc_trace(flags, pv);
     if (pv == 0) return;   /* "Set this parameter to NULL to clear all usage data": nothing is kept */
     switch (flags) {
     case 2: {   /* SHARD_PATHA */

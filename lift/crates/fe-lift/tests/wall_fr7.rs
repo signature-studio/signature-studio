@@ -41,7 +41,7 @@ fn clang_obj(src: &Path, obj: &Path, strict: bool) {
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-c"]);
     if strict {
-        cmd.arg("-Werror");
+        cmd.arg("-Werror").arg("-Wno-deprecated-declarations");
     }
     let cc = cmd.arg("-I").arg(src_dir()).arg("-I").arg(rt_dir()).arg(src).arg("-o").arg(obj).env("TMPDIR", work_dir().join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed for {}: {}", src.display(), String::from_utf8_lossy(&cc.stderr));
@@ -63,11 +63,19 @@ fn build_objs(tag: &str, files: &[(&str, bool)]) -> Vec<PathBuf> {
 
 fn gdi_objs() -> &'static Vec<PathBuf> {
     static O: OnceLock<Vec<PathBuf>> = OnceLock::new();
-    O.get_or_init(|| build_objs("obj-fr7-gdi", &[("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", true), ("fle_imports.c", false), ("fle_env.c", false), ("fle_cursor.c", false)]))
+    O.get_or_init(|| {
+        let mut v = build_objs("obj-fr7-gdi", &[("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", true), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false), ("fle_cursor.c", false)]);
+        let dir = work_dir().join(etxt_common::per_process("obj-fr7-trace"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let o = dir.join("win_trace_off.o");
+        clang_obj(&manifest().join("tests/support/win_trace_off.c"), &o, false);
+        v.push(o);
+        v
+    })
 }
 fn win_objs() -> &'static Vec<PathBuf> {
     static O: OnceLock<Vec<PathBuf>> = OnceLock::new();
-    O.get_or_init(|| build_objs("obj-fr7-win", &[("fle_win.c", true), ("fle_class.c", true), ("fle_callback.c", false), ("fle_imports.c", false), ("fle_env.c", false)]))
+    O.get_or_init(|| build_objs("obj-fr7-win", &[("fle_win.c", true), ("fle_class.c", true), ("fle_callback.c", false), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false)]))
 }
 
 struct Out {

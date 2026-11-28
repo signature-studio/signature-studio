@@ -9,10 +9,10 @@ export const HZ_MAX = 1000;
 export const HZ_WINDOW_MS = 500;
 /** the engine's default (fle_thread.c FLE_DWM_HZ, fle_monitor.h FLE_DISPLAYSETTINGS_FREQUENCY): what the engine runs at until the screen's rate is measured */
 export const HZ_DEFAULT = 60;
-/** S-hz-standard: the refresh rates displays are sold with that the measured rate is rounded to (50 and 100 Hz panels round to 60 and 90; high-refresh displays run up to 300 Hz). */
-export const STANDARD_HZ: readonly number[] = [60, 75, 90, 120, 144, 165, 180, 240, 300];
+/** S-hz-standard: the refresh rates displays are sold with that the measured rate is rounded to (50 and 100 Hz panels round to 60 and 90; Issue #1402 adds 30 at the low end for throttled pages; high-refresh displays run up to 300 Hz). */
+export const STANDARD_HZ: readonly number[] = [30, 60, 75, 90, 120, 144, 165, 180, 240, 300];
 
-/** S-hz-round: the nearest standard rate by ratio (|ln(hz / s)|); at or below the lowest standard (60) and at or above the highest (300) the end value */
+/** S-hz-round: the nearest standard rate by ratio (|ln(hz / s)|); at or below the lowest standard (30) and at or above the highest (300) the end value */
 export function roundToStandardHz(measured: number): number {
   if (!(measured > 0) || !Number.isFinite(measured)) return HZ_DEFAULT;
   let best = STANDARD_HZ[0] as number, bestD = Infinity;

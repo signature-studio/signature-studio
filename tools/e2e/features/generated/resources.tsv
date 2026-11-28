@@ -1,0 +1,21 @@
+id	kind	name	source	how	nameSource
+settings/language/de	language	de	inputs/fl-installer-files.tsv System\Languages\de.moe	System\Languages,  B	memory
+settings/language/es	language	es	inputs/fl-installer-files.tsv System\Languages\es.moe	System\Languages,  B	memory
+settings/language/fr	language	fr	inputs/fl-installer-files.tsv System\Languages\fr.moe	System\Languages,  B	memory
+settings/language/ja	language	ja	inputs/fl-installer-files.tsv System\Languages\ja.moe	System\Languages,  B	memory
+settings/language/ko	language	ko	inputs/fl-installer-files.tsv System\Languages\ko.moe	System\Languages,  B	memory
+settings/language/vi	language	vi	inputs/fl-installer-files.tsv System\Languages\vi.moe	System\Languages,  B	memory
+settings/language/zh	language	zh	inputs/fl-installer-files.tsv System\Languages\zh.moe	System\Languages,  B	memory
+settings/theme/ash	theme	Ash	inputs/fl-installer-files.tsv Artwork\Themes\Ash.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/dedzii	theme	DEDZII	inputs/fl-installer-files.tsv Artwork\Themes\DEDZII.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/dedzii-light	theme	DEDZII Light	inputs/fl-installer-files.tsv Artwork\Themes\DEDZII Light.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/dark	theme	Dark	inputs/fl-installer-files.tsv Artwork\Themes\Dark.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/dark-orange	theme	Dark orange	inputs/fl-installer-files.tsv Artwork\Themes\Dark orange.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/light-cherry	theme	Light cherry	inputs/fl-installer-files.tsv Artwork\Themes\Light cherry.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/light-pear	theme	Light pear	inputs/fl-installer-files.tsv Artwork\Themes\Light pear.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/light-tangerine	theme	Light tangerine	inputs/fl-installer-files.tsv Artwork\Themes\Light tangerine.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/ppriime-dark	theme	PPRIIME Dark	inputs/fl-installer-files.tsv Artwork\Themes\PPRIIME Dark.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/ppriime-light	theme	PPRIIME Light	inputs/fl-installer-files.tsv Artwork\Themes\PPRIIME Light.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/sytrus	theme	Sytrus	inputs/fl-installer-files.tsv Artwork\Themes\Sytrus.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/ultra-green	theme	Ultra green	inputs/fl-installer-files.tsv Artwork\Themes\Ultra green.flstheme	the .flstheme file of the theme (its name is the file name)	memory
+settings/theme/veela	theme	Veela	inputs/fl-installer-files.tsv Artwork\Themes\Veela.flstheme	the .flstheme file of the theme (its name is the file name)	memory

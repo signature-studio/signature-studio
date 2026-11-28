@@ -57,6 +57,8 @@ int fle_class_lookup(const char *api, uint64_t name, uint64_t hinst, uint16_t *a
  * *prev = the previous hIcon, the class `atom` has `value` as its hIcon from now on (GetClassInfoW reports it). An atom that is not in the table stops by name. */
 #define FLE_CLASS_WC_OFF_HICON 32
 void fle_class_set_hicon(const char *api, uint16_t atom, uint64_t value, uint64_t *prev);
+/* Issue #1538 (GetClassLongPtrW, GCLP_HICON): *out = the hIcon of the class `atom` (the value fle_class_set_hicon replaces). */
+void fle_class_get_hicon(const char *api, uint16_t atom, uint64_t *out);
 
 /* Decision 0123 (PROVISIONAL): the name of the class that has `atom` (fle_win.c: FindWindowW compares class names): 1 and the name units when the atom is in the table, 0 otherwise. No state moves.
  * user32!UnregisterClassW: BOOL f(LPCWSTR lpClassName rcx, HINSTANCE hInstance rdx). Learn UnregisterClassW: nonzero on success; zero "If the class could not be found or if a window still exists that was created with

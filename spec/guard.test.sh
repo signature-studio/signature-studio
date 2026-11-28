@@ -8,17 +8,50 @@ unset RUNNER_TEMP   # 判定の受け入れは RUNNER_TEMP の boot.json を使�
 here=$(cd "$(dirname "$0")" && pwd); g=$here/../guard; fail=0; T=$(mktemp -d "$here/../.tmp-spec.XXXXXX")
 ok() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected $3, got $2"; fail=1; : > "$T/failed"; fi; }
 rc() { "$@" >/dev/null 2>&1; echo $?; }
-# deploy.yml の制約
-printf 'on: push\njobs:\n  a:\n    steps:\n      - run: npm ci\n' > "$T/good.yml"
-ok "deploy-lint: 守っている物は通る" "$(rc bash "$g/deploy-lint.sh" "$T/good.yml")" 0
-{ for i in $(seq 1 101); do echo "# $i"; done; } > "$T/long.yml"; ok "deploy-lint: 101 行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/long.yml")" 1
-{ echo "# $(printf 'x%.0s' $(seq 1 81))"; } > "$T/wide.yml"; ok "deploy-lint: 81 字の行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/wide.yml")" 1
-printf 'jobs:\n  a:\n    steps:\n      - run: bash ci/x.sh\n' > "$T/sh.yml"; ok "deploy-lint: シェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/sh.yml")" 1
-printf 'jobs:\n  a:\n    steps:\n      - uses: ./.github/actions/y\n' > "$T/local.yml"; ok "deploy-lint: ローカル action は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/local.yml")" 1
-printf 'on:\n  workflow_call:\n' > "$T/reuse.yml"; ok "deploy-lint: 再利用ワークフローは見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/reuse.yml")" 1
-mkdir -p "$T/cwd/.github/workflows"
-ok "deploy-lint: 引数が無ければ、いま居る所の .github/workflows/deploy.yml を見る(101 行なら見つかる)" "$(cp "$T/long.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 1
-ok "deploy-lint: 引数が無く、その deploy.yml が守っていれば 0" "$(cp "$T/good.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 0
+# deploy.yml は 100 行以内、e2e.yml は 200 行以内(依頼者の決まり L-007 の 100 行。E2E を分けた e2e.yml は上限を別に持つ)。どちらも 1 行 80 字以内
+L=$T/lint; mkdir -p "$L/d" "$L/e" "$L/x" "$L/cwd/.github/workflows"
+pad() { { cat "$1"; for i in $(seq 1 "$2"); do echo "# $i"; done; } > "$3"; }
+cat > "$L/good-deploy.yml" <<'Y'
+on:
+  workflow_run: {workflows: [e2e], types: [completed]}
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - run: npm ci
+Y
+cat > "$L/good-e2e.yml" <<'Y'
+name: e2e
+on:
+  push: {branches: [main]}
+jobs:
+  build:
+    steps:
+      - {if: always(), run: npm ci}
+      - {if: steps.cache.outputs.cache-hit != 'true', run: npm ci}
+Y
+pad "$L/good-deploy.yml" 93 "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml が 100 行(ちょうど上限。守っている)なら通る" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 0
+pad "$L/good-deploy.yml" 94 "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml が 101 行なら見つかる(上限は 100 行)" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+pad "$L/good-e2e.yml" 192 "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml が 200 行(ちょうど上限)なら通る" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 0
+pad "$L/good-e2e.yml" 193 "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml が 201 行なら見つかる(上限は 200 行)" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+cp "$L/good-e2e.yml" "$L/e/e2e.yml"; ok "deploy-lint: 守っている e2e.yml は通る(if: always() と cache-hit の条件を含む)" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 0
+{ cat "$L/good-deploy.yml"; echo "# $(printf 'x%.0s' $(seq 1 81))"; } > "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml の 81 字の行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "# $(printf 'x%.0s' $(seq 1 81))"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の 81 字の行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-deploy.yml"; echo "      - run: bash ci/x.sh"; } > "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml のシェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "      - run: ./ci/x"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml のシェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-deploy.yml"; echo "      - uses: ./.github/actions/y"; } > "$L/d/deploy.yml"; ok "deploy-lint: ローカル action は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+printf 'on:\n  workflow_call:\n' > "$L/d/deploy.yml"; ok "deploy-lint: 再利用ワークフローは見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "on: workflow_dispatch"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の workflow_dispatch は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "  schedule: [{cron: '0 0 * * *'}]"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の schedule は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "      - run: echo \"::add-mask::x\""; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml のマスク(add-mask)は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "      - run: echo \"[skip ci]\""; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の [skip ci] は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-deploy.yml"; echo "      - {if: always(), run: npm ci}"; } > "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml の e2e の成功以外の if は見つかる(always)" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+sed "s/== 'success'/== 'failure'/" "$L/good-deploy.yml" > "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml の if が failure の形なら見つかる(成功の形だけ許す)" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "      - {if: github.event_name == 'push', run: npm ci}"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の if でイベントで段を飛ばすと見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "      - {if: github.ref == 'refs/heads/main', run: npm ci}"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の if でブランチで段を飛ばすと見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+cp "$L/good-e2e.yml" "$L/x/other.yml"; ok "deploy-lint: deploy.yml・e2e.yml 以外の名前は、上限が決まらないので見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/x/other.yml")" 1
+pad "$L/good-deploy.yml" 94 "$L/cwd/.github/workflows/deploy.yml"; ok "deploy-lint: 引数が無ければ、いま居る所の .github/workflows/deploy.yml を見る(101 行なら見つかる)" "$(cd "$L/cwd" && rc bash "$g/deploy-lint.sh")" 1
+pad "$L/good-deploy.yml" 93 "$L/cwd/.github/workflows/deploy.yml"; ok "deploy-lint: 引数が無く、その deploy.yml が守っていれば 0" "$(cd "$L/cwd" && rc bash "$g/deploy-lint.sh")" 0
 # 内容の検査(scan.sh は相対パスで規則の範囲を決めるので、一時ディレクトリの中で走らせる)
 mkdir -p "$T/app"
 v1=anthr; v2=opic
@@ -43,6 +76,19 @@ printf 'by %s%s and %s%s\n' "$v1" "$v2" "$v1" "$v2" > "$T/app/r6.txt"
 ( cd "$T" && printf 'host %s by %s%s\n' "$hs" "$v1" "$v2" > app/r3.txt && ok "redact: cfhost の指摘は伏せ字にしない(終了コード 1、ホスト名は残る)" "$(rc bash "$g/scan.sh" --redact app/r3.txt)/$(grep -cF -- "$hs" app/r3.txt)/$(grep -c '伏せ字' app/r3.txt)" "1/1/1" )
 ( cd "$T" && printf 'ok text\n' > app/r4.txt && ok "redact: 違反の無いファイルは 0 で終わり、redact の行を出さない" "$(rc bash "$g/scan.sh" --redact app/r4.txt)/$(bash "$g/scan.sh" --redact app/r4.txt 2>/dev/null | grep -c '^redact')" "0/0" )
 ( cd "$T" && ok "redact: PATH が無ければ使い方の誤り(2)" "$(rc bash "$g/scan.sh" --redact)" 2 )
+# cfhex(32 桁の 16 進)は、試験のデータ(lift/crates/*/tests/ の下の *.rs・*.txt・*.tsv・*.hex)の行だけ除く。他の規則は、その場所でも効く
+mkdir -p "$T/app/src" "$T/lift/crates/fe-lift/tests" "$T/lift/crates/fe-build/tests/plugins/d"
+printf 'const id = "%s";\n' "$hx" > "$T/app/src/x.ts"
+( cd "$T" && ok "cfhex: 製品の外(app/src/)で 32 桁の 16 進があれば落ちる" "$(rc bash "$g/scan.sh" app/src/x.ts)" 1 )
+( cd "$T" && printf 'let data = "%s";\n' "$hx" > lift/crates/fe-lift/tests/x.rs && ok "cfhex: 試験のデータ(lift/crates/*/tests/*.rs)の 32 桁の 16 進は通る" "$(rc bash "$g/scan.sh" lift/crates/fe-lift/tests/x.rs)" 0 )
+( cd "$T" && printf 'let s = "%s%s"; let id = "%s";\n' "$v1" "$v2" "$hx" > lift/crates/fe-lift/tests/x.rs && ok "cfhex: 試験のデータでも、ベンダー名は vendor で落ちる(cfhex は除外、vendor は効く)" "$(bash "$g/scan.sh" lift/crates/fe-lift/tests/x.rs 2>/dev/null | cut -f1 | sort -u | paste -sd, -)" "vendor" )
+( cd "$T" && printf 'let h = "%s"; let id = "%s";\n' "$hs" "$hx" > lift/crates/fe-lift/tests/x.rs && ok "cfhex: 試験のデータでも、cfhost の形は cfhost で落ちる(cfhex は除外、cfhost は効く)" "$(bash "$g/scan.sh" lift/crates/fe-lift/tests/x.rs 2>/dev/null | cut -f1 | sort -u | paste -sd, -)" "cfhost" )
+( cd "$T" && printf 'let data = "%s";\n' "$hx" > lift/crates/fe-lift/tests/x.rs && ok "cfhex: 試験のデータの除外は、--redact の経路にも効く(伏せ字の後の再検査も通る)" "$(rc bash "$g/scan.sh" --redact lift/crates/fe-lift/tests/x.rs)" 0 )
+( cd "$T" && printf 'let data = "%s";\n' "$hx" > lift/crates/fe-lift/tests/x.txt && printf '%s\n' "$hx" > lift/crates/fe-build/tests/plugins/d/p.tsv && ok "cfhex: 試験の .txt・入れ子の .tsv も除外する" "$(rc bash "$g/scan.sh" lift/crates/fe-lift/tests/x.txt)/$(rc bash "$g/scan.sh" lift/crates/fe-build/tests/plugins/d/p.tsv)" "0/0" )
+( cd "$T" && printf '%s\n' "$hx" > lift/crates/fe-lift/src.rs && ok "cfhex: crate の tests/ の外(lift/crates/fe-lift/src.rs)は、今まで通り落ちる" "$(rc bash "$g/scan.sh" lift/crates/fe-lift/src.rs)" 1 )
+( cd "$T" && printf '%s\n' "$hx" > lift/crates/fe-lift/tests/x.md && ok "cfhex: 試験の場所でも、対象の拡張子(.rs・.txt・.tsv・.hex)以外は今まで通り落ちる" "$(rc bash "$g/scan.sh" lift/crates/fe-lift/tests/x.md)" 1 )
+( cd "$T" && mkdir -p lift/crates/fe-lift/src/tests && printf '%s\n' "$hx" > lift/crates/fe-lift/src/tests/x.rs && ok "cfhex: crate の src/ の下の tests/ は、試験の場所ではないので落ちる" "$(rc bash "$g/scan.sh" lift/crates/fe-lift/src/tests/x.rs)" 1 )
+( cd "$here/.." && ok "cfhex: 既存の試験の機械語・画素のデータ(gdi.rs・gdi_bulk.rs)は、scan で 0 件" "$(bash guard/scan.sh lift/crates/fe-lift/tests/gdi.rs lift/crates/fe-lift/tests/gdi_bulk.rs 2>/dev/null | wc -l | tr -d ' ')" 0 )
 ( cd "$T" && printf 'by %s%s\n' "$v1" "$v2" > app/r9.txt && ok "redact: --redact 無しの検査は、従来どおり vendor で失敗し、伏せ字にしない" "$(rc bash "$g/scan.sh" app/r9.txt)/$(grep -c "$v1$v2" app/r9.txt)" "1/1" )
 # 値を隠す命令(マスク)は、ワークフローに置かない(依頼者の指示 2026-11-20・L-031)。scan.sh の mask 規則は .github/workflows/ の下だけを見る
 ok "ワークフローに、値を隠す命令が無い(件数)" "$(cat "$here"/../.github/workflows/*.yml | grep -cF -- 'add-mask')" 0
@@ -95,6 +141,22 @@ cp "$T/tools/write.txt" "$T/spec/write.txt"; cp "$T/tools/write.txt" "$T/pm-work
 ( cd "$T" && ok "scan: wrangler.jsonc を読むだけの行(書きの関数と同じ行でも)は見つけない" "$(bash "$g/scan.sh" tools/read.txt 2>/dev/null | grep -c '^wranglergen')" 0 )
 ( cd "$T" && ok "scan: wrangler.noperf.jsonc・wrangler.deploy.json は見つけない" "$(bash "$g/scan.sh" tools/other.txt 2>/dev/null | grep -c '^wranglergen')" 0 )
 ( cd "$T" && ok "scan: spec/・pm-work/・*.md は対象外" "$(bash "$g/scan.sh" spec/write.txt pm-work/write.tsv notes.md 2>/dev/null | grep -c '^wranglergen')" 0 )
+# plugin の link は lift/runtime/fle_*.c の全部と plugin-worker の .c を入れる。両方が強く定義した fle_imp_* は wasm-ld が二重定義で落とす(#1501 段 B の memset)。runtime 側は weak にする
+fidefs() { awk '/^[A-Za-z_]/ && match($0, /(^|[^A-Za-z0-9_])fle_imp_[A-Za-z0-9_]+\([^)]*\)[ \t]*(\{|$)/) { n = substr($0, RSTART, RLENGTH); sub(/^[^A-Za-z_]*/, "", n); sub(/\(.*/, "", n); print n, (prev ~ /^__attribute__\(\(weak\)\)[ \t]*$/ || $0 ~ /^__attribute__\(\(weak\)\)/) ? "weak" : "strong" } { prev = $0 }' "$@"; }
+dupdef() { fidefs "$2"/*.c | awk '{ print $1 }' | sort -u > "$T/plugin-defs.txt"; fidefs "$1"/fle_*.c | awk '$2 == "strong" { print $1 }' | sort -u | comm -12 - "$T/plugin-defs.txt"; }
+mkdir -p "$T/lk/rt" "$T/lk/rtw" "$T/lk/rtp" "$T/lk/pw" "$T/lk/wrap" "$T/lk/pwwrap"
+printf 'void fle_imp_memset(void)\n{\n}\n' > "$T/lk/rt/fle_env.c"
+printf 'void __wrap_fle_imp_RaiseException(void)\n{\n}\n' > "$T/lk/wrap/thread_stub.c"
+printf '/* x */\n__attribute__((weak))\nvoid fle_imp_memset(void)\n{\n}\n' > "$T/lk/rtw/fle_env.c"
+printf 'void fle_imp_memset(void) __attribute__((weak));\n' > "$T/lk/rtp/fle_env.c"
+printf 'void fle_imp_memset(void)\n{\n}\n' > "$T/lk/pw/vst_crt.c"
+printf 'void __wrap_fle_imp_memset(void)\n{\n}\n' > "$T/lk/pwwrap/vst_wrap.c"
+ok "link: 両方が強く定義した fle_imp_* は見つかる(検査の網羅)" "$(dupdef "$T/lk/rt" "$T/lk/pw" | paste -sd, -)" "fle_imp_memset"
+ok "link: runtime 側が weak なら、二重定義として見つけない" "$(dupdef "$T/lk/rtw" "$T/lk/pw" | wc -l | tr -d ' ')" 0
+ok "link: 宣言(; で終わり、weak の印が付く)は、定義として数えない" "$(dupdef "$T/lk/rtp" "$T/lk/pw" | wc -l | tr -d ' ')" 0
+ok "link: __wrap_fle_imp_ は --wrap の転送で、fle_imp_ の定義として数えない" "$(fidefs "$T/lk/wrap"/*.c | wc -l | tr -d ' ')" 0
+ok "link: --wrap の口(__wrap_fle_imp_* の定義)は、fle_imp_* の定義として数えない(plugin-worker の vst_wrap.c)" "$(dupdef "$T/lk/rt" "$T/lk/pwwrap" | wc -l | tr -d ' ')" 0
+ok "link: lift/runtime/fle_*.c が強く定義し、plugin-worker の .c も定義する fle_imp_* は無い(無ければ空)" "$(dupdef "$here/../lift/runtime" "$here/../lift/harness/web/mt1/plugin-worker" | paste -sd, -)" ""
 # リポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "guard/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$g"/*.sh | wc -l)" 0
 # 旗と判定(git の差分を使う)
@@ -204,7 +266,30 @@ FAKE
   printf '2\n' > "$H3/tools/x.mjs"; git -C "$H3" commit -qam s9; printf '1\n' > "$T/rc-workflow.test.sh"; rm -f "$T/spec-runs.log"
   ( cd "$H3" && out=$(FAKE_T="$T" FAKE_G="$g" bash "$g/judge.sh" "$H3B" "$T/task-ok.md" 2>&1); echo "$?" > "$T/jrc"; printf '%s\n' "$out" > "$T/jout" )
   ok "判定: spec/workflow.test.sh が BASE に在るとき、ハーネスの変更で走り、失敗すれば落ちて名指しする" "$(cat "$T/jrc")/$(grep -c 'judge: ハーネスの変更がテストに通らない(spec/workflow.test.sh)' "$T/jout")/$(grep -c 'workflow.test.sh' "$T/spec-runs.log" 2>/dev/null)" 1/1/1
+  # 判定は、受け入れの前に、木へ内蔵のプラグインの DLL を置く道具(tools/place-plugin-dlls.mjs)を 1 回呼ぶ。道具が 1 で終わっても判定は続き、受け入れの結果で通る。偽の道具で確かめる
+  pd=$T/pd; rm -rf "$pd"; mkdir -p "$pd/tools"; git -C "$pd" init -q; printf 'x\n' > "$pd/a.txt"; git -C "$pd" add -A; git -C "$pd" commit -qm pdbase; PDB=$(git -C "$pd" rev-parse HEAD)
+  printf '%s\n' 'import fs from "node:fs"; fs.appendFileSync(process.env.PD_ORDER, "tool\n"); console.error("place-plugin-dlls: missing x"); process.exit(1);' > "$pd/tools/place-plugin-dlls.mjs"
+  printf 'y\n' > "$pd/b.txt"; git -C "$pd" add -A; git -C "$pd" commit -qm pdhead
+  printf 'accept: echo accept >> "%s"\n' "$T/pd-order" > "$T/task-pd.md"
+  rm -f "$T/pd-order"; ( cd "$pd" && out=$(PD_ORDER="$T/pd-order" bash "$g/judge.sh" "$PDB" "$T/task-pd.md" 2>&1); echo "$?" > "$T/pdrc"; printf '%s\n' "$out" > "$T/pdout" )
+  ok "判定: 受け入れの前に、道具 tools/place-plugin-dlls.mjs を 1 回呼ぶ(受け入れは道具の後に走る)" "$(paste -sd' ' "$T/pd-order" 2>/dev/null)" "tool accept"
+  ok "判定: 道具が 1 で終わっても、判定は受け入れの結果で通り、道具の行と、木に無い DLL の 1 行を出す" "$(cat "$T/pdrc")/$(grep -c 'place-plugin-dlls: missing x' "$T/pdout")/$(grep -c '木に無い DLL' "$T/pdout")/$(tail -n 1 "$T/pdout")" "0/1/1/judge: 通った"
+  # 道具が無いリポジトリ(従来の作業)では、呼ばずに通る(道具の行は出ない)
+  ( cd "$R" && out=$(bash "$g/judge.sh" "$base" "$T/task-ok.md" 2>&1); ok "判定: 道具が無い作業では、道具の行を出さず従来どおり通る" "$(grep -c 'place-plugin-dlls\|木に無い DLL' <<<"$out")/$(tail -n 1 <<<"$out")" "0/judge: 通った" )
 else
   echo "FAIL flags・judge: 環境に git の名義が無い(判定の検査は名義が要る。skip して通さない)"; fail=1
 fi
+# e2e-full.yml(全シナリオの非ゲート)は、200 行以内・1 行 80 字以内。if は workflow_run の成功と always() だけ(e2e.yml とは別の分類)
+FULL=$here/../.github/workflows/e2e-full.yml; FD=$L/f; mkdir -p "$FD"
+NF=$(wc -l < "$FULL")
+pad "$FULL" $((200 - NF)) "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml が 200 行(ちょうど上限)なら通る" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 0
+pad "$FULL" $((201 - NF)) "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml が 201 行なら見つかる(上限は 200 行)" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+cp "$FULL" "$FD/e2e-full.yml"; ok "deploy-lint: 守っている e2e-full.yml は通る(always() の段の if を含む)" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 0
+{ cat "$FULL"; echo "      - {if: github.ref == 'refs/heads/main', run: npm ci}"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の if でブランチで段を飛ばすと見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+sed "s/always() && github.event.workflow_run.conclusion == 'success'/always() \&\& github.event_name == 'push'/" "$FULL" > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の report の if をイベントに変えると見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+sed "s/== 'success'/== 'failure'/" "$FULL" > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の if が failure の形なら見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+{ cat "$FULL"; echo "      - {if: failure(), run: npm ci}"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の if: failure() は見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+{ cat "$FULL"; echo "# $(printf 'x%.0s' $(seq 1 81))"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の 81 字の行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+{ cat "$FULL"; echo "      - run: bash ci/x.sh"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml のシェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+{ cat "$FULL"; echo "on: workflow_dispatch"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の workflow_dispatch は見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

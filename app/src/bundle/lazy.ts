@@ -14,7 +14,7 @@ export async function downloadLazy(items: readonly LazyDownload[], opts: LoadOpt
   for (const { ref, feed } of items) {
     let r: LazyResult;
     try {
-      feed.deliver(await fetchAsset(ref, ref.name, opts));
+      feed.deliver(await fetchAsset(ref, ref.path, opts));   // the label is the path (the names of the Data files repeat, Issue #1478)
       r = { name: ref.name, ok: true, message: null };
     } catch (e) {
       feed.fail();

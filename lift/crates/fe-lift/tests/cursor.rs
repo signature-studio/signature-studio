@@ -70,12 +70,15 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-cursor"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for (name, ours) in [("fle_cursor.c", true), ("fle_gdi.c", false), ("fle_raster.c", false), ("fle_gdc.c", false), ("fle_imports.c", false), ("fle_env.c", false)] {
+        for (name, ours) in [("fle_cursor.c", true), ("fle_gdi.c", false), ("fle_raster.c", false), ("fle_gdc.c", false), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false)] {
             let base = if ours { src_dir() } else { runtime_dir() };
             let o = dir.join(name.replace(".c", ".o"));
             clang_c(&base.join(name), &o, ours);
             v.push(o);
         }
+        let o = dir.join("win_trace_off.o");
+        clang_c(&manifest().join("tests/support/win_trace_off.c"), &o, false);
+        v.push(o);
         v
     })
 }
@@ -267,7 +270,8 @@ fn the_row_is_in_the_table_and_declared_in_the_header() {
     // ("SetCursor", "GetCursor", "DestroyCursor" and "ShowCursor" were in this list until decision 0111: runtime/fle_gdi.c, tests/gdi_bulk.rs)
     for n in [
         "LoadCursorA", "LoadCursorFromFileW", "LoadImageA", "CopyImage", "CopyCursor",
-        "ClipCursor", "GetClassLongPtrW",
+        "ClipCursor",
+        // "GetClassLongPtrW" was in this list until Issue #1538 (GCLP_HICON, runtime/fle_win.c; tests/second_wave_imports.rs)
         // old: "GetCursorInfo" and "SetCursorPos" were in this list; decision 0126 answered them (wall 77 GetCursorInfo, wall 74 SetCursorPos: runtime/fle_win.c, tests/wall_fr11.rs); new: not asserted absent
         // "SetClassLongPtrW" was in this list until decision 0119 (wall 9 / 15: runtime/fle_win.c answers it, tests/wall_fr6.rs); old: asserted absent
     ] {
@@ -643,7 +647,8 @@ fn the_dll_name_and_the_api_name_are_part_of_the_match() {
         assert!(!st.handled.contains_key("jmp_imp:LoadCursorW"), "{dll}!{api}");
         assert!(!c.contains("fle_imp_LoadCursorW"), "{dll}!{api}");
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        // Issue #1538: a thunk that no row answers stops by name
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
     }
 }
 

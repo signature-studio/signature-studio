@@ -1,6 +1,6 @@
 /* Virtual process environment: environment block, command line, startup info
- * (docs/decisions/0018-virtual-fs-reg-env.md). Nothing is read from the host: the environment block
- * starts empty and only SetEnvironmentVariableW fills it.
+ * (docs/decisions/0018-virtual-fs-reg-env.md). Nothing is read from the host. The environment block is built at its
+ * first use from the Windows session's standard variables (fle_env.c, Issue #1412); SetEnvironmentVariableW changes it.
  *
  * This header is also the common base of fle_vfs.c and fle_reg.c: Win32 error numbers, the stop helper,
  * the wide-string helpers and the stack-argument reader live here so that the three files agree.
@@ -25,6 +25,7 @@
 #define FLE_W32_ERR_HANDLE_EOF          38u
 #define FLE_W32_ERR_FILE_EXISTS         80u
 #define FLE_W32_ERR_INVALID_PARAMETER   87u
+#define FLE_W32_ERR_NOACCESS            998u
 #define FLE_W32_ERR_BUFFER_OVERFLOW     111u
 #define FLE_W32_ERR_INSUFFICIENT_BUFFER 122u
 #define FLE_W32_ERR_INVALID_NAME        123u
@@ -57,9 +58,33 @@
 #define FLE_VIRTUAL_COMPUTER_NAME "DESKTOP-0000001"
 #define FLE_COMPUTERNAME_NETBIOS_MAX 15u
 
+/* Issue #1412: the folders of the virtual Windows session. SHGetFolderPathW (fle_env.c) answers these and the standard environment
+ * variables of the block (fle_env.c, env_std) take their values from them, so each text is written once. Where no Microsoft page gives
+ * the value, it is a choice of this environment (the comments at each use say which). */
+#define FLE_VIRTUAL_DRIVE                "C:"
+#define FLE_VIRTUAL_PROGRAM_FILES_DIR    "C:\\Program Files"
+#define FLE_VIRTUAL_COMMON_FILES_DIR     FLE_VIRTUAL_PROGRAM_FILES_DIR "\\Common Files"
+#define FLE_VIRTUAL_COMMON_APPDATA_DIR   "C:\\ProgramData"
+#define FLE_VIRTUAL_APPDATA_DIR          FLE_VIRTUAL_USER_PROFILE_DIR "\\AppData\\Roaming"
+#define FLE_VIRTUAL_LOCALAPPDATA_DIR     FLE_VIRTUAL_USER_PROFILE_DIR "\\AppData\\Local"
+#define FLE_VIRTUAL_TEMP_DIR             FLE_VIRTUAL_LOCALAPPDATA_DIR "\\Temp"
+#define FLE_VIRTUAL_DOCUMENTS_DIR        FLE_VIRTUAL_USER_PROFILE_DIR "\\Documents"
+/* the answer of GetSystemInfo (fle_sys.c: dwNumberOfProcessors 1, wProcessorArchitecture AMD64) as the environment variables spell it */
+#define FLE_VIRTUAL_NUMBER_OF_PROCESSORS "1"
+#define FLE_VIRTUAL_PROCESSOR_ARCHITECTURE "AMD64"
+
 /* Stops the run: prints "fle: <api>: <why>" and aborts. Used for every input that the Microsoft pages
  * leave undefined (nothing is silently turned into a success). */
 void fle_stop(const char *api, const char *why) __attribute__((noreturn));
+
+/* Issue #1418: a call that the runtime does not model is answered with the Windows failure `value` (the one the Microsoft or Wine
+ * sources give for it) instead of stopping the run. The first call of each `api` (a string literal) prints the line
+ *   fle: warn: <api>: not modelled, returned <value> (caller 0x...)
+ * and every call is counted. The counts go to stderr as one line "fle-warns: {"api":calls,...}" (in the order the APIs were first
+ * warned about, the last line wins for the beacon): when the scheduler is idle (fle_warn_idle, every 64 idle reports) and before a
+ * stop (fle_stop), when they changed since the line was last printed. */
+void fle_warn(const char *api, uint64_t value);
+void fle_warn_idle(void);
 
 /* Argument n (1-based) of the Microsoft x64 call. Arguments 1-4 are in rcx, rdx, r8, r9; argument n >= 5 is at
  * [rsp + 0x28 + 8 * (n - 5)] when the stub starts, because [rsp] holds the guest return address and
@@ -98,6 +123,8 @@ void fle_imp_SetEnvironmentVariableW(void);
 void fle_imp_ExpandEnvironmentStringsW(void);
 /* kernel32!GetCommandLineW: LPWSTR GetCommandLineW(void). */
 void fle_imp_GetCommandLineW(void);
+/* api-ms-win-crt-string!memset (Issue #1501): void *memset(void *dest, int c, size_t count). */
+void fle_imp_memset(void);
 /* kernel32!GetStartupInfoW: void GetStartupInfoW(LPSTARTUPINFOW lpStartupInfo). */
 void fle_imp_GetStartupInfoW(void);
 /* kernel32!GetCommandLineA: LPSTR GetCommandLineA(void). The ASCII text of GetCommandLineW (decision 0078). */

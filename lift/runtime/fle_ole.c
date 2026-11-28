@@ -627,6 +627,35 @@ void fle_imp_IsEqualGUID(void)
     R[0] = memcmp((const void *)fle_addr(a, 16, 0), (const void *)fle_addr(b, 16, 0), 16) == 0 ? 1u : 0u;
 }
 
+/* ole32!StringFromGUID2: int f(REFGUID rguid rcx, LPOLESTR lpsz rdx, int cchMax r8d). Learn: the GUID as "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"
+ * (38 characters and the terminating NUL, upper case), the return value is the number of characters written, the NUL included (39), and 0 when the
+ * buffer is too small. The fields are those of the GUID structure: Data1 (4 bytes), Data2 and Data3 (2 bytes each, little-endian in memory), Data4
+ * (8 bytes in order). A NULL pointer is not defined and stops. */
+void fle_imp_StringFromGUID2(void)
+{
+    char s[40];
+    uint8_t b[16];
+    uint64_t g = R[1], p = R[2];
+    int32_t cch = (int32_t)(uint32_t)R[8];
+    uint32_t d1;
+    uint16_t d2, d3;
+    int i;
+
+    check_thread("StringFromGUID2");
+    if (g == 0 || p == 0) fle_stop("StringFromGUID2", "a NULL pointer: the page does not define it");
+    if (cch < 39) {
+        R[0] = 0;
+        return;
+    }
+    for (i = 0; i < 16; i++) b[i] = (uint8_t)fle_ld(g + (uint64_t)i, 1);
+    d1 = (uint32_t)b[0] | ((uint32_t)b[1] << 8) | ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
+    d2 = (uint16_t)(b[4] | (b[5] << 8));
+    d3 = (uint16_t)(b[6] | (b[7] << 8));
+    snprintf(s, sizeof s, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", d1, d2, d3, b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]);
+    for (i = 0; i < 39; i++) fle_st(p + 2u * (uint64_t)i, 2, (uint8_t)s[i]);
+    R[0] = 39;
+}
+
 /* ---- ProgIDFromCLSID ----
  * Page: converts a CLSID to its ProgID using the registry; S_OK, REGDB_E_CLASSNOTREG (class not registered),
  * REGDB_E_READREGDB; the ProgID is freed with CoTaskMemFree. CLSID Key page: HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{CLSID}

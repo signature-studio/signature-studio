@@ -69,45 +69,111 @@ export async function dismissProblems(guest) {
   return true;
 }
 
-/** Ctrl+O opens the engine's Open box: the page's file box (#filedlg-input) or the file manager in selection mode (#fx-input-files) */
-export async function openProjectFile(guest, cdp, projectPath, log) {
-  if (!fs.existsSync(projectPath)) throw new Error(`no project file ${projectPath}`);
-  await guest.focusDesktop();
-  await guest.ctrl('KeyO', 'o', 79);
-  let box = null;
+export const MISSING_PLUGINS = 'TMissingPluginsForm';
+
+/**
+ * the "Problems loading the project" box (TMissingPluginsForm) that a project with missing plugins brings: Enter answers it (its default button), and Escape when it stays.
+ * It is looked for until it has not been seen for `settleMs` (a box can come after the project's load); `limitMs` bounds the whole. Returns the number of answers.
+ */
+export async function clearProblems(guest, { settleMs = 0, limitMs = 20000 } = {}) {
+  const isBox = async () => (await guest.windows().catch(() => [])).some((x) => x.cls === MISSING_PLUGINS);
   const t0 = Date.now();
-  while (!box && Date.now() - t0 < 40000) {
-    box = await guest.ev("document.getElementById('filedlg-input') ? 'filedlg' : (document.getElementById('fx-input-files') ? 'explorer' : null)");
-    if (!box) await sleep(500);
+  let quietSince = Date.now();
+  let n = 0;
+  while (Date.now() - t0 < limitMs) {
+    if (await isBox()) {
+      n++;
+      await guest.key('Enter', 'Enter', 13);
+      await sleep(1000);
+      if (await isBox()) {
+        await guest.escape();
+        await sleep(800);
+      }
+      quietSince = Date.now();
+    } else {
+      if (Date.now() - quietSince >= settleMs) break;
+      await sleep(500);
+    }
   }
-  if (!box) throw new Error('no open box (#filedlg-input or #fx-input-files) 40 s after Ctrl+O');
-  const setFile = async (selector) => {
+  return n;
+}
+
+/** the page's file manager window (Issue #1519) is the engine's Open / Save dialog: it is up while #fx-input-files (its Upload input) is in the page. The page opens no browser chooser for it */
+export const WINDOW = "document.getElementById('fx-input-files') ? 'explorer' : null";
+
+/** the window's list has its first listing (the path is drawn): the rows it shows are then the folder's */
+export async function waitListing(guest, ms = 20000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (await guest.ev("(() => { const c = document.getElementById('fx-crumbs'); return !!c && c.textContent.trim() !== ''; })()")) {
+      await sleep(300);
+      return true;
+    }
+    await sleep(200);
+  }
+  return false;
+}
+
+/** the paths given to the window's Upload (a file: #fx-input-files; a folder: #fx-input-dir, which takes a folder); a name the window already lists is not uploaded again (a clash would ask the person) */
+export async function uploadToWindow(guest, cdp, paths) {
+  for (const p of paths) {
+    const name = path.basename(p);
+    const row = `#fx-list [data-name="${name}"]`;
+    if (await guest.ev(`!!document.querySelector(${JSON.stringify(row)})`)) continue;
+    const selector = fs.statSync(p).isDirectory() ? '#fx-input-dir' : '#fx-input-files';
     const doc = await cdp.send('DOM.getDocument', {});
     const q = await cdp.send('DOM.querySelector', { nodeId: doc.root.nodeId, selector });
     if (!q.nodeId) throw new Error(`${selector} is not a node`);
-    await cdp.send('DOM.setFileInputFiles', { nodeId: q.nodeId, files: [projectPath] });
-  };
-  const clickSelector = async (selector) => {
-    const r = await guest.ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
-    if (!r) throw new Error(`no element ${selector}`);
-    await guest.move(r);
-    await guest.press(r, 'left', 1);
-  };
-  const name = path.basename(projectPath);
-  if (box === 'filedlg') {
-    await setFile('#filedlg-input');
-    log(`${name} given to #filedlg-input`);
-  } else {
-    await setFile('#fx-input-files');
-    const row = `#fx-list [data-name="${name}"]`;
+    await cdp.send('DOM.setFileInputFiles', { nodeId: q.nodeId, files: [p] });
     const t1 = Date.now();
     while (!(await guest.ev(`!!document.querySelector(${JSON.stringify(row)})`))) {
       if (Date.now() - t1 >= 30000) throw new Error(`${name} is not listed in the file manager 30 s after the upload`);
       await sleep(500);
     }
-    await clickSelector(row);
-    await clickSelector('#fx-ok');
-    log(`${name} uploaded into the file manager, chosen and Open pressed`);
   }
+}
+
+/** a row of the window's list (by its name) is pressed; with `ctrl` it is added to the selection */
+export async function clickRow(guest, name, { ctrl = false } = {}) {
+  const row = `#fx-list [data-name="${name}"]`;
+  const r = await guest.ev(`(() => { const e = document.querySelector(${JSON.stringify(row)}); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+  if (!r) throw new Error(`no row ${name} in the file manager`);
+  await guest.move(r);
+  await guest.press(r, 'left', 1, ctrl ? 2 : 0);
+}
+
+/** Ctrl+O (File > Open) shows the page's file manager window in selection mode; the project file is uploaded into it, chosen in its list and answered with Open */
+export async function openProjectFile(guest, cdp, projectPath, log) {
+  if (!fs.existsSync(projectPath)) throw new Error(`no project file ${projectPath}`);
+  // the page answers the engine in its window (Issue #1519). If a browser chooser opened anyway, the interception reports it (filechooser) instead of showing it
+  await cdp.send('Page.setInterceptFileChooserDialog', { enabled: true });
+  await guest.focusDesktop();
+  await guest.ctrl('KeyO', 'o', 79);
+  let box = null;
+  const t0 = Date.now();
+  while (!box && Date.now() - t0 < 40000) {
+    box = await guest.ev(WINDOW);
+    if (!box) await sleep(500);
+  }
+  if (!box) {
+    // what the page knows of the engine's Open request (the count, the answers, the page's own lines about it): the names of files are not in these
+    const diag = await guest.ev("(() => { const a = window.__app; const lg = document.getElementById('log'); return { requests: a.fileDlg.requests.length, history: a.fileDlg.history, open: a.fileDlg.open, lines: (lg ? lg.textContent : '').split('\\n').filter((l) => /dialog|chooser|Open|Save/.test(l)).slice(-8) }; })()").catch((e) => String(e?.message ?? e));
+    throw new Error(`no file manager window (#fx-input-files) 40 s after Ctrl+O: ${JSON.stringify(diag)}`);
+  }
+  await waitListing(guest);
+  const name = path.basename(projectPath);
+  await uploadToWindow(guest, cdp, [projectPath]);
+  await clickRow(guest, name);
+  await clickElement(guest, '#fx-ok');
+  log(`${name} uploaded into the file manager window, chosen and Open pressed`);
   return box;
+}
+
+/** a press on an element of the page (its centre): the window's own buttons (#fx-ok, #fx-close) are pressed this way */
+export async function clickElement(guest, selector) {
+  const r = await guest.ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+  if (!r) return false;
+  await guest.move(r);
+  await guest.press(r, 'left', 1);
+  return true;
 }

@@ -1,6 +1,7 @@
 // Page entry: loads the bundle (/assets/manifest.json), shows the start-up stages, progress and errors, starts the engine Worker and shows the engine's desktop on its one canvas. The page has no URL parameters (decision 0243).
 import './style.css';
 import { attachDesktopInput } from './input/pointer.ts';
+import { suppressContextMenu } from './input/context-menu.ts';
 import { describeRaw, IN, type RawInput } from './input/events.ts';
 import { TaskbarRestore } from './ui/taskbar.ts';
 import { fetchAsset, fetchManifest, hashModeOfThisBrowser, loadPack, loadWasm, LoadError, type LoadedPack, type Progress } from './bundle/loader.ts';
@@ -8,14 +9,13 @@ import { sha256Hex } from './bundle/sha256.ts';
 import type { FruityOptions, Manifest } from './bundle/manifest.ts';
 import { EngineClient, type ExitInfo } from './engine/client.ts';
 import { stateAfterFirstPixel } from './engine/start-state.ts';
-import { applyHz, HZ_DEFAULT, measureFrameRate, type FrameHost, type HzMeasurement } from './engine/hz.ts';
+import { applyHz, HZ_DEFAULT, measureFrameRate, roundToStandardHz, type FrameHost, type HzMeasurement } from './engine/hz.ts';
 import { blockingMissing, describeMissing, detectFeatures, type FeatureReport } from './engine/features.ts';
 import { matchStopNotes, summarizeEngineLog, type EngineLogSummary } from './engine/fruity-log.ts';
 import type { AppView } from './engine/appview.ts';
 import type { HostFileStats } from './engine/hostfiles.ts';
 import type { FromWorker, GuestTextBest, GuestTextNear } from './engine/protocol.ts';
-import { scaleNearest } from './engine/cursor-picture.ts';
-import { CURSOR_IMAGE_MAX, type CursorChoice, type CursorPictureState, cursorCss } from './ui/cursor.ts';
+import { type CursorChoice, type CursorPictureState, cursorCss } from './ui/cursor.ts';
 import { base64Of, pngDataUrl } from './ui/png.ts';
 import { DesktopView } from './ui/desktop.ts';
 import { engineState, meanCycle, type EngineClockState } from './ui/engine-status.ts';
@@ -24,6 +24,7 @@ import { stopLines } from './ui/stop-message.ts';
 import { EngineLogView, renderThreads, renderWindows } from './ui/panels.ts';
 import { stageRows, Timeline, type StageId } from './ui/phases.ts';
 import { ProgressView } from './ui/progress.ts';
+import { LoadingModal } from './ui/loading-modal.ts';
 import { chooseGuestScreen, drawScale, restartNeeded, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
 import { collectBrowserInfo, collectClientInfo, webglRenderer, type BrowserInfo } from './perf/browser-info.ts';
 import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, type FailureKind } from './perf/failure-beacon.ts';
@@ -32,15 +33,15 @@ import { DisplayMonitor, hzFit, type DisplaySnapshot, type HzInfo } from './perf
 import { browserDisplayHost } from './perf/display-host.ts';
 import { engineExitMessage, engineStopFacts, type EngineStop } from './perf/exit-message.ts';
 import { perfNotice, perfRows, renderPerfPanel, type PanelView } from './perf/panel.ts';
+import { warnsOf } from './perf/warns.ts';
 import { inputLatencyStats, PerfRecorder } from './perf/stats.ts';
 import { audioOffReason, installAudio } from './audio/install.ts';
 import { bindAudioStatus } from './audio/status.ts';
 import { FileDialogView, SavedFilesView } from './ui/filedlg.ts';
 import { PageClipboard, type ClipboardState } from './engine/clipboard.ts';
 import type { FileDlgRequest } from './engine/filedlg.ts';
-import { mountFiles } from './files/mount.ts';
-import { EngineFiles } from './files/engine-dialog.ts';
 import { filesUsage } from './files/usage.ts';
+import { EngineFiles } from './files/engine-dialog.ts';
 import { AssetStore } from './bundle/assetstore.ts';
 import { AssetsRecorder, assetLines, resourceLookupFromPerformance, sourceSummary, type AssetsReport } from './bundle/assets-report.ts';
 import type { AssetRef, LazyRef } from './bundle/manifest.ts';
@@ -95,7 +96,7 @@ interface AppApi {
   /** the last time the picture changed (for the stop message) */
   lastChanged: { at: number } | null;
   /** every idle the engine reported: when (ms, performance.timeOrigin based), how long it had computed since it was last resumed, its virtual clock and next deadline in ticks */
-  idles: { at: number; busyMs: number | null; n: number; now: number; next: number }[];
+  idles: { at: number; busyMs: number | null; n: number; now: number; next: number; dwm: number | null }[];
   /** decision 0170: the size of the engine's wasm memory (bytes) as of the last idle report; null before the first. It only grows: a steady climb during playback is the engine's own allocation */
   engineMemoryBytes: number | null;
   /** decision 0221: what the engine has asked of its host files (open / stat / read counts and bytes; null: an old-format bundle) */
@@ -108,7 +109,7 @@ interface AppApi {
   hz: { hz: number | null; measurement: HzMeasurement | null; warning: string | null };
   /** decision 0212: the guest's screen. `asked` is what the page put into the engine's environment (null: nothing, the engine's own 1920x1080); `reported` is what the engine says it uses (fle_av_poll: screen_w, screen_h; null until the first
    *  report, {0,0} from a build that does not report it); `guest` is what the desktop is drawn for now; `room` the room measured at the last layout */
-  screen: { panelOpen: boolean; engineFollows: boolean | null; resizes: { room: Room; guest: { width: number; height: number }; sent: boolean; at: number }[]; asked: { width: number; height: number; env: Record<string, string> } | null; reported: { width: number; height: number } | null; guest: { width: number; height: number }; room: Room | null; notes: string[] };
+  screen: { engineFollows: boolean | null; resizes: { room: Room; guest: { width: number; height: number }; sent: boolean; at: number }[]; asked: { width: number; height: number; env: Record<string, string> } | null; reported: { width: number; height: number } | null; guest: { width: number; height: number }; room: Room | null; notes: string[] };
   /** decision 0193: the page's answers to the engine's file dialogs (no file names) and the files the engine wrote (Save dialog targets) */
   fileDlg: { readonly open: boolean; readonly history: FileDialogView['history']; /** for the record of decision 0193: whether the page had a transient user activation (navigator.userActivation.isActive) and how long ago the page's last trusted pointer or key event was, when each engine request arrived */ readonly requests: { id: number; save: boolean; at: number; activationActive: boolean | null; msSinceInput: number | null; /** what the engine asked (its own strings: types, title, folder, suggested name) */ request: FileDlgRequest }[] };
   saved: SavedFilesView['files'];
@@ -160,21 +161,19 @@ interface AppApi {
 declare global { interface Window { __app?: AppApi } }
 
 const view = new DesktopView($('desktop'));
-// decision 0193: the engine's file dialogs are answered here by the person; the answer (File objects) goes to the Worker, never to a server
+// decision 0193 / 0216 (opfs1) / Issue #1519: the engine's Open, Save and folder dialogs are answered by the person in the page's file manager window (OPFS, files/engine-dialog.ts), never by the browser's own chooser; the answer goes to the Worker, never to a server
 const engineFiles = new EngineFiles((kind, text) => addLog(kind, text));
-// decision 0216 stage 2 (opfs1): the engine's Open / Save are answered by the file manager window (OPFS)
-const fileDlgView = new FileDialogView($('filedlg'), { answer: (id, answer) => client.answerFileDlg(id, answer), closed: () => $('desktop').focus({ preventScroll: true }), select: engineFiles.select });
-// decision 0216 (opfs1): the browser-files window (OPFS); a header button and an overlay, the layout is untouched
-const filesHandle = mountFiles(document.querySelector('header') as HTMLElement, () => $('desktop').focus({ preventScroll: true }));
-(window as unknown as { __files: unknown }).__files = Object.assign(filesHandle, { engine: engineFiles });
-const savedView = new SavedFilesView($('saved-files'), $('saved-list'));
+const fileDlgView = new FileDialogView($('filedlg'), { answer: (id, answer) => client.answerFileDlg(id, answer), closed: () => $('desktop').focus({ preventScroll: true }), log: (kind, text) => addLog(kind, text), select: engineFiles.select });
+const savedView = new SavedFilesView();
 const logEl = $('log');
 const addLog = (level: string, text: string): void => {
   logEl.textContent += `[${level}] ${text}\n`;
   logEl.scrollTop = logEl.scrollHeight;
 };
 const timeline = new Timeline();
-const progress = new ProgressView($('progress'));
+// Issue #1520: the start's downloads, in the modal that is in the page from the first paint and is removed just before the engine starts
+const START_ASSETS = ['engine wasm', 'seed pack', 'DLL pack', 'engine glue'];
+const loading = new LoadingModal($('loading-modal'), new ProgressView($('progress'), START_ASSETS));
 const engineLog = new EngineLogView($('engine-log'), $('log-count'));
 let hintFirstPixelS: number | undefined;
 let failedStage: StageId | null = null;
@@ -186,13 +185,16 @@ let endRequested = false;
 
 /** C-6 (#1310) / #1347: the window-API trace asked for (on, or off); the engine's start takes it, so the trace covers the start-up too */
 let apiTraceWanted = false;
-// #1389: the engine's Copy and Paste reach the operating system's clipboard through the page (clipboard.ts)
-const pageClipboard = new PageClipboard(document);
-void pageClipboard.refresh();
+// #1389: the engine's Copy and Paste reach the operating system's clipboard through the page (clipboard.ts); #1482: through the Clipboard API only
+const pageClipboard = new PageClipboard();
+pageClipboard.attach(window);
+void pageClipboard.start();
+// #1482: the browser's own context menu never shows on the page (context-menu.ts)
+suppressContextMenu(document);
 const app: AppApi = {
   assetsReport: () => assetsNow(),
   state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, cursorRecord: { unmapped: [], made: 0, unresolved: 0 }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
-  screen: { panelOpen: true, engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
+  screen: { engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
   engineLog: () => engineLog.lines,
   webview2Front: () => face.frontRects(),
   engineStatus: () => engineState(clock, performance.timeOrigin + performance.now()),
@@ -280,8 +282,10 @@ function showError(what: string, where: string, stage: StageId | null = null, ki
   failedStage = stage ?? failedStage ?? 'download';
   stamp('error');
   setState('error', 'failed');
+  loading.close();   // the error note is the one to see: the modal of the downloads does not cover it
   const el = $('error');
   el.hidden = false;
+  $('exit').hidden = true;   // one note at a time: the error is the one shown (Issue #1481)
   el.replaceChildren();
   const w = document.createElement('div');
   w.textContent = what;
@@ -315,27 +319,8 @@ function applyDisplay(): void {
   view.setScale(scale);
   $('canvas-info').textContent = `guest screen ${g.width}x${g.height} device px in a room of ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px (scale ${scale.toFixed(4)} CSS px per guest px, device pixel ratio ${dpr}, ${(g.width * g.height / 1e6).toFixed(2)} Mpx)`;
 }
-// decision 0212: the toolbar and the engine's status lines are in the monitor panel so that the stage is the desktop and nothing else; the panel button; the room follower
-const panelBtn = $<HTMLButtonElement>('panel-toggle');
-function setPanel(open: boolean): void {
-  document.body.classList.toggle('panel-off', !open);
-  app.screen.panelOpen = open;
-  panelBtn.setAttribute('aria-pressed', open ? 'true' : 'false');
-  panelBtn.textContent = open ? 'Monitor \u25B8' : '\u25C2 Monitor';
-  applyDisplay();
-}
-$('resize-reload').addEventListener('click', () => location.reload());
+// Issue #1481: the page is the guest's screen and nothing else (the header, the monitor panel and the notes are hidden in index.html; the stage fills the window)
 document.body.classList.add('screen-fit');
-{
-  const sec = document.createElement('section');
-  sec.id = 'display-section';
-  const h = document.createElement('h2');
-  h.textContent = 'Display and engine';
-  sec.append(h, $('toolbar'), $('engine-line'), $('pointer-info').parentElement as HTMLElement);
-  (document.querySelector('aside') as HTMLElement).prepend(sec);
-}
-panelBtn.addEventListener('click', () => setPanel(!app.screen.panelOpen));
-setPanel(true);
 // Issue #1362: the Browser panel's WebView2 face (ui/webview2-surface.ts). Its document is the bundle's lazy file that Navigate names: the bytes come once the download has arrived
 const lazyByPath = new Map<string, LazyFileShared>();
 async function lazyResource(path: string): Promise<Uint8Array | null> {
@@ -359,19 +344,24 @@ const roomFollower = new RoomDebouncer((room) => followRoom(room), roomTimers);
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { applyDisplay(); roomFollower.push(measureRoom()); }).observe($('stage'));
 // #1348: the ratio the engine started with (FL takes its scale and DPI at its start); null before the start
 let bootDpr: number | null = null;
-/** #1348: the restart notice (data-restart-notice): shown when the ratio now differs in percent from the one FL started with */
+/** #1348: the ratio now differs in percent from the one FL started with: the page's log says so once (Issue #1481: no notice is shown) */
+let restartNoted = false;
 function renderRestartNotice(): void {
-  $('restart-note').hidden = bootDpr === null || !restartNeeded(bootDpr, window.devicePixelRatio || 1);
+  if (restartNoted || bootDpr === null || !restartNeeded(bootDpr, window.devicePixelRatio || 1)) return;
+  restartNoted = true;
+  addLog('warn', 'the browser zoom changed after FL Studio started: FL Studio keeps the scale of its start until it is restarted');
 }
 // #1348: the ratio changes (a browser zoom, a move to another monitor): the room is measured again, so that the guest's screen follows it (the engine is told the new size),
 // and the restart notice is shown or hidden. The ratio is read again on each of three signals: the query for the ratio the page has (kept, and made again after each change: a
 // query is for one ratio), the window's resize, and a timer (250 ms) that reads the ratio itself, since a change of the ratio does not always reach the query.
+// #1480: the guest's cursor is given again for the new ratio here too (its image-set's resolution is the ratio), so all three signals do it.
 let lastDpr = window.devicePixelRatio || 1;
 function onDevicePixelRatio(): void {
   const dpr = window.devicePixelRatio || 1;
   if (dpr === lastDpr) return;
   lastDpr = dpr;
   applyDisplay();
+  applyGuestCursor();
   roomFollower.push(measureRoom());
   renderRestartNotice();
 }
@@ -383,8 +373,6 @@ function watchDevicePixelRatio(): void {
 watchDevicePixelRatio();
 window.addEventListener('resize', onDevicePixelRatio);
 setInterval(onDevicePixelRatio, 250);
-
-$('stop-btn').addEventListener('click', () => { endRequested = true; client.stop(); });
 
 /** decision 0212: what the engine says about its screen (fle_av_poll); the desktop is drawn for what the engine uses, whatever the page asked for */
 function syncGuestScreen(v: Pick<AppView, 'screenW' | 'screenH'>): void {
@@ -405,11 +393,11 @@ function syncGuestScreen(v: Pick<AppView, 'screenW' | 'screenH'>): void {
 function followRoom(room: Room): void {
   const g = chooseGuestScreen(room);
   if (!app.screen.asked) return;
-  if (g.width === app.screen.asked.width && g.height === app.screen.asked.height) { $('resize-note').hidden = true; return; }
+  if (g.width === app.screen.asked.width && g.height === app.screen.asked.height) return;
   const rec = { room, guest: { width: g.width, height: g.height }, sent: false, at: nowAbs() };
   app.screen.resizes.push(rec);
   if (app.screen.resizes.length > 50) app.screen.resizes.shift();
-  if (app.screen.engineFollows === false) { const n = 'this engine build has no display-change entry (fle_g3_display); a reload takes the new size'; if (app.screen.notes[app.screen.notes.length - 1] !== n) { app.screen.notes.push(n); addLog('warn', n); } return; }
+  if (app.screen.engineFollows === false) { const n = 'this engine build has no display-change entry (fle_g3_display): the screen keeps the size it started with'; if (app.screen.notes[app.screen.notes.length - 1] !== n) { app.screen.notes.push(n); addLog('warn', n); } return; }
   if (!inputEnabled()) return;   // before the first idle: followRoom runs again at the first idle
   sendRaw({ k: 'display', kind: IN.DISPLAY, width: g.width, height: g.height }, 'room', undefined, false);
   rec.sent = true;
@@ -573,6 +561,7 @@ function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
     hz: displayMonitor.isRunning ? hzInfo() : null,
     guestScreen: guestScreenInfo(),
     files: filesUsage.snapshot(),
+    warns: warnsOf(engineLog.lines), // Issue #1418: the calls the engine answered without a model (its last counts line)
     assets: assetsNow(),
     desk: app.engineKind === 'emscripten-fruity-v1' ? deskBeacon(app.deskStats as Record<string, unknown> | null, prevDeskBeacon, nowAbs(), deskHistory.samples) : null,
     engineRun: engineRunBeacon(app.idles, nowAbs()),
@@ -647,7 +636,7 @@ setInterval(renderPerf, 1000);
 
 /** #1392: the pictures of the cursors the guest loaded from its modules or made with CreateIconIndirect, by handle (the engine sends one before each osstate that names its handle) */
 const cursorPictures = new Map<number, CursorPictureState>();
-/** #1392: the engine's picture of a cursor as the page shows it: the PNG of the engine's pixels, and its copies at 2x and 3x (nearest neighbour, the same pixels; only where the copy fits the browser's cursor size), with the hot spot */
+/** #1392: the engine's picture of a cursor as the page shows it: the PNG of the engine's pixels (not scaled; the size is checked against the browser's limit where it is shown, cursorCss) */
 const pictureLogged = new Map<number, string>();
 const cursorPictureCache = new Map<string, CursorPictureState>();
 function rgbaHashHex(u8: Uint8Array): string {
@@ -665,8 +654,6 @@ function pictureState(m: Extract<FromWorker, { t: 'cursorpic' }>): CursorPicture
   if (m.picture === null) return { ok: false, why: m.why };
   const p = m.picture;
   const source = p.made ? 'made by CreateIconIndirect' : p.named ? p.name : `ordinal ${p.ordinal}`;
-  const images = [1, 2, 3].filter((k) => p.width * k <= CURSOR_IMAGE_MAX && p.height * k <= CURSOR_IMAGE_MAX);
-  if (images.length === 0) return { ok: false, why: `the picture is ${p.width} x ${p.height}, larger than a cursor the browser shows (${CURSOR_IMAGE_MAX} px)` };
   const rgba = new Uint8Array(p.rgba);
   const what = `the guest's cursor ${source}${p.made ? '' : `: RT_CURSOR ${p.cursorId}`}, ${p.width} x ${p.height}, hot spot ${p.hotX}, ${p.hotY}; ${p.alpha ? `drawn with the alpha bytes (${p.transparent} transparent, ${p.opaque} opaque pixels)` : `${p.invert} pixels drawn black (AND 1, XOR not 0)`}`;
   if (pictureLogged.get(m.handle) !== what) { pictureLogged.set(m.handle, what); addLog('info', what); }
@@ -674,7 +661,7 @@ function pictureState(m: Extract<FromWorker, { t: 'cursorpic' }>): CursorPicture
   const cached = cursorPictureCache.get(cacheKey);
   if (cached) return cached;
   const state: CursorPictureState = {
-    ok: true, images: images.map((k) => ({ scale: k, url: pngDataUrl(p.width * k, p.height * k, scaleNearest(p.width, p.height, rgba, k)) })),
+    ok: true, url: pngDataUrl(p.width, p.height, rgba),
     hotX: p.hotX, hotY: p.hotY, source, cursorId: p.cursorId, width: p.width, height: p.height, invert: p.invert, alpha: p.alpha,
     ...(p.raw !== null ? { raw: base64Of(new Uint8Array(p.raw)) } : {}),
   };
@@ -694,21 +681,15 @@ function recordCursor(c: CursorChoice): void {
   if (c.unresolved) app.cursorRecord.unresolved++;
 }
 
-/** the guest's cursor as the last osstate named it (applied again when the device pixel ratio changes: the picture's copies depend on it) */
+/** the guest's cursor as the last osstate named it (applied again when the device pixel ratio changes: the image-set's resolution is the ratio, #1480) */
 let guestCursor: Pick<AppView, 'cursor' | 'cursorIdc' | 'cursorShared' | 'cursorMade'> | null = null;
+/** Issue #1481: the CSS of a cursor picture is a data: URL (the picture's PNG in Base64). The desktop gets the CSS; the page's state, its text and the tests' JSON name only its kind and length */
 function applyGuestCursor(): CursorChoice {
-  const c = cursorCss(guestCursor, guestCursor ? cursorPictures.get(guestCursor.cursor) : undefined, window.devicePixelRatio);
-  app.cursor = c;
+  const c = cursorCss(guestCursor, window.devicePixelRatio, guestCursor ? cursorPictures.get(guestCursor.cursor) : undefined);
+  app.cursor = { ...c, css: c.css.includes('data:') ? `a picture (${c.css.length} characters of CSS)` : c.css };
   view.setCursor(c.css);
   return c;
 }
-/** #1392: the device pixel ratio is read now and then: when it has changed (the window moved to a screen of another density), the cursor is given again for the new ratio */
-let shownDpr = window.devicePixelRatio;
-setInterval(() => {
-  if (window.devicePixelRatio === shownDpr) return;
-  shownDpr = window.devicePixelRatio;
-  applyGuestCursor();
-}, 250);
 
 const client = new EngineClient({
   deskCanvas: () => view.deskCanvas(),
@@ -732,6 +713,9 @@ const client = new EngineClient({
   clipboardRead(id) {
     addLog('info', `the engine's Paste asks for the clipboard text (request ${id})`);
     pageClipboard.read().then((text) => client.clipboardAnswer(id, text)).catch(() => client.clipboardAnswer(id, null));
+  },
+  clipboardProbe(id) {
+    pageClipboard.probe().then((has) => client.clipboardProbeAnswer(id, has)).catch(() => client.clipboardProbeAnswer(id, false));
   },
   desk(m) {
     app.deskStats = m.stats;
@@ -764,8 +748,6 @@ const client = new EngineClient({
       refreshPanels();
       endKind = 'idle';
       setState('engine-idle', 'engine idle (waiting for input)');
-      $('stop-btn').hidden = false;
-      $('stop-btn').textContent = 'End session';
       addLog('info', `engine idle (${m.n}) at virtual clock ${(m.now / 10000).toFixed(0)} ms; input ${m.caps.input ? 'is accepted from now on' : 'is NOT supported by this build'}; window list ${m.caps.appview ? 'is read from the engine' : 'is not available (no fle_av_poll)'}`);
       if (m.caps.input && document.activeElement === document.body) $('desktop').focus({ preventScroll: true });
       renderDesktopInfo();
@@ -773,8 +755,7 @@ const client = new EngineClient({
       beacons.firstIdle(); // after the state is "engine-idle": the beacon carries it
       if (app.screen.asked) followRoom(measureRoom());   // decision 0212: the room may have changed while the engine started
     }
-    fileDlgView.engineIdle();
-    app.idles.push({ at, busyMs: m.busyMs, n: m.n, now: m.now, next: m.next });
+    app.idles.push({ at, busyMs: m.busyMs, n: m.n, now: m.now, next: m.next, dwm: m.dwm ?? null });
     if (app.idles.length > 5000) app.idles.shift();
     const prev = cycleLast;
     if (prev !== null) { (clock.cycles as number[]).push((at - prev) / Math.max(1, sinceN)); if (clock.cycles.length > 100) (clock.cycles as number[]).shift(); }
@@ -793,8 +774,10 @@ const client = new EngineClient({
   },
   fileDlgProgress: (id, done, total) => fileDlgView.progress(id, done, total),
   savedFile(f) {
-    addLog('info', `the engine finished writing a file it was asked to save (${f.size} bytes); it is listed under "Files the engine wrote"`);
-    savedView.add(f);
+    // a Save whose place the person chose in the file window is copied to that OPFS path (engine-dialog.ts onSavedFile), so it is not handed to the browser's download too
+    const chosen = engineFiles.pendingSaves.has(f.guestPath.toLowerCase());
+    addLog('info', chosen ? `the engine finished writing a file (${f.size} bytes) to the place the person chose in the file window` : `the engine finished writing a file it was asked to save (${f.size} bytes); it is listed under "Files the engine wrote"`);
+    savedView.add(f, !chosen);
     void engineFiles.onSavedFile(f);
   },
   inputDone: (items) => app.latency.done(items),
@@ -818,7 +801,6 @@ const client = new EngineClient({
     el.dataset.kind = d.kind;
     el.replaceChildren(document.createTextNode(d.text));
     for (const n of d.notes) { const s = document.createElement('span'); s.className = 'note'; s.textContent = n; el.append(s); }
-    $('stop-btn').hidden = true;
     addLog(info.reason === 'trap' ? 'error' : 'info', `exit ${info.reason} code ${info.code}: ${info.message}`);
     renderPhases();
     if (phaseTimer) { clearInterval(phaseTimer); phaseTimer = null; }
@@ -837,6 +819,20 @@ function applyHzParam(manifest: Manifest, measured: HzMeasurement | null): void 
   app.hz.hz = r.hz;
   app.hz.warning = r.warning;
   for (const l of r.lines) addLog(l.level, l.text);
+}
+
+// Issue #1402: the page's rate of requestAnimationFrame is measured again every HZ_TRACK_MS while the engine runs (a window of HZ_TRACK_WINDOW_MS, the start-up's measure). When the rounded rate
+// changes, the engine is told (client.setHz) and takes it at its next idle: its frames (DwmFlush) and the rate EnumDisplaySettingsW reports follow the page. A window with no frames (a hidden tab) changes nothing.
+const HZ_TRACK_MS = 2000, HZ_TRACK_WINDOW_MS = 500;
+function trackHz(): void {
+  void measureFrameRate(hzFrames, { skipIntervals: 2, windowMs: HZ_TRACK_WINDOW_MS, minIntervals: 8, giveUpMs: 1500 }).then((m) => {
+    if (m.measuredHz === null) return;
+    const hz = roundToStandardHz(m.measuredHz);
+    if (hz === app.hz.hz) return;
+    addLog('info', `display refresh rate ${hz} Hz for the engine (the page's requestAnimationFrame measures ${m.measuredHz.toFixed(1)} Hz now)`);
+    app.hz.hz = hz;
+    client.setHz(hz);
+  }).finally(() => { setTimeout(trackHz, HZ_TRACK_MS); });
 }
 
 
@@ -899,11 +895,11 @@ async function boot(): Promise<void> {
     if (typeof SharedArrayBuffer === 'undefined') { showError('the engine takes its input through a SharedArrayBuffer (a cross-origin isolated page): this browser or page lacks it', 'feature check (before any download)', 'download', 'no-shared-memory'); return; }
 
     setState('loading', 'downloading engine and data');
-    const expected = ['engine wasm', 'seed pack', 'DLL pack', 'engine glue'];
+    const expected = START_ASSETS;
     const assetsDone = new Set<string>();
     const onProgress = (p: Progress): void => {
       stamp('download_start', p.at);
-      progress.update(p, p.label === 'engine wasm' && !p.done ? ' · compiling as it arrives' : '');
+      loading.update(p, p.label === 'engine wasm' && !p.done ? ' · compiling as it arrives' : '');
       if (p.done) { assetsDone.add(p.label); if (expected.every((l) => assetsDone.has(l))) stamp('download_done', p.at); }
     };
     // decision 0220: the stored copy lives in OPFS; a browser without it loads from the network every time
@@ -917,7 +913,7 @@ async function boot(): Promise<void> {
     const lazyShared = lazyRefs.map((r) => makeLazyFileShared(r.name, r.path, r.size));
     for (const s of lazyShared) lazyByPath.set(s.path, s);   // Issue #1362: the face finds its document by the path
     for (const [label, r] of refs) recorder.expect(label, r, base);
-    for (const r of lazyRefs) recorder.expect(r.name, r, base);
+    for (const r of lazyRefs) recorder.expect(r.path, r, base);
     const keep: AssetRef[] = [...refs.map(([, r]) => r), ...lazyRefs];
     const opts = { onProgress, store, onTrace: recorder.trace };
     const [module, seed, dll, glue]: [WebAssembly.Module, LoadedPack, LoadedPack, Uint8Array] = await Promise.all([
@@ -931,16 +927,20 @@ async function boot(): Promise<void> {
     applyHzParam(manifest, await hzMeasuring);
     applyScreenParam(manifest);
     setState('loaded', 'starting engine');
+    // Issue #1520: the bars are painted at 100 % before the modal leaves (the last asset can finish in the same task as the rest: without a frame, 100 % is never on the screen).
+    // Two frames: the one that paints the bars, and the one after it. A hidden tab has no frame: the wait then ends after 100 ms.
+    await new Promise<void>((done) => { requestAnimationFrame(() => requestAnimationFrame(() => done())); setTimeout(done, 100); });
+    loading.close();   // the downloads are done and the engine is about to start; the modal leaves the page, then the engine's own first drawing comes
+    stamp('modal_removed');
     await client.init(manifest, { module, seed: seed.bytes, glue, dll: dll.bytes, lazy: lazyShared });
     stamp('worker_ready');
     setState('running', 'engine starting');
     stamp('engine_start');
     clock.startedAt = nowAbs();
     perfRecorder.start(clock.startedAt);
-    $('stop-btn').hidden = false;
-    $('stop-btn').textContent = 'Stop engine';
     if (apiTraceWanted) client.windowApiTrace(true);   // #1347: on before the engine's first instruction, so the start-up's DPI answers are traced
     client.start();
+    trackHz();
     startLazy(lazyRefs, lazyShared, store, recorder, keep);
   } catch (e) {
     if (e instanceof LoadError) {

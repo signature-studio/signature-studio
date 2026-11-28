@@ -29,6 +29,51 @@ project: signature-studio/3
 - 設定窓(F10)の Theme 頁: 頁の一覧に在る(`pm-work/findings/hidpi-fl-scaling.md` の 10.1)。テーマを切り替える操作は、この頁で行うと推定する(未確認。再現の手順で確かめる)。
 - 原因は、まだ分かっていない。この節の推定は、再現の前の材料であり、結論ではない。
 
+## 前回の試行で分かったこと(run 45572376012。`failed`)
+
+- 前回: run 45572376012 の作業 #1382 のジョブ。判定は差し戻し(`failed`)。作業は差分として `agent-1382` の `work.diff` に保存された(作業者の commit `ccd52462` は runner 上のもので、main には無い)。次の試行は、その差分を `.prior-work.md` と共に作業ツリーで受け取る。
+- 判定で落ちたのは 1 点だけ: `elapsedMs` の上限 12,500 を、DPR 2.85 の行が超えた(17,807 ms)。それ以外は全て通った(流れ A〜D 4/4、`npm test` 通過、`boot-bundle` は engine-idle)。
+- 停止の原因(実測。DPR 2.93 の 1 回の測定。切り替えの 4 番目 PPRIIME Light。停止の全文):
+
+  ```
+  fle: DIB section made 24883200 bytes (live 7 blocks, 145006504 bytes; guest return address 0x6b072f)
+  Cannot enlarge memory, requested 2163200000 bytes, but the limit is 2147483648 bytes!
+  fle: CreateDIBSection: out of memory        (exit 134)
+  ```
+
+- 原因: PPRIIME Dark・PPRIIME Light・Veela の切り替えごとに、24.8 MB の DIB(2880×2160×4)が 1 個ずつ解放されずに残った。DPR 1 でも同じ(DPR には依らない)。DPR 2.93 は、画面サイズの面(約 66 MB)が重なって、先に wasm の上限 2 GiB に届いた。
+- 残った経路(実測): 戻り番地 `0x6aff79`(関数 `f_6aff60`)の `DeleteObject` は、DIB が DC に選ばれたまま(`sel 1`)呼ばれ、0 を返して削除されなかった。Windows でも選択中のビットマップは削除できず、同じ戻り値になる。その後の `DeleteDC` で DC は消えるが、DIB の実体は残る。ゲストは `DeleteObject` の後にハンドルの欄を 0 にするので、後から解放する手段が無かった。
+- 直し方(既定の動作。オプションは作らない): `lift/runtime/fle_gdi.c` で、選択中のビットマップへの `DeleteObject` は Windows どおり 0 を返す。ただし、そのビットマップに保留の印を付け、その DC を `DeleteDC` で解放する時に、選択が外れていれば実体を解放する。`SelectObject` で外す時には解放しない(外された古いハンドルの意味を変えないため)。
+- mutex の再入(前回の段階 3 の原因): `LocalFree` が無効な値を解放し、dlmalloc の lock を取ったまま戻っていた。`lift/runtime/fle_thread.c` の wrapper は、同じ guest thread の再入を黙って数えず、停止(戻り番地つき)にする。今回の 4 回の測定では、再入の停止は出なかった。
+- 切り替えの結果(runner の値。nproc 4、loadavg 1.6〜1.8。DPR 1 と乱数の DPR 2.85 の 2 行。タイルはつまみのドラッグで押した): 13 件とも押せて、停止は 0。全件で画面が変わった。Light pear は背景色が変わらない(画面は変わる)。
+
+| # | テーマ | DPR 1: 提示 | 背景 | DPR 2.85: 提示 | 背景 |
+|---|---|---|---|---|---|
+| 1 | DEDZII Light | 271→285 | #34444e→#b0aca1 | 78→84 | #3c454b→#bab9ae |
+| 2 | DEDZII | 400→413 | #bab9ae→#d7e4f2 | 118→123 | #bab9ae→#d7e4f2 |
+| 3 | PPRIIME Dark | 531→545 | #d7e4f2→#f0f0f0 | 160→165 | #d7e4f2→#f0f0f0 |
+| 4 | PPRIIME Light | 668→683 | #f0f0f0→#dad5b0 | 205→209 | #f0f0f0→#d5d2bc |
+| 5 | Veela | 818→832 | #dad5b0→#310c50 | 245→249 | #d5d2bc→#331f46 |
+| 6 | Ash | 955→968 | #310c50→#444444 | 282→288 | #331f46→#444444 |
+| 7 | Dark orange | 1092→1104 | #444444→#293134 | 327→332 | #444444→#2d3132 |
+| 8 | Dark | 1224→1235 | #293134→#22272b | 367→373 | #2d3132→#25272a |
+| 9 | Light cherry | 1322→1335 | #25272a→#e9e9e9 | 410→416 | #25272a→#e9e9e9 |
+| 10 | Light pear | 1421→1430 | #e9e9e9→#e9e9e9 | 452→457 | #e9e9e9→#e9e9e9 |
+| 11 | Light tangerine | 1515→1524 | #e9e9e9→#efefef | 493→498 | #e9e9e9→#efefef |
+| 12 | Sytrus | 1614→1629 | #efefef→#3399ff | 527→533 | #efefef→#3399ff |
+| 13 | Ultra green | 1720→1733 | #3399ff→#222222 | 565→570 | #3399ff→#242424 |
+
+- 時間: DPR 1 の `elapsedMs` は 11,691 ms。DPR 2.85 は 17,807 ms(キャンバスは 5233×3010。WebGL の文脈は作れている)。前回の DPR 2.93 も 17,647 ms。起動から `engine-idle` までの時間は、キャンバスの画素数に比例して延びる。runner には GPU が無く、大きいキャンバスをソフトウェアで描くため。
+- 起動確認(`boot-bundle.mjs`、DPR 1): 作業者の 1 回目は `elapsedMs` 13,564(engine-idle・standIn false・error null)。同じ bundle で 12,461〜13,564 ms とばらつく。ビルド直後の最初の起動が遅い。
+
+## 次の試行の決まり(PM の決定。run 45572376012 の後)
+
+1. 前回の差分を取り込み、受け入れを通して commit する。新しい変更は足さない(ほぼ完了)。前回の決まりの 1・2・3(mutex の解放の経路)と 6(タイルの押し方)は、この試行で済んだ。5(DPR 2.93 の切り分け)は、WebGL の文脈が作れている(上限に収まる)ので、キャンバスを縮めない。2.93 の停止は DIB のリークが原因。
+2. 受け入れの判定を、次のとおりに変えた(この本文の `accept` が正):
+   - 起動確認(DPR 1): 3 回の `boot-bundle.mjs` の `elapsedMs` の中央値が 12,500 以下。最初の起動が遅いが、捨てずに 3 回の中央値で見る。
+   - テーマの切り替え: `elapsedMs` の上限は、DPR が 1.5 以下の行は 12,500、それ以外の行は 12,500 × DPR。理由: runner に GPU が無く、起動の描画がキャンバスの画素数に比例する。P1 の高い DPR での実測は、実機のビーコンと #1422 の計測で見る。DPR 1 の行は 12,500 のまま(起動の悪化を見逃さないため)。
+3. 作業の進め方: ビルドは約 35 分。フォアグラウンドで直接、シェルツールの `timeout` 引数は最大 5400000。**4 時間 30 分で、受け入れが通らなくても、commit して終える**。
+
 ## 前回の試行で分かったこと(run 45501335817。`failed`)
 
 前回の試行: run 45501335817 の作業 #1382 のジョブ(22:32〜03:51 UTC)。作業者は 22:33〜02:57 UTC(4 時間 24 分)、判定の段は 02:57〜03:51 UTC(54 分)。判定は終了コード 1 で、push は無し。作業は保存された(commit `b7f219ba` の差分 `work.diff`)。次の試行は、その差分を `.prior-work.md` と共に作業ツリーで受け取る。
@@ -112,13 +157,14 @@ project: signature-studio/3
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/theme-switch/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/theme.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const n=fs.readFileSync("inputs/fl-installer-files.tsv","utf8").replace(/\r/g,"").split("\n").filter((l)=>/^Artwork\\Themes\\.*\.flstheme\t/i.test(l)).length;const ok=(r)=>r.error===null&&r.stopped===false&&r.themes===n&&r.switched===n&&r.items.length===n&&r.elapsedMs<=12500&&r.preBootBytes<=314368711&&r.items.every((x)=>x.presentsAfter>x.presentsBefore&&x.screenChanged===true);process.exit(n===13&&L.length===2&&L.every(ok)?0:1)' "$RUNNER_TEMP/theme.jsonl" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && for i in 1 2 3; do node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot$i.json" || exit 1; done && node -e 'const fs=require("fs");const R=process.argv.slice(1).map((f)=>JSON.parse(fs.readFileSync(f,"utf8")));const m=R.map((r)=>r.elapsedMs).sort((a,b)=>a-b)[1];process.exit(R.length===3&&R.every((r)=>r.error==null&&r.state==="engine-idle"&&r.standIn===false)&&m<=12500?0:1)' "$RUNNER_TEMP/boot1.json" "$RUNNER_TEMP/boot2.json" "$RUNNER_TEMP/boot3.json" && node tools/theme-switch/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/theme.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const n=fs.readFileSync("inputs/fl-installer-files.tsv","utf8").replace(/\r/g,"").split("\n").filter((l)=>/^Artwork\\Themes\\.*\.flstheme\t/i.test(l)).length;const ok=(r)=>r.error===null&&r.stopped===false&&r.themes===n&&r.switched===n&&r.items.length===n&&r.elapsedMs<=(r.dpr<=1.5?12500:12500*r.dpr)&&r.preBootBytes<=314368711&&r.items.every((x)=>x.presentsAfter>x.presentsBefore&&x.screenChanged===true);process.exit(n===13&&L.length===2&&L.every(ok)?0:1)' "$RUNNER_TEMP/theme.jsonl" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
 ```
 
 判定の基準:
+- 起動確認(DPR 1。`boot-bundle.mjs` を 3 回)の `elapsedMs` の中央値が 12,500 以下。3 回とも engine-idle・standIn が false・error が null。
 - 道具の出力は 2 行(DPR 1 の 1 行と、乱数の DPR 1.01〜3.00 の 1 行)。各行で、`error` が null、`stopped` が false、`themes`(配信の `.flstheme` の件数。一覧から数えた 13)と `switched` が一致する。
 - 各テーマ(`items`)で、`presentsAfter` が `presentsBefore` より大きい、かつ `screenChanged` が true(切り替えの前後で、画素が異なる)。
-- `elapsedMs` が 12,500 以下。`preBootBytes` が 314,368,711 以下(起動の前に取る量を増やさない)。
+- `elapsedMs` の上限は、DPR が 1.5 以下の行は 12,500、それ以外の行は 12,500 × DPR(上の「次の試行の決まり」の 2)。`preBootBytes` が 314,368,711 以下(起動の前に取る量を増やさない)。
 - 流れ A〜D(`tools/smoke/welcome-flow.mjs`)が通る(#{{116}} の判定のまま)。
 - 単体テスト(`npm test --prefix app`)が通る。
 

@@ -21,6 +21,8 @@
 //!    is the old output byte for byte; the mistakes of the annotation stop the generator; the command line reads VA and RVA lines.
 //! 2. Runtime, through a driver linked with every runtime source and the generated C: the image is mapped at its ImageBase and the driver
 //!    writes `jmp rel32` and the original bytes the way the guest does.
+//! 3. Many modules (Issue #1516): 300 registered images, each with a hook point, and the stop at the limit of the runtime (its message gives
+//!    the count and the limit).
 //!
 //! Outputs go under lift/out-hook/test.
 
@@ -558,40 +560,50 @@ struct Out {
     code: Option<i32>,
 }
 
+/// Links the runtime (every fle_*.c and the two host stubs), the generated unit `gen_c` and the driver `main_c` into one program.
+fn link_program(tag: &str, gen_c: &str, main_c: &str) -> PathBuf {
+    let dir = work_dir();
+    let gen_path = dir.join(format!("{tag}-gen.c"));
+    let main_path = dir.join(format!("{tag}-main.c"));
+    std::fs::write(&gen_path, gen_c).unwrap();
+    std::fs::write(&main_path, main_c).unwrap();
+    let rt = rt_dir();
+    let mut srcs: Vec<PathBuf> = std::fs::read_dir(&rt)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            let n = p.file_name().unwrap().to_string_lossy().to_string();
+            n.starts_with("fle_") && n.ends_with(".c")
+        })
+        .collect();
+    srcs.sort();
+    srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+    srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
+    let exe = dir.join(tag);
+    let mut cmd = Command::new("clang");
+    cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt);
+    for p in &srcs {
+        cmd.arg(p);
+    }
+    let cc = cmd.arg(&gen_path).arg(&main_path).arg("-lm").arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
+    assert!(cc.status.success(), "clang failed: {}", String::from_utf8_lossy(&cc.stderr));
+    exe
+}
+
 fn driver() -> &'static PathBuf {
     static D: OnceLock<PathBuf> = OnceLock::new();
     D.get_or_init(|| {
-        let dir = work_dir();
-        let tag = etxt_common::per_process("hook-driver");
         let (_, c) = lift(&build(), &[H1_VA, H2_VA]).unwrap();
-        let gen_c = dir.join(format!("{tag}-gen.c"));
-        let main_c = dir.join(format!("{tag}-main.c"));
-        std::fs::write(&gen_c, &c).unwrap();
-        std::fs::write(&main_c, DRIVER.replace("/*PREFIX*/", &prefix())).unwrap();
-        let rt = rt_dir();
-        let mut srcs: Vec<PathBuf> = std::fs::read_dir(&rt)
-            .unwrap()
-            .map(|e| e.unwrap().path())
-            .filter(|p| {
-                let n = p.file_name().unwrap().to_string_lossy().to_string();
-                n.starts_with("fle_") && n.ends_with(".c")
-            })
-            .collect();
-        srcs.sort();
-        let exe = dir.join(&tag);
-        let mut cmd = Command::new("clang");
-        cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt);
-        for p in &srcs {
-            cmd.arg(p);
-        }
-        let cc = cmd.arg(&gen_c).arg(&main_c).arg("-lm").arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
-        assert!(cc.status.success(), "clang failed: {}", String::from_utf8_lossy(&cc.stderr));
-        exe
+        link_program(&etxt_common::per_process("hook-driver"), &c, &DRIVER.replace("/*PREFIX*/", &prefix()))
     })
 }
 
 fn run(scenario: &str) -> Out {
-    let r = Command::new(driver()).arg(scenario).output().expect("run failed");
+    run_in(driver(), scenario)
+}
+
+fn run_in(exe: &PathBuf, scenario: &str) -> Out {
+    let r = Command::new(exe).arg(scenario).output().expect("run failed");
     Out {
         stdout: String::from_utf8_lossy(&r.stdout).to_string(),
         stderr: String::from_utf8_lossy(&r.stderr).to_string(),
@@ -608,7 +620,11 @@ fn lines(scenario: &str) -> Vec<String> {
 
 /// The scenario must stop the run by name: SIGABRT, a "fle:" message with every `must_say`, and nothing printed after the stop.
 fn aborts(scenario: &str, must_say: &[&str]) -> Out {
-    let o = run(scenario);
+    aborts_in(driver(), scenario, must_say)
+}
+
+fn aborts_in(exe: &PathBuf, scenario: &str, must_say: &[&str]) -> Out {
+    let o = run_in(exe, scenario);
     assert!(o.signal.is_some() || o.code != Some(0), "{scenario}: expected an abort, got stdout {}", o.stdout);
     assert_eq!(o.signal, Some(6), "{scenario}: not SIGABRT (code {:?}): {}", o.code, o.stderr);
     assert!(o.stderr.contains("fle:"), "{scenario}: no fle: message: {}", o.stderr);
@@ -715,4 +731,147 @@ fn virtualprotect_outside_the_image_is_as_before() {
     aborts("vp-after-image", &["address is not in a VirtualAlloc region"]);
     // a VirtualAlloc region still works with an image registered
     assert_eq!(lines("vp-region"), ["alloc 1", "vp 1 old 4"]);
+}
+
+// ---------------------------------------------------------------------------------------------
+// 3. Many modules (Issue #1516): the registration does not stop at a few modules, and the stop at the limit says why
+// ---------------------------------------------------------------------------------------------
+
+/// The driver of section 3. It knows no limit. Scenario `many` maps MODS images, each at its own base (0x10000000 + i * 0x10000), with one hook
+/// point at +0x1020 (`mov eax, imm32` in its 5 bytes), and registers each with fle_hook_register. Then, for each module: fle_hook_target with the
+/// original bytes is 0; VirtualProtect on the 5 bytes succeeds and returns the protection of the section (PAGE_EXECUTE_READ 0x20); a jmp rel32 is
+/// written and fle_hook_target returns its target; the original bytes are written back and fle_hook_target is 0 again. Scenario `limit` registers
+/// modules without mapping them, one by one, and prints the count after each registration until the runtime stops. The generated unit of this
+/// driver has no hook points (lift with no hooks), so the registrations are the driver's own.
+const MANY: &str = r####"#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <sys/mman.h>
+#include "fle_runtime.h"
+#include "fle_vmap.h"
+#include "fle_imports.h"
+#include "fle_sys.h"
+
+#define MODS 300u
+#define TRY 4096u
+#define IMG UINT64_C(0x2000)
+#define HOOK_OFF UINT64_C(0x1020)
+#define JMP_AT UINT64_C(0x40)
+#define LAST_END (UINT64_C(0x10000000) + (uint64_t)(MODS - 1) * UINT64_C(0x10000) + IMG)
+_Static_assert(LAST_END <= FLE_MAX_APP_ADDR, "the images are above FLE_MAX_APP_ADDR");
+#define U(x) ((unsigned long long)(x))
+
+static fle_hook_point pts[TRY];
+
+static uint64_t base_of(unsigned i) { return UINT64_C(0x10000000) + (uint64_t)i * UINT64_C(0x10000); }
+static uint64_t va_of(unsigned i) { return base_of(i) + HOOK_OFF; }
+/* mov eax, imm32 with imm = i + 1: the 5 bytes b8 imm32, byte k in bits 8k..8k+7 */
+static uint64_t orig_of(unsigned i) { return UINT64_C(0xb8) | ((uint64_t)(i + 1u) << 8); }
+static void put5(uint64_t at, uint64_t v) { memcpy((void *)(uintptr_t)at, &v, 5); }
+static void put_jmp(uint64_t at, uint64_t to)
+{
+    uint8_t *p = (uint8_t *)(uintptr_t)at;
+    int32_t rel = (int32_t)(to - (at + 5));
+    p[0] = 0xe9;
+    memcpy(p + 1, &rel, 4);
+}
+static void map_one(unsigned i)
+{
+    void *p = mmap((void *)(uintptr_t)base_of(i), IMG, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+    if (p != (void *)(uintptr_t)base_of(i)) {
+        fprintf(stderr, "cannot map the image at %#llx\n", U(base_of(i)));
+        exit(77);
+    }
+    put5(va_of(i), orig_of(i));
+}
+/* VirtualProtect with the guest's arguments (rcx, rdx, r8, r9); the Win32 result is in R[0]. */
+static uint64_t vp(uint64_t addr, uint64_t size, uint32_t prot, uint32_t *old)
+{
+    R[1] = addr;
+    R[2] = size;
+    R[8] = prot;
+    R[9] = (uint64_t)(uintptr_t)old;
+    fle_imp_VirtualProtect();
+    return R[0];
+}
+
+int main(int argc, char **argv)
+{
+    const char *m = argc > 1 ? argv[1] : "";
+    unsigned i, unhooked = 0, protect = 0, hooked = 0, restored = 0;
+
+    for (i = 0; i < TRY; i++) {
+        pts[i].va = va_of(i);
+        pts[i].orig5 = orig_of(i);
+        pts[i].prot = 0x20;
+    }
+    if (!strcmp(m, "many")) {
+        for (i = 0; i < MODS; i++) {
+            map_one(i);
+            fle_hook_register(base_of(i), IMG, &pts[i], 1);
+        }
+        printf("registered %u\n", MODS);
+        for (i = 0; i < MODS; i++) {
+            uint64_t va = va_of(i), to = va + JMP_AT;
+            uint32_t old = 0xff;
+            if (fle_hook_target(va, orig_of(i)) == 0) unhooked++;
+            if (vp(va, 5, 0x40, &old) == 1 && old == 0x20) protect++;
+            put_jmp(va, to);
+            if (fle_hook_target(va, orig_of(i)) == to) hooked++;
+            put5(va, orig_of(i));
+            if (fle_hook_target(va, orig_of(i)) == 0) restored++;
+        }
+        printf("unhooked %u\n", unhooked);
+        printf("protected %u\n", protect);
+        printf("hooked %u\n", hooked);
+        printf("restored %u\n", restored);
+        if (unhooked == MODS && protect == MODS && hooked == MODS && restored == MODS) {
+            printf("ok\n");
+            return 0;
+        }
+        printf("bad\n");
+        return 1;
+    }
+    if (!strcmp(m, "limit")) {
+        for (i = 0; i < TRY; i++) {
+            fle_hook_register(base_of(i), IMG, &pts[i], 1);
+            printf("registered %u\n", i + 1u);
+            fflush(stdout);
+        }
+        printf("no stop\n");
+        return 3;
+    }
+    printf("no scenario %s\n", m);
+    return 3;
+}
+"####;
+
+fn many_driver() -> &'static PathBuf {
+    static D: OnceLock<PathBuf> = OnceLock::new();
+    D.get_or_init(|| {
+        let (_, c) = lift(&build(), &[]).unwrap();
+        link_program(&etxt_common::per_process("hook-many"), &c, MANY)
+    })
+}
+
+#[test]
+fn three_hundred_modules_register_and_each_hook_point_answers_for_itself() {
+    let o = run_in(many_driver(), "many");
+    assert!(o.signal.is_none() && o.code == Some(0), "did not exit normally (signal {:?}, code {:?}): {}\n{}", o.signal, o.code, o.stderr, o.stdout);
+    assert_eq!(o.stdout.lines().collect::<Vec<_>>(), ["registered 300", "unhooked 300", "protected 300", "hooked 300", "restored 300", "ok"]);
+}
+
+#[test]
+fn the_stop_at_the_limit_names_the_count_the_limit_and_the_base_of_the_module() {
+    let o = aborts_in(many_driver(), "limit", &["fle: inline hook: more modules with hook points than the runtime holds"]);
+    let counted: Vec<u32> = o.stdout.lines().filter_map(|l| l.strip_prefix("registered ")).map(|n| n.parse().unwrap()).collect();
+    let n = *counted.last().expect("the driver printed no registration");
+    assert!(counted.iter().enumerate().all(|(k, c)| *c == k as u32 + 1), "{counted:?}");
+    // the runtime holds at least 512 modules: the 8 of the first version are not enough for the effect DLLs that follow (#1434-#1448)
+    assert!(n >= 512, "the runtime stopped after {n} modules: {}", o.stderr);
+    // the module that did not fit is the one at index n (its base), and the message gives the count before the stop and the limit (the same)
+    let base = 0x1000_0000u64 + n as u64 * 0x1_0000;
+    assert!(o.stderr.contains(&format!("the module at base {base:#x}; {n} modules are registered and the limit is {n}")), "{}", o.stderr);
 }

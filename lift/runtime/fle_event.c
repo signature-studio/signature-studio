@@ -132,15 +132,15 @@ static ev_ent *event_arg(const char *api, uint64_t h, uint64_t fail_ret)
  *  - not implemented, stop: a name (named events, ERROR_ALREADY_EXISTS and the shared namespace need an object table
  *    across kinds) and a security attributes structure.
  * The last error is left alone on success (the page says nothing about changing it; ERROR_ALREADY_EXISTS needs a name). */
-void fle_imp_CreateEventW(void)
+/* Issue #1502: one line per event call while the thread trace is on (the exit of the page; the trace is off otherwise). v: the state (create, set, reset, signaled), the time-out (wait) or the result (done) */
+static void ev_trace(const char *what, uint64_t h, uint32_t v)
 {
-    static const char api[] = "CreateEventW";
-    uint64_t attrs = R[1], name = R[9];
-    uint32_t manual = (uint32_t)R[2], initial = (uint32_t)R[8];
+    if (fle_thread_trace_event) fle_thread_trace_event(what, h, v);
+}
 
-    fle_event_check_thread(api);
-    if (attrs != 0) fle_stop(api, "lpEventAttributes is not NULL (security descriptors and inheritance are not implemented)");
-    if (name != 0) fle_stop(api, "a named event is not implemented");
+/* A new object of the table (the handle is returned in R[0] by the callers); stops when the table is full. */
+static uint64_t ev_make(const char *api, uint32_t manual, uint32_t initial)
+{
     hook_once();
     if (evs_n == evs_cap) {
         uint64_t nc = evs_cap ? evs_cap * 2 : 16;
@@ -156,7 +156,70 @@ void fle_imp_CreateEventW(void)
     evs[evs_n].live = 1;
     evs_n++;
     evs_live++;
-    R[0] = FLE_EVENT_HANDLE_BASE + 4u * evs_n;
+    ev_trace("create", FLE_EVENT_HANDLE_BASE + 4u * evs_n, evs[evs_n - 1].signaled);
+    return FLE_EVENT_HANDLE_BASE + 4u * evs_n;
+}
+
+void fle_imp_CreateEventW(void)
+{
+    static const char api[] = "CreateEventW";
+    uint64_t attrs = R[1], name = R[9];
+    uint32_t manual = (uint32_t)R[2], initial = (uint32_t)R[8];
+
+    fle_event_check_thread(api);
+    if (attrs != 0) fle_stop(api, "lpEventAttributes is not NULL (security descriptors and inheritance are not implemented)");
+    if (name != 0) fle_stop(api, "a named event is not implemented");
+    R[0] = ev_make(api, manual, initial);
+}
+
+/* kernel32!CreateMutexW (Issue #1501,段 B: the Plugin Manager's start creates a mutex). HANDLE f(lpMutexAttributes rcx, BOOL bInitialOwner edx, LPCWSTR lpName r8). Learn (CreateMutexW): the
+ * return value is the handle; "If the mutex is a named mutex and the object existed before this function call, the GetLastError function returns ERROR_ALREADY_EXISTS"; lpName NULL makes an unnamed mutex.
+ * Modelled as an auto-reset object of the event table (CreateEventW's table), signaled at the start: a wait takes it (WaitForSingleObject) and ReleaseMutex gives it back. READINGS (no page for these):
+ * bInitialOwner is not used (the owner's wait succeeds at once, and no other thread waits for a mutex held across a wait: the cooperative threads switch only at waits, a mutex held across one is not
+ * modelled); a name is kept for the run (up to MUTEX_NAMES_MAX names), a second creation of a kept name gives a new handle with ERROR_ALREADY_EXISTS (the page's rule, without sharing the object).
+ * Stops: lpMutexAttributes not NULL (security is not implemented), a name of 0 units (the page does not say), a name longer than MAX_PATH - 1, a name table that is full. */
+#define MUTEX_NAMES_MAX 64u
+static uint16_t *mutex_names[MUTEX_NAMES_MAX];
+static unsigned mutex_name_n;
+
+void fle_imp_CreateMutexW(void)
+{
+    static const char api[] = "CreateMutexW";
+    uint64_t attrs = R[1], name = R[8];
+    uint16_t *nm = NULL;
+    size_t nl = 0;
+    unsigned i;
+    int exists = 0;
+
+    fle_event_check_thread(api);
+    if (attrs != 0) fle_stop(api, "lpMutexAttributes is not NULL (security descriptors and inheritance are not implemented)");
+    if (name != 0) {
+        nm = fle_w_read_alloc(api, name, 259u, &nl);
+        if (nl == 0) fle_stop(api, "lpName is an empty string: the page does not define it");
+        for (i = 0; i < mutex_name_n && !exists; i++)
+            exists = fle_w_len(mutex_names[i]) == nl && memcmp(mutex_names[i], nm, nl * sizeof *nm) == 0;
+        if (!exists) {
+            if (mutex_name_n == MUTEX_NAMES_MAX) fle_stop(api, "more named mutexes than the run keeps (MUTEX_NAMES_MAX)");
+            mutex_names[mutex_name_n++] = nm;
+        } else {
+            free(nm);
+        }
+    }
+    R[0] = ev_make(api, 0, 1);
+    if (exists) fle_set_last_error(FLE_W32_ERR_ALREADY_EXISTS);
+}
+
+/* kernel32!ReleaseMutex: BOOL f(HANDLE hMutex rcx). Learn (ReleaseMutex): "releases ownership of a mutex object"; the return value is nonzero when the function succeeds. Here (see CreateMutexW):
+ * the object becomes signaled again, and a handle that is not an object of the table fails as SetEvent's does (event_arg). */
+void fle_imp_ReleaseMutex(void)
+{
+    ev_ent *e;
+
+    fle_event_check_thread("ReleaseMutex");
+    e = event_arg("ReleaseMutex", R[1], 0);
+    if (!e) return;
+    e->signaled = 1;
+    R[0] = 1;
 }
 
 /* kernel32!SetEvent: BOOL f(hEvent rcx). Learn (SetEvent): the event becomes signaled; the return value is nonzero. A
@@ -171,6 +234,7 @@ void fle_imp_SetEvent(void)
     fle_event_check_thread("SetEvent");
     e = event_arg("SetEvent", R[1], 0);
     if (!e) return;
+    ev_trace("set", R[1], 1);
     e->signaled = 1;
     R[0] = 1;
     if (fle_thread_wake_event) fle_thread_wake_event(R[1]);
@@ -186,6 +250,7 @@ void fle_imp_ResetEvent(void)
     fle_event_check_thread("ResetEvent");
     e = event_arg("ResetEvent", R[1], 0);
     if (!e) return;
+    ev_trace("reset", R[1], 0);
     e->signaled = 0;
     R[0] = 1;
 }
@@ -216,13 +281,16 @@ void fle_imp_WaitForSingleObject(void)
     }
     e = event_arg(api, R[1], FLE_WAIT_FAILED);
     if (!e) return;
+    ev_trace("wait", R[1], ms);
     if (e->signaled) {
         if (!e->manual) e->signaled = 0;
         R[0] = FLE_WAIT_OBJECT_0;
+        ev_trace("done-signaled", R[1], e->manual);
         return;
     }
     if (ms == 0) {
         R[0] = FLE_WAIT_TIMEOUT;
+        ev_trace("done-timeout", R[1], 0);
         return;
     }
     if (fle_thread_wait_objects && fle_thread_count && fle_thread_count() > 1) {

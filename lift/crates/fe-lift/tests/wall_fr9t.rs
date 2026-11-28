@@ -30,9 +30,9 @@ fn work_dir() -> PathBuf {
     d
 }
 
-const FILES: [&str; 18] = [
+const FILES: [&str; 19] = [
     "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
-    "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c",
+    "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c", "fle_glob.c",
 ];
 
 fn clang_obj(src: &Path, obj: &Path, strict: bool, extra: &[&str]) {
@@ -63,6 +63,9 @@ fn scen_exe() -> &'static PathBuf {
         let so = dir.join("thread_scenarios.o");
         clang_obj(&th_dir().join("thread_scenarios.c"), &so, false, &[]);
         objs.push(so);
+        let mo = dir.join("mutex_real_stub.o");
+        clang_obj(&manifest().join("tests/support/mutex_real_stub.c"), &mo, true, &[]);
+        objs.push(mo);
         let exe = dir.join("scen");
         let mut cmd = Command::new("clang");
         cmd.arg("-pie").arg("-o").arg(&exe);
@@ -227,8 +230,13 @@ fn the_scheduler_trace_on_stderr_is_the_same_in_two_runs_and_counts_one_switch_p
     let b = run(&["ping_pong"]);
     assert_eq!(trace(&a), trace(&b));
     let sw = trace(&a).iter().filter(|l| l.starts_with("switch ")).count();
-    // 2000 rounds, two transfers per round (main -> thread when main waits, thread -> main when it waits), plus the first start and the end: 4003 stderr lines = create + switches + start + exit
-    assert_eq!(a.err.len(), 4003, "{}", a.err.len());
+    // 2000 rounds, two transfers per round (main -> thread when main waits, thread -> main when it waits), plus the first start and the end. Issue #1502 added the event lines
+    // (2 creates, 4000 SetEvent, 4000 waits and 1 wait that is signaled at once) and the wait-objects lines (one per call site of a wait): the count is itemized here, no line is left out
+    let tt = a.err.iter().filter(|l| l.starts_with("fle-thread: ")).count();
+    let ev = a.err.iter().filter(|l| l.starts_with("fle-event: ")).count();
+    assert_eq!(tt, 4005, "create + switches + start + exit + wait-objects");
+    assert_eq!(ev, 8003, "create + set + wait + done-signaled");
+    assert_eq!(a.err.len(), tt + ev, "{}", a.err.len());
     assert!(sw >= 4000 && sw <= 4001, "{sw}");
 }
 
@@ -240,7 +248,7 @@ fn the_three_stops_end_by_name_with_the_thread_table_and_exit_134() {
     assert!(d.err.iter().any(|l| l.starts_with("threads: 2 (running index 1)")) && d.err.iter().any(|l| l.contains("thread 1: id 0x1002")));
     let b = run(&["stop_bad_start"]);
     assert_eq!(b.signal, Some(6));
-    assert!(b.err.iter().any(|l| l == "fle: indirect call to 0x5555 is not a known function entry"), "{:?}", b.err);
+    assert!(b.err.iter().any(|l| l.starts_with("fle: indirect call to 0x5555 is not a known function entry (caller ")), "{:?}", b.err);
     let t = run(&["stop_in_thread"]);
     assert_eq!(t.signal, Some(6));
     assert!(t.err.iter().any(|l| l == "fle: ResumeThread: thread handle value was never returned by CreateThread"), "{:?}", t.err);

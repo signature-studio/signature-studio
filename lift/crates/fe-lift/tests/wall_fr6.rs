@@ -205,9 +205,9 @@ fn each_new_thunk_is_answered_under_its_own_dll_and_no_other_dll() {
         let (st, c) = gen(&[(dll, name), (other, name), (dll, "SendMessageA"), ("kernel32.dll", "GetProcAddress")]);
         assert_eq!(st.handled[format!("jmp_imp:{name}").as_str()], 1, "{dll}!{name}");
         assert_eq!(c.matches(&format!("fle_imp_{name}(); return;")).count(), 1, "{dll}!{name}: only the thunk of its own dll is answered");
-        for k in [1u64, 2] {
+        for (k, want) in [(1u64, format!("{other}!{name}")), (2, format!("{dll}!SendMessageA"))] {
             let va = IB + 0x1040 + 0x10 * k;
-            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{name}: thunk {k} stays unsupported");
+            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{want}\"); }}")), "{dll}!{name}: thunk {k} stops by name");
         }
     }
 }
@@ -232,7 +232,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-fr6"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for (name, ours) in [("fle_win.c", true), ("fle_class.c", true), ("fle_callback.c", false), ("fle_imports.c", false), ("fle_env.c", false)] {
+        for (name, ours) in [("fle_win.c", true), ("fle_class.c", true), ("fle_callback.c", false), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false)] {
             let base = if ours { src_dir() } else { rt_dir() };
             let o = dir.join(name.replace(".c", ".o"));
             clang_obj(&base.join(name), &o, ours);
@@ -1139,9 +1139,9 @@ int main(int argc, char **argv)
             (void)d;
         }
     } else if (!strcmp(s, "absent")) {
-        static const char *const names[] = { "imm32.dll", "msimg32", "propsys.dll", "windowscodecs" };
+        static const char *const names[] = { "msimg32", "propsys.dll", "windowscodecs" };
         unsigned i;
-        for (i = 0; i < 4; i++) { prep(A(wide(names[i])), 0, 0, 0); fle_imp_LoadLibraryW(); printf("%s %llx %llu\n", names[i], U(R[0]), U(le())); }
+        for (i = 0; i < 3; i++) { prep(A(wide(names[i])), 0, 0, 0); fle_imp_LoadLibraryW(); printf("%s %llx %llu\n", names[i], U(R[0]), U(le())); }
     } else {
         printf("no scenario %s\n", s);
         return 3;
@@ -1173,6 +1173,8 @@ fn mod_driver() -> &'static PathBuf {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let exe = dir.join(&tag);
         let mut cmd = Command::new("clang");
         cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt).arg("-I").arg(manifest().join("../../harness"));
@@ -1206,7 +1208,7 @@ fn wtsapi32_and_uxtheme_load_by_every_spelling_and_each_has_only_its_own_row() {
             format!("UxTheme.DLL {hu} 5"),
             format!("gmh-wts {hw} 5"),
             format!("gmh-ux {hu} 5"),
-            format!("count 42 name36 wtsapi32.dll name37 uxtheme.dll handle36 {hw} handle37 {hu}"), // decision 0238: 40 modules (kernelbase.dll appended); decision 0122: 39 modules (dwmapi.dll appended; old: 38)
+            format!("count 43 name36 wtsapi32.dll name37 uxtheme.dll handle36 {hw} handle37 {hu}"), // decision 0238: 40 modules (kernelbase.dll appended); decision 0122: 39 modules (dwmapi.dll appended; old: 38)
             // the process loaded each at start (count 1, FreeLibrary page) plus three LoadLibraryW calls
             "refs 4 4".to_string(),
             "wts!WTSRegisterSessionNotification found 5".to_string(),
@@ -1221,11 +1223,12 @@ fn wtsapi32_and_uxtheme_load_by_every_spelling_and_each_has_only_its_own_row() {
 }
 
 #[test]
-fn the_four_names_that_remain_absent_still_fail_with_126() {
+fn the_three_names_that_remain_absent_still_fail_with_126() {
+    // Issue #1370: imm32.dll is virtual module N = 43, so it is no longer one of the absent names (old name `the_four_names_that_remain_absent_still_fail_with_126`).
     // Decision 0122: dwmapi.dll is virtual module N = 39 (old name `the_five_names_that_remain_absent_still_fail_with_126`: dwmapi, DWMAPI.DLL, imm32.dll, msimg32, propsys.dll, windowscodecs).
     let got = mod_lines(&["absent"]);
-    assert_eq!(got.len(), 4);
-    for (l, n) in got.iter().zip(["imm32.dll", "msimg32", "propsys.dll", "windowscodecs"]) {
+    assert_eq!(got.len(), 3);
+    for (l, n) in got.iter().zip(["msimg32", "propsys.dll", "windowscodecs"]) {
         assert_eq!(l, &format!("{n} 0 126"));
     }
     let t = std::fs::read_to_string(rt_dir().join("fle_load.c")).unwrap();
@@ -1233,7 +1236,7 @@ fn the_four_names_that_remain_absent_still_fail_with_126() {
     let list = &t[a..a + t[a..].find("};").unwrap()];
     let names: Vec<&str> = list.split('"').enumerate().filter(|(i, _)| i % 2 == 1).map(|(_, s)| s).collect();
     // Issue #1355: old: the four names above and "webview2loader.dll" (decision 0126 wall 86, S-webview2-absent); webview2loader.dll is a virtual module now (N = 42)
-    assert_eq!(names, ["imm32.dll", "msimg32.dll", "propsys.dll", "windowscodecs.dll"]);
+    assert_eq!(names, ["msimg32.dll", "propsys.dll", "windowscodecs.dll"]);
 }
 
 // ---- a second thread stops every new API ----
@@ -1305,7 +1308,8 @@ fn the_last_error_1400_is_set_in_one_place_and_the_window_table_reads_no_host_st
     let h = std::fs::read_to_string(src_dir().join("fle_win.h")).unwrap();
     assert!(h.contains("#define FLE_ERROR_INVALID_WINDOW_HANDLE 1400u"));
     // decision 0122: PostMessageW and GetMessageW (an hWnd that is not a window of the thread) call it too: 7 (old: 5)
-    assert_eq!(code.matches("invalid_window();").count(), 7, "SendMessageW, SetClassLongPtrW, GetWindowLongPtrW, SetWindowTextW, SetWindowLongPtrW, PostMessageW and GetMessageW");
+    // Issue #1538: GetClassLongPtrW (the window rule of SetClassLongPtrW) calls it too: 8 (old: 7)
+    assert_eq!(code.matches("invalid_window();").count(), 8, "SendMessageW, SetClassLongPtrW, GetWindowLongPtrW, SetWindowTextW, SetWindowLongPtrW, PostMessageW, GetMessageW and GetClassLongPtrW");
     for bad in [
         "getpid", "getenv", "environ", "fopen", "open(", "/proc", "/etc", "/home", "/dev", "/tmp", "clock_gettime", "gettimeofday", "time(", "nanosleep", "usleep", "sleep(", "select(", "<time.h>", "<sys/time.h>",
         "pthread", "<sys/", "<unistd.h>", "<signal.h>", "fork(", "syscall", "futex", "__asm__", "abort(", "X11", "DISPLAY", "wayland", "ioctl", "dlopen", "LoadLibrary", "setjmp", "longjmp", "(void (*)",

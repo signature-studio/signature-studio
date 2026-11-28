@@ -2,8 +2,8 @@
 //!
 //! The synthetic PE imports three slots:
 //! - kernel32.dll!TlsAlloc (in the table): the thunk at 0x1040 calls the runtime.
-//! - kernel32.dll!TlsFree (same DLL, not in the table): the thunk at 0x1050 stays unsupported.
-//! - k.dll!Fn (not in the table): the thunk at 0x1060 stays unsupported.
+//! - kernel32.dll!TlsFree (same DLL, not in the table): the thunk at 0x1050 stops by name (Issue #1538: fle_import_stop).
+//! - k.dll!Fn (not in the table): the thunk at 0x1060 stops by name.
 
 use fe_lift::generate;
 
@@ -128,8 +128,9 @@ fn table_thunk_calls_runtime_and_others_stay_unsupported() {
     assert!(!c.contains(&format!("L_{tls_alloc:x}: {{ /* {tls_alloc:#x} Jmp */ fle_unsupported")));
     assert!(!c.contains("fle_imp_TlsFree"));
 
-    assert!(c.contains(&format!("L_{tls_free:x}: {{ /* {tls_free:#x} Jmp */ fle_unsupported(UINT64_C({tls_free:#x})); }}")));
-    assert!(c.contains(&format!("L_{fn_thunk:x}: {{ /* {fn_thunk:#x} Jmp */ fle_unsupported(UINT64_C({fn_thunk:#x})); }}")));
+    // Issue #1538: a thunk that no row answers stops by name (counted as before)
+    assert!(c.contains(&format!("L_{tls_free:x}: {{ /* {tls_free:#x} Jmp */ fle_import_stop(\"kernel32.dll!TlsFree\"); }}")));
+    assert!(c.contains(&format!("L_{fn_thunk:x}: {{ /* {fn_thunk:#x} Jmp */ fle_import_stop(\"k.dll!Fn\"); }}")));
     assert_eq!(st.unsupported["Jmp: indirect through IAT slot (not lifted)"], 2);
     assert!(!st.unsupported.contains_key("Jmp: indirect target unresolved"));
 }

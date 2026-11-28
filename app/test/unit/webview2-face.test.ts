@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decodeText, resourceOf, webView2Message } from '../../src/engine/webview2-log.ts';
-import { dirOf, faceClipPath, faceRect, joinPath, rewriteRefs, splitStyles, subtractBoxes } from '../../src/ui/webview2-surface.ts';
+import { dirOf, faceClipPath, faceRect, joinPath, rewriteRefs, splitStyles, subtractBoxes, withoutCspBlocked, withoutScripts } from '../../src/ui/webview2-surface.ts';
 
 describe('the WebView2 model lines the page needs (Issue #1362)', () => {
   it('reads the controller bounds with the window origin', () => {
@@ -44,6 +44,19 @@ describe('the face of the Browser panel (Issue #1362)', () => {
     expect(styles).toEqual(['\n  body { color: red; }\n', 'p{}']);
     expect(markup).not.toContain('<style');
     expect(markup).toContain('<p>b</p>');
+  });
+
+  it('takes the scripts and the event handlers out of the markup (Issue #1419: a frame without allow-scripts logs an error for each, on every load)', () => {
+    const html = '<body onload="f()"><p onclick="g()">b</p><script>f()</script><script src="x.js"></script><img src="a.png" alt="x" onerror=\'h()\'></body>';
+    expect(withoutScripts(html)).toBe('<body><p>b</p><img src="a.png" alt="x"></body>');
+    expect(withoutScripts('<p>no script</p>')).toBe('<p>no script</p>');
+    expect(withoutScripts('<Script language="Javascript">\ndocument.body.scroll="no"\n</script><form onSubmit="return jumpit()"><input type="text" value="http://"></form>')).toBe('<form><input type="text" value="http://"></form>');
+  });
+
+  it('takes the inline style attributes and the data: fonts out (Issue #1419: the page CSP stops each one, and logs an error on every load)', () => {
+    const html = '<svg version="1.1" style="enable-background:new 0 0 1 1;"><g>x</g></svg><style>@font-face {\n  font-family: \'gilroy\';\n  src: url(data:font/truetype;base64,AAAA) format(\'truetype\');\n}\np { color: red; }</style>';
+    expect(withoutCspBlocked(html)).toBe('<svg version="1.1"><g>x</g></svg><style>\np { color: red; }</style>');
+    expect(withoutCspBlocked('<p class="a">b</p>')).toBe('<p class="a">b</p>');
   });
 
   it('joins a reference to the directory of the document', () => {

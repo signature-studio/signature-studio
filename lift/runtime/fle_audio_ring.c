@@ -138,7 +138,7 @@ uint64_t fle_audio_tick_of_frame(uint64_t frames)
     return seg_t0 + (num + r->sample_rate - 1u) / r->sample_rate;   /* the first tick at which (now - seg_t0) * rate / 10^7 >= rel */
 }
 
-/* The lead in ms: FLE_AUDIO_LEAD_MS (60, S-audio-lead; Learn's "typically about 15 milliseconds" is the other candidate). Decision 0243: the page no longer passes another value; the native scenarios of decision 0139 give 15 through the environment (FLE_TEST_GETENV: the wasm product reads none).
+/* The lead in ms: FLE_AUDIO_LEAD_MS (300, S-audio-lead, #1432; Learn's "typically about 15 milliseconds" is the other candidate). Decision 0243: the page no longer passes another value; the native scenarios of decision 0139 give 15 through the environment (FLE_TEST_GETENV: the wasm product reads none).
  * A longer lead lets the output ride out a longer stall of the engine, and costs the engine time to rewrite the half it has just left: the output reads that far ahead of the play cursor, and a region read ahead cannot be changed any more. */
 static uint32_t lead_ms_cached;
 static uint32_t lead_ms(void)

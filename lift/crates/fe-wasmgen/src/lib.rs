@@ -53,7 +53,7 @@ pub struct Config {
     pub c_imports: Option<HashMap<String, String>>,
     /// The memory import (module, name); default env.memory. The C module of the pilot defines its memory: `c.memory`.
     pub mem_import: Option<(String, String)>,
-    /// decision 0234 (`--tls-ctx OFFSET`; required by `hybrid_r` and requires it: the hybrid with the C runtime has one form; the imported memory is declared shared with a maximum of 32768 pages (2 GiB, the maximum of the C part's link), as the C part's is): the C path's R[], FL and X[] are the first 0x300 bytes of the C part's thread-local block `fle_ctx`, which is
+    /// decision 0234 (`--tls-ctx OFFSET`; required by `hybrid_r` and requires it: the hybrid with the C runtime has one form; the imported memory is declared shared with a maximum of 65536 pages (4 GiB, the maximum of the C part's link, #1382), as the C part's is): the C path's R[], FL and X[] are the first 0x300 bytes of the C part's thread-local block `fle_ctx`, which is
     /// at this offset of its TLS segment (the link map): the register page is addressed as `global.get <the imported c.__tls_base>` + a memarg offset. R at `hybrid_r`, X at `hybrid_x` = `hybrid_r` + 0x200.
     pub tls_ctx: Option<u32>,
     /// Hybrid mode: address of the XMM file X[] of the C path; XMM registers cross function boundaries through it (see `xabi`).
@@ -612,10 +612,10 @@ pub fn compile(data: &[u8], extra: &[u64], specs: &[fe_decode::Spec], conf: &Con
         module.import_global("c", "__tls_base");
     }
     if let Some((m, n)) = &conf.mem_import {
-        if conf.tls_ctx.is_some() { module.import_memory_shared(m, n, 1, 32768); } else { module.import_memory(m, n, 1, None); }
+        if conf.tls_ctx.is_some() { module.import_memory_shared(m, n, 1, 65536); } else { module.import_memory(m, n, 1, None); }
     } else {
         let name = if conf.hybrid_r.is_some() { "memory" } else { "mem" };
-        if conf.tls_ctx.is_some() { module.import_memory_shared("env", name, 1, 32768); } else { module.import_memory("env", name, 1, None); }
+        if conf.tls_ctx.is_some() { module.import_memory_shared("env", name, 1, 65536); } else { module.import_memory("env", name, 1, None); }
     }
     let ui = FuncType { params: vec![Ty::I64; 6], results: vec![Ty::I64] };
     let ui_ty = module.type_index(ui.clone());

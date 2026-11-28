@@ -67,7 +67,7 @@ fn objs() -> &'static Vec<PathBuf> {
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
         for (name, ours) in
-            [("fle_sysinfo.c", true), ("fle_proc.c", false), ("fle_sys.c", false), ("fle_imports.c", false), ("fle_env.c", false)]
+            [("fle_sysinfo.c", true), ("fle_proc.c", false), ("fle_sys.c", false), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false)]
         {
             let base = if ours { src_dir() } else { runtime_dir() };
             let o = dir.join(name.replace(".c", ".o"));
@@ -816,6 +816,8 @@ fn runtime_sources(rt: &Path) -> Vec<PathBuf> {
         })
         .collect();
     v.sort();
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
     v
 }
 

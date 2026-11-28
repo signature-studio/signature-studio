@@ -26,6 +26,7 @@ export class Guest {
     this.page = page;
     this.cdp = cdp;
     this.origin = origin;
+    this.dumpRetries = 0;
   }
   send(method, params = {}) { return timed(this.cdp.send(method, params), method); }
   async ev(expression) {
@@ -33,6 +34,7 @@ export class Guest {
     return r;
   }
   state() { return this.ev(STATE); }
+  /** the window table. The page answers "ask again" while the picture is being shown (the render Worker has not read the last one): it is asked again every 100 ms, for up to 60 s; the number of asks is in dumpRetries (the scenario's JSON) */
   async windows() {
     const t0 = Date.now();
     for (;;) {
@@ -40,6 +42,7 @@ export class Guest {
         return parseWindows(await timed(this.page.evaluate(async () => (await window.__app.deskDumpBase64(false)).windows), 'windows'));
       } catch (e) {
         if (!/ask again/.test(String(e?.message ?? e)) || Date.now() - t0 >= 60000) throw e;
+        this.dumpRetries++;
         await sleep(100);
       }
     }
@@ -70,11 +73,12 @@ export class Guest {
     await this.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y, button: 'none', buttons: 0, pointerType: 'mouse' });
     await sleep(60);
   }
-  async press(c, button, clickCount) {
+  /** a press and release; `modifiers` as CDP's (2 = Ctrl), 0 by default */
+  async press(c, button, clickCount, modifiers = 0) {
     const buttons = button === 'right' ? 2 : 1;
-    await this.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button, buttons, clickCount, pointerType: 'mouse' });
+    await this.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button, buttons, clickCount, modifiers, pointerType: 'mouse' });
     await sleep(50);
-    await this.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button, buttons: 0, clickCount, pointerType: 'mouse' });
+    await this.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button, buttons: 0, clickCount, modifiers, pointerType: 'mouse' });
     await sleep(100);
   }
   /** a click (or `clicks` clicks in a row, the second with clickCount 2) with the left button, or the right one */
@@ -140,7 +144,6 @@ export class Guest {
     }
   }
   async shot(file) {
-    if (!this.shots) return;
     const s = await this.send('Page.captureScreenshot', { format: 'png' });
     const fs = await import('node:fs');
     fs.writeFileSync(file, Buffer.from(s.data, 'base64'));

@@ -26,6 +26,8 @@ export interface EngineInput {
   display?(width: number, height: number): number;
   /** decision 0272: the taskbar button of window `lid` was pressed (fle_g3_taskbar_syscommand); absent in a build that has no such export */
   syscommand?(lid: number, cmd: number): number;
+  /** Issue #1402: the page's measured rate of requestAnimationFrame (fle_g3_hz); absent in a build that has no such export */
+  hz?(hz: number): number;
   clockTo(ticks: number): void;
 }
 export interface DriverHost {
@@ -78,6 +80,8 @@ export class IdleDriver {
   private timer: unknown = null;
   private started = false;
   private lastResumeAt: number | null = null;
+  /** Issue #1402: a rate the page has measured and not yet put into the engine (given at the engine's next idle, while it waits) */
+  private pendingHz: number | null = null;
   private readonly queue: { ev: RawInput; seq: number; tPage: number }[] = [];
   private awaiting: Injected[] = [];
   private readonly engine: EngineInput;
@@ -167,9 +171,13 @@ export class IdleDriver {
     if (!this.anchor) this.anchor = { wall: at, ticks: nowTicks };
     if (this.awaiting.length) { this.hooks.processed?.(this.awaiting, at); this.awaiting = []; }
     this.hooks.idle?.(n, nowTicks, nextTicks, this.lastResumeAt === null ? null : at - this.lastResumeAt, at);
+    if (this.pendingHz !== null) { const hz = this.pendingHz; this.pendingHz = null; this.engine.hz?.(hz); }
     if (this.queue.length) { this.apply(this.queue.splice(0)); return; }
     this.arm();
   }
+
+  /** Issue #1402: the page measured a new rate of requestAnimationFrame: the engine takes it at its next idle (its frames follow it from then on). The last one put before the idle wins. */
+  setHz(hz: number): void { this.pendingHz = hz; }
 
   /** ends the session (the engine's fle_idle_wait returns < 0) */
   end(): boolean { this.turnStart = this.host.now(); return this.resume(-1, 'end'); }

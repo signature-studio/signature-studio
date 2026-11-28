@@ -13,21 +13,37 @@
 // elapsedMs: navigation to the first engine-idle; reloadElapsedMs: Page.reload to the idle after it; preBootBytes: the start-up assets (assetsReport, as welcome-flow.mjs reads them) at the first idle.
 // Issue #1385, the files row (step "files"): a new profile; the Welcome window is closed (Escape) and the start-up consent box is pressed at its measured guest pixel (on the 780x480 screen only);
 // the project is opened with File > Open (Ctrl+O, the file box: openProjectFile follows tools/p3-audio-probe/measure.mjs openProject, which is only read). The project is the smallest .flp at the top of
-// the installer's demo folder (lift/out-app/host-extra/resources/Data/Demo projects, put there by the workflow). recentBefore: the project's file name is in the guest memory (guestText, as #1358) after the open.
-// The page is reloaded and the engine is idle again; recentKept: the file name is in the guest memory after the reload (the Recent list). recentWhere: the saved records (the page's log, /fl/state/hkcu.log,
-// parsed here as lift/runtime/fle_reg.c writes them) say where the name is kept: "file" when a saved file (op 5) holds the name (ASCII or UTF-16LE), "registry" when a saved value (op 2) does, else "unknown".
-// recentFiles: the saved files that hold the name; savedFiles and savedPaths: the saved files (their count and paths, the first 200); bytes: the size of /fl/state after the reload.
+// the installer's demo folder (lift/out-app/host-extra/resources/Data/Demo projects, put there by the workflow).
+// Issue #1409, the same row: after the open, Ctrl+S (save), Ctrl+N (new) and the page's exit request (what pagehide sends: FL is asked to close) are the operations. recentOps: each operation's engine lines
+// (titleBefore / titleAfter: the window's title, so a key FL did not take shows as unchanged; writes: the trace lines of the files, the registry and the shell, and the lines about Recent;
+// recentWrites: the lines that write Recent, with their place: file, registry or shell). recentWhere: the first such write as "<place>@<operation>", or "none".
+// recentInSession (1): the six tabs of the Browser (the tab icons on its title row; the tree area under each tab is read as a picture hash, no text is read) before the open and after it, in the same start.
+// recentInSession is true when a tab's picture changed, false when none did, null when the tabs do not respond (all six pictures the same). changedAfterOpen: the indices of the changed tabs.
+// File > #2 is not the recent list in this build: its submenu is "New from template", and the File menu has no "Open recent" item (checked on the pictures, 2026-11-25).
+// recentKept (4): the welcome window after the reload has its recent module (TRecentFilesModule, in the window table) with a caption that holds the project's stem. recentModuleBefore / recentModuleAfterReload: { present, captions } of the first and the second start.
+// keptTabs / browserBefore / browserAfterOpen / browserAfterReload: the Browser's tabs as above (a tab that changed with the open and reads the same after the reload); tableBefore / tableAfterOpen: the windows with a caption (diagnostics).
+// recentOps[].fleLines: the engine's "fle:" lines of each operation (what the engine answered or did not model).
+// Issue #1409 (round 4): positiveControl (one separate Chrome per form): the start, the page's exit request, the records put into the journal, the start after it. Each form puts the
+// project file (the smallest demo project's bytes, at C:\Users\user\Downloads\persist-positive.flp: op 5) into the guest's files, and names it in FL's list: the registry's MRU value "1" (op 2, REG_SZ with NUL, which FL reads),
+// Recent files.scr (op 5, one UTF-8 line), or both. positiveControl.fileInVfs: every form restored the project file (the vfs-restored trace line); positiveControl.moduleShown: some form's welcome window shows TRecentFilesModule;
+// positiveControl.variants[]: per form { fileInVfs, present (the module), captions, projectLines (the trace's lines about the project), readSide }.
+// closeSequence (files run): the engine's lines from the exit request to the engine's stop that name the close (wndproc WM_CLOSE / WM_DESTROY / WM_NCDESTROY, window-api DestroyWindow / PostQuitMessage / registry / shell, vfs-, fle:).
+// closeLines (files run): all of those lines (the first 200, 200 characters each), so that what runs after the quit is posted can be read.
+// recentCause (files run): a one-line summary of that close, computed from all its lines (WM_CLOSE reached a window, DestroyWindow / PostQuitMessage calls, registry and file writes, the engine's state and the time).
+// readSide (files run): the read-side lines (missing-path, vfs-open, enum-dir, RegQueryValueExW, RegCreateKeyExW) up to the Welcome window; matched: those about Recent, Settings, Browser, tabconfig or .scr. readSideAfterReload: the same after the reload.
+// recentOps: also saveAs (Ctrl+Alt+S, its binding in FL not checked), settingsWrites (writes under Settings\) and settingsWhere. A vfs-open that asks for write access counts as a write.
+// browserWindows: the Browser's windows of the window table (class Browser, Tree, Tab or Explorer) before the open. recentKept: the module after the reload has a caption (no name is looked for).
+// savedFiles, savedPaths and recentFiles: the saved records (the page's log, /fl/state/hkcu.log,
+// parsed here as lift/runtime/fle_reg.c writes them). closeRun: the time from the exit request to the engine's stop, and /fl/state's bytes before and after it.
 // logFilesBefore / logFilesAfter: the Startup logs the page keeps (the saved records under Support\Logs\Startup\, read before the reload and after it). A log whose content is empty is not kept,
-// so the count does not grow with each reload. The page's pagehide asks FL to close (Worker exit-request): FL closes the files it keeps open, and a closed file's write is recorded.
-// exitRun (--exit-before-reload, a test aid): the same request at once, with the time to the engine's stop and the engine's lines from it (closeLines).
-// saveRun (--save-after-open, a test aid): File > Save (Ctrl+S) of the open project before the reload; its engine lines are read by index (the engine log is read in batches,
-// so a line that comes late is not in it: savedPaths is the record to read).
+// so the count does not grow with each reload.
 // The output is two JSON lines: the language row (as before, with languageKept = registryKept) and the files row.
 // Usage: node tools/persist/measure.mjs <absolute path to the bundle directory raw/<name>> [--shots <directory>] [--language CODE] > persist.jsonl   (needs app/node_modules and app/dist, as boot-bundle.mjs does).
 //   --language CODE (a test aid; the default is the random choice): the language to choose (de, es, fr, ja, ko, vi or zh).
 //   --shots DIR (a test aid): the page's PNGs (general, language-open, language-after, reload, and in the files run files-start, files-consent, files-welcome, files-opened, files-reloaded) are written to DIR (the directory is made; nothing is removed).
 //   --files-only (a test aid): the files run alone (the language and the default runs are not made; their row is then empty).
 // stdout: two JSON lines (the language row, the files row). Everything else goes to stderr. Exit 0 when the tool ran (the rows' error says whether the run was good), 1 when the tool itself failed, 2 without a bundle directory.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -51,10 +67,32 @@ const NAME_OF = {
 const RESTART_TITLE = 'Language change';
 const WELCOME = 'TWelcomeWizard';
 const NO_THANKS = { gw: 780, gh: 480, x: 513, y: 308 };   // the start-up consent box's "No thanks" (tools/p3-audio-probe/measure.mjs, measured on this screen)
+const NO_THANKS_WIDE = { gw: 1836, gh: 1056, x: 993, y: 548 };   // the same box on the 1836x1056 guest screen (tools/smoke/welcome-flow.mjs, flow B). Issue #1502: the Welcome is seen under it in the picture
 const PROBLEMS_TITLE = /Problems loading/;
 const DEMO_DIR = ['lift', 'out-app', 'host-extra', 'resources', 'Data', 'Demo projects'];
 const LIST_MAX = 200;
 const EXIT_LIMIT_MS = 30000, EXIT_SETTLE_MS = 3000;
+const OP_LINES_MAX = 150, RECENT_MAX = 50, FLE_LINES_MAX = 40;
+/** the Browser (Issue #1409, ①): the six tab icons on its title row (guest pixels, measured on the 1836 x 1056 room) and the tree area under them. The picture under each tab is read as a hash (tools/crash-hunt/hunt.mjs rectHash); no text is read */
+const BROWSER_TABS = [31, 85, 138, 191, 245, 298], BROWSER_TAB_Y = 150;
+const BROWSER_TREE = { x: 0, y: 165, w: 335, h: 830 };
+const TAB_WAIT_MS = 800, TABLE_MAX = 400;
+/** FL's welcome window shows its recent projects in a window of their own (TRecentFilesModule, the class name of the window table) */
+const RECENT_MODULE = 'TRecentFilesModule';
+/** Issue #1409, ①: the file FL asks for as its recent list (pm-work/findings/missing-paths.md: GetFileAttributesW 2 at the start). The positive control puts a record of it into the page's saved records (the user's files, reg-journal.ts op 5) before a start; a test aid only, the product does not use the path */
+const RECENT_FILE = 'C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Settings\\Browser\\Recent files.scr';
+const REG_OP_FILE_PUT = 5;
+/** the access bits that write (GENERIC_WRITE, FILE_WRITE_DATA, GENERIC_ALL) in a vfs-open line's access=0x... */
+const WRITE_ACCESS = 0x40000000 | 0x2 | 0x10000000;
+/** the lines that read the user's files, the registry or the folders (the trace's read-side calls; RegOpenKeyExW and RegEnumValueW are not traced) */
+const READ_RE = /missing-path: |vfs-open: |vfs-read: |vfs-attr: |enum-dir: |RegOpenKeyExW|RegQueryValueExW|RegEnumValueW|RegCreateKeyExW/;
+/** the read-side lines about the settings folder (matched) and about the recent list itself (recent) */
+const SETTINGS_RE = /Settings|Browser|tabconfig|\.scr/i;
+const RECENT_RE = /Recent|MRU|History|tabconfig|\.scr/i;
+const READ_MAX = 400, RECENT_READ_MAX = 200;
+const PICTURE = `(async () => { const d = await window.__app.deskDumpBase64(true); return { width: d.width, height: d.height, base64: d.base64 }; })()`;
+/** the engine's lines of a file operation that are kept in recentOps: the files and the registry the guest opens, sets or closes, the shell's calls, and every line about Recent */
+const OP_RE = /vfs-(open|kept|empty|gone|dir|dropped): |RegSetValueExW|RegCreateKeyExW|shell-api: |Recent/;
 // how long the files run waits after the open before the reload (a test aid: --wait-after-open SECONDS)
 let waitAfterOpenMs = 15000;
 const JOURNAL_FILE = 'hkcu.log';
@@ -184,6 +222,25 @@ class Sess {
     await this.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key2, modifiers: 2 });
     await sleep(40);
     await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key2, modifiers: 2 });
+    await sleep(40);
+    await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ctrl, modifiers: 0 });
+  }
+  /** Ctrl + Alt + a letter (Issue #1409: Save as; the key's binding in FL is not checked, the operation's writes are what is recorded) */
+  async ctrlAltKey(code, key, vk) {
+    await this.ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
+    await sleep(100);
+    const ctrl = { code: 'ControlLeft', key: 'Control', windowsVirtualKeyCode: 0xa2, nativeVirtualKeyCode: 0xa2 };
+    const alt = { code: 'AltLeft', key: 'Alt', windowsVirtualKeyCode: 0xa4, nativeVirtualKeyCode: 0xa4 };
+    const key2 = { code, key, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk };
+    await this.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...ctrl, modifiers: 2 });
+    await sleep(40);
+    await this.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...alt, modifiers: 3 });
+    await sleep(40);
+    await this.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key2, modifiers: 3 });
+    await sleep(40);
+    await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key2, modifiers: 3 });
+    await sleep(40);
+    await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...alt, modifiers: 2 });
     await sleep(40);
     await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ctrl, modifiers: 0 });
   }
@@ -509,13 +566,14 @@ async function closeWelcome(sess) {
 /** the start-up consent box is pressed at its measured guest pixel on the screen it was measured on (tools/p3-audio-probe/measure.mjs dismissStartupBox) */
 async function dismissConsent(sess, files) {
   const s = await sess.ev('(() => { const g = window.__app.screen.guest; return { gw: g.width, gh: g.height }; })()');
-  if (s.gw !== NO_THANKS.gw || s.gh !== NO_THANKS.gh) {
+  const at = [NO_THANKS, NO_THANKS_WIDE].find((p) => p.gw === s.gw && p.gh === s.gh);
+  if (!at) {
     files.steps.push(`consent box not pressed: the guest screen is ${s.gw}x${s.gh}`);
     return;
   }
-  await sess.click(NO_THANKS.x, NO_THANKS.y);
+  await sess.click(at.x, at.y);
   await sleep(1500);
-  files.steps.push(`consent box: "No thanks" at guest (${NO_THANKS.x}, ${NO_THANKS.y})`);
+  files.steps.push(`consent box: "No thanks" at guest (${at.x}, ${at.y})`);
 }
 
 /** a "Problems loading the project" box (the front window's title) is closed with Enter; true when one was */
@@ -575,18 +633,119 @@ async function openProjectFile(sess, file, name, files) {
   await sess.shot('files-opened.png');
 }
 
-/** the file name as the guest's memory holds it (guestText, as #1358): the text lines at the places of the name, ASCII or UTF-16LE */
-async function nameInGuest(sess, name) {
-  try {
-    const r = await sess.ev(`window.__app.guestText(${JSON.stringify([name])}, 256)`, 120000);
-    const lines = [...(r.best?.lines ?? []), ...r.near.flatMap((n) => n.runs)].filter((l) => l.includes(name));
-    return { found: lines.length > 0, memBytes: r.memBytes, lines: lines.slice(0, 3).map((l) => l.slice(0, 300)) };
-  } catch (e) {
-    return { found: false, error: String(e?.message ?? e).slice(0, 200) };
-  }
+/** the SHA-1 of the picture in a box (guest pixels; only the box is read, as crash-hunt's rectHash: the clocks and the meters change elsewhere) */
+async function rectHash(sess, box) {
+  const pic = await sess.ev(PICTURE, 60000);
+  const bytes = Buffer.from(pic.base64, 'base64');
+  const stride = bytes.length / pic.height;
+  const x0 = Math.max(0, box.x), y0 = Math.max(0, box.y), x1 = Math.min(pic.width, box.x + box.w), y1 = Math.min(pic.height, box.y + box.h);
+  const h = crypto.createHash('sha1');
+  for (let y = y0; y < y1; y++) h.update(bytes.subarray(y * stride + 4 * x0, y * stride + 4 * x1));
+  return h.digest('hex');
 }
 
-/** the files run (Issue #1385): the project is opened, the page is reloaded, and the name is looked for after the reload; the saved records say where the name is kept. Fills files */
+/** the picture under each Browser tab: the tab is pressed, then the tree area's hash is read (one reading of six tabs; shot is a test aid: the picture names' prefix) */
+async function browserTabs(sess, shot) {
+  const hashes = [];
+  for (let i = 0; i < BROWSER_TABS.length; i++) {
+    await sess.click(BROWSER_TABS[i], BROWSER_TAB_Y);
+    await sleep(TAB_WAIT_MS);
+    hashes.push(await rectHash(sess, BROWSER_TREE));
+    await sess.shot(`${shot}-tab${i}.png`);
+  }
+  return hashes;
+}
+
+/** the windows that have a caption, as the window table has them (a diagnostic: the captions are the engine's own text, not read from the picture) */
+const windowsWithText = (t) => t.all.filter((w) => w.text).slice(0, TABLE_MAX).map((w) => ({ lid: w.lid, cls: w.cls, text: w.text.slice(0, 120), top: w.top, vis: w.vis, x: w.x, y: w.y, w: w.w, h: w.h }));
+/** the Browser's windows (Issue #1409, ③: why its tree is not drawn): the classes that name the Browser, its tree, its tabs or its explorer */
+const BROWSER_CLASS = /Browser|Tree|Tab|Explorer/i;
+const windowsOfClass = (t, re) => t.all.filter((w) => re.test(w.cls)).slice(0, TABLE_MAX).map((w) => ({ lid: w.lid, cls: w.cls, text: (w.text ?? '').slice(0, 120), top: w.top, vis: w.vis, x: w.x, y: w.y, w: w.w, h: w.h }));
+
+/** the Recent module of the welcome window in a window table: present or not, and the captions under it (the window table's text, not the picture) */
+const recentModuleOf = (t) => {
+  const m = t.all.find((w) => w.cls === RECENT_MODULE) ?? null;
+  return m ? { present: true, captions: t.under(m.lid).map((w) => w.text).filter(Boolean).slice(0, 40) } : { present: false, captions: [] };
+};
+
+/** the tabs whose picture differs between two readings (indices); null when a reading is missing */
+const changedTabs = (a, b) => (a && b ? b.flatMap((h, i) => (h !== a[i] ? [i] : [])) : null);
+/** the tabs that changed with the open and read the same after the reload (the same picture as after the open): the change was kept */
+const keptTabs = (before, afterOpen, afterReload) => (before && afterOpen && afterReload ? changedTabs(before, afterOpen).filter((i) => afterReload[i] === afterOpen[i]) : null);
+/** the tabs react to a press: the pictures differ between the tabs; when they do not, a reading says nothing */
+const tabsRespond = (hashes) => hashes !== null && new Set(hashes).size > 1;
+
+/** the page's title (the window's title as FL sets it: the project's name, "Untitled" when there is none); null when the engine has none */
+const titleOf = (sess) => sess.ev("(window.__app ? window.__app.pageTitle().title : null)").catch(() => null);
+
+/** a vfs-open line that asks for write access (its access=0x... has a write bit) */
+const isWriteOpen = (l) => {
+  const m = /access=0x([0-9a-f]+)/i.exec(l);
+  return m !== null && (parseInt(m[1], 16) & WRITE_ACCESS) !== 0;
+};
+/** what a trace line writes, as recordOp reads it: the shell's Recent call, the registry, a file opened for writing or a file the guest closed; null for the other lines */
+const writeKind = (l) => (/SHAddToRecentDocs/.test(l) ? 'shell' : /RegSetValueExW|RegCreateKeyExW/.test(l) ? 'registry' : /vfs-(kept|empty|gone|dir|dropped): /.test(l) || (/vfs-open: /.test(l) && isWriteOpen(l)) ? 'file' : null);
+
+/** the read-side lines of a log: the lines that read the files, the folders or the registry, and the ones about the recent list and its folder (Issue #1409, ①) */
+const readSideOf = (lines) => {
+  const reads = lines.map((l) => String(l)).filter((l) => READ_RE.test(l));
+  const count = (re) => reads.filter((l) => re.test(l)).length;
+  return {
+    total: reads.length,
+    counts: {
+      missing: count(/missing-path: /), open: count(/vfs-open: /), read: count(/vfs-read: /), attr: count(/vfs-attr: /), enumerated: count(/enum-dir: /),
+      regOpen: count(/RegOpenKeyExW/), regQuery: count(/RegQueryValueExW/), regEnum: count(/RegEnumValueW/), regCreate: count(/RegCreateKeyExW/),
+    },
+    recent: withCounts(reads.filter((l) => RECENT_RE.test(l)), RECENT_READ_MAX),
+    matched: withCounts(reads.filter((l) => SETTINGS_RE.test(l)), READ_MAX),
+    created: withCounts(reads.filter((l) => /RegCreateKeyExW/.test(l)), READ_MAX),
+  };
+};
+/** the lines of a close (Issue #1409, round 4): the close messages to a window, the windows' destruction, the quit, the registry and the files, the shell, and the engine's stop */
+const CLOSE_SEQ_RE = /wndproc: (in|out) .*\b(WM_CLOSE|WM_DESTROY|WM_NCDESTROY) wp=|window-api: (DestroyWindow|PostQuitMessage|RegSetValueExW|RegCreateKeyExW) |vfs-(open|kept|empty|gone|dir|dropped|restored): |fle: |shell-api: /;
+const CLOSE_MAX = 300, CLOSE_ALL_MAX = 200, REG_LINES_MAX = 150;
+/** one line about the close, from all its lines: whether FL's window got WM_CLOSE, the windows destroyed, the quit posted, the writes FL made, and how the engine ended (the measured counts; the reading is the report's) */
+export function closeCauseOf(lines, state, ms) {
+  const n = (re) => lines.filter((l) => re.test(l)).length;
+  const closeMsgs = n(/wndproc: in .*\bWM_CLOSE wp=/);
+  const destroyed = n(/window-api: DestroyWindow /);
+  const quits = n(/window-api: PostQuitMessage /);
+  const regWrites = n(/window-api: RegSetValueExW /);
+  const fileWrites = n(/vfs-(kept|empty|gone|dropped): /);
+  const shellCalls = n(/SHAddToRecentDocs/);
+  const reached = closeMsgs > 0 ? `WM_CLOSE reached a window ${closeMsgs} time(s)` : 'WM_CLOSE reached no window';
+  return `close: ${reached}; DestroyWindow ${destroyed}; PostQuitMessage ${quits}; registry writes ${regWrites}; file writes ${fileWrites}; shell calls ${shellCalls}; the engine ${state ?? 'unknown'} after ${ms} ms (${lines.length} lines)`;
+}
+/** the lines in the order of their first appearance, each once; a line that came n times ends with " (xn)" (a repeated call would fill the list) */
+function withCounts(lines, max) {
+  const m = new Map();
+  for (const l of lines) { const s = l.slice(0, 300); m.set(s, (m.get(s) ?? 0) + 1); }
+  return [...m].slice(0, max).map(([l, n]) => (n > 1 ? `${l} (x${n})` : l));
+}
+
+/** one operation of the files run (Issue #1409, ②): the engine's lines from `from` on (up to now), the ones FL wrote while it ran, and the page's title before and after; returns the log's length read (the next operation's `from`) */
+async function recordOp(sess, ops, op, title0, from, stem) {
+  const title1 = await titleOf(sess);
+  const lines = (await sess.log()).slice(from).map((l) => String(l));
+  const writes = lines.filter((l) => OP_RE.test(l));
+  // the shell's SHAddToRecentDocs is a Windows call (its name has "Recent"): it is kept apart from a write of FL's own list (a file or a registry value)
+  const own = (l) => writeKind(l) !== null && writeKind(l) !== 'shell';
+  const recentWrites = writes.filter((l) => own(l) && /Recent|MRU|History/.test(l)).slice(0, RECENT_MAX).map((l) => ({ where: writeKind(l), line: l.slice(0, 240) }));
+  const settingsWrites = writes.filter((l) => own(l) && /Settings\\/.test(l)).slice(0, RECENT_MAX).map((l) => ({ where: writeKind(l), line: l.slice(0, 240) }));
+  const shellCalls = writes.filter((l) => writeKind(l) === 'shell').slice(0, RECENT_MAX).map((l) => l.slice(0, 240));
+  const wv = webView2Of(lines);
+  ops.push({
+    op, titleBefore: title0, titleAfter: title1, lines: lines.length, writeCount: writes.length,
+    nameWrites: writes.filter((l) => l.includes(stem)).length,
+    writes: writes.slice(0, OP_LINES_MAX).map((l) => l.slice(0, 300)), recentWrites, settingsWrites, shellCalls,
+    webview2: { count: wv.count, methods: wv.methods, lines: wv.lines.slice(0, 12) },
+    fleLines: lines.filter((l) => /fle: /.test(l)).slice(0, FLE_LINES_MAX).map((l) => l.slice(0, 240)),
+  });
+  // the engine's lines reach the page late (the Worker flushes them at idle): the next operation's window starts where this one ends, so no line falls between two windows
+  return from + lines.length;
+}
+
+/** the files run (Issue #1385, #1409): File > #2 (the recent projects) is counted before the open and after it, in the same start (①); then Ctrl+S, a count, Ctrl+N and the page's exit request (②); the page is reloaded and the count is read again (④) */
 async function filesRun(sess, port, files, project, opts) {
   const first = await start(sess, navigateTo(sess, port), files, 'filesStalls');
   files.firstElapsedMs = first.elapsedMs;
@@ -595,45 +754,86 @@ async function filesRun(sess, port, files, project, opts) {
   await sess.shot('files-start.png');
   await dismissConsent(sess, files);
   await sess.shot('files-consent.png');
+  const welcome = await tableWhenReady(sess);
+  files.recentModuleBefore = recentModuleOf(welcome);
+  files.welcomeClasses = [...new Set(welcome.all.map((w) => w.cls))];
+  files.readSide = readSideOf(await sess.log());
+  files.steps.push(`read side, the start up to the Welcome window: ${files.readSide.total} read lines, ${files.readSide.recent.length} about the recent list (${JSON.stringify(files.readSide.counts)})`);
   if (!(await closeWelcome(sess))) files.steps.push('the Welcome window did not close with Escape');
   await sess.shot('files-welcome.png');
+  files.projectName = project.name;
+  const stem = path.basename(project.name, path.extname(project.name));
+  const ops = [];
+
+  files.browserBefore = await browserTabs(sess, 'files-browser-before');
+  const tableBefore = await sess.table();
+  files.tableBefore = windowsWithText(tableBefore);
+  files.browserWindows = windowsOfClass(tableBefore, BROWSER_CLASS);
+  files.steps.push(`before the open: the pictures under the Browser's ${BROWSER_TABS.length} tabs read, ${new Set(files.browserBefore).size} distinct (the tabs respond: ${tabsRespond(files.browserBefore)})`);
+  let title0 = await titleOf(sess), mark = (await sess.log()).length;
   await openProjectFile(sess, project.file, project.name, files);
-  await sess.shot('files-opened.png');
+  mark = await recordOp(sess, ops, 'open', title0, mark, stem);
   files.stateAfterOpen = await sess.state();
   files.stopLines = (await sess.log()).map((l) => String(l)).slice(-60).map((l) => l.slice(0, 300));
   const regSets = (await sess.log()).map((l) => String(l)).filter((l) => /RegSetValueExW/.test(l));
   files.registrySets = { count: regSets.length, lines: regSets.slice(-12).map((l) => l.slice(0, 240)) };
   if (files.stateAfterOpen?.state !== 'engine-idle') throw new Error(`the engine did not stay up after the open (state ${files.stateAfterOpen?.state})`);
-  files.projectName = project.name;
-  files.recentBefore = await nameInGuest(sess, project.name);
-  files.steps.push(`before the reload: the name in the guest memory ${files.recentBefore.found}`);
-  if (opts.saveAfterOpen) {
-    // a test aid (--save-after-open): File > Save (Ctrl+S) of the open project; the engine's lines from the key on are kept (the file lines, the registry sets and the Recent lines)
-    const logAt = (await sess.log()).length;
-    await sess.ctrlKey('KeyS', 's', 83);
-    await sleep(EXIT_SETTLE_MS);
-    const lines = (await sess.log()).slice(logAt).map((l) => String(l));
-    const pick = lines.filter((l) => TRACE_RE.test(l) || /RegSetValueExW|Recent/.test(l));
-    files.saveRun = { state: (await sess.state())?.state ?? null, afterLines: lines.length, fileLines: pick.slice(-120).map((l) => l.slice(0, 300)), tail: lines.slice(-30).map((l) => l.slice(0, 200)) };
-    await sess.shot('files-saved.png');
-    files.steps.push(`File > Save: ${files.saveRun.afterLines} engine lines, ${pick.length} file or registry lines`);
-  }
-  if (opts.exitBefore) {
-    // a test aid (--exit-before-reload, after the save when --save-after-open is given): the page asks the engine to close FL now (what the page does when it is left) and the time to the engine's stop is measured;
-    // the engine's lines from the request on are kept by index (closeLines: what FL wrote at its close)
-    const bytes0 = (await sess.ev(SIZE_OF_STATE)).bytes;
-    const logAt = (await sess.log()).length;
-    const t4 = Date.now();
-    await sess.ev('window.__app.exitRequest(); true');
-    let st = await sess.state();
-    while (st && st.state === 'engine-idle' && Date.now() - t4 < EXIT_LIMIT_MS) { await sleep(250); st = await sess.state(); }
-    const ms = Date.now() - t4;
-    await sleep(EXIT_SETTLE_MS);
-    const afterLines = (await sess.log()).slice(logAt).map((l) => String(l));
-    const closeLines = afterLines.filter((l) => CLOSE_RE.test(l) || /RegSetValueExW|CreateFileW|WriteFile|CloseHandle/.test(l));
-    files.exitRun = { state: st?.state ?? null, ms, afterLines: afterLines.length, bytesBefore: bytes0, bytesAfter: (await sess.ev(SIZE_OF_STATE)).bytes, closeLines: closeLines.slice(-120).map((l) => l.slice(0, 300)) };
-    files.steps.push(`exit request: the engine ${files.exitRun.state} after ${ms} ms (${closeLines.length} close lines)`);
-  }
+
+  files.browserAfterOpen = await browserTabs(sess, 'files-browser-open');
+  files.tableAfterOpen = windowsWithText(await sess.table());
+  files.changedAfterOpen = changedTabs(files.browserBefore, files.browserAfterOpen);
+  files.recentInSession = tabsRespond(files.browserBefore) && files.changedAfterOpen !== null ? files.changedAfterOpen.length > 0 : null;
+  files.steps.push(`in the same start, after the open: the tabs whose picture changed ${JSON.stringify(files.changedAfterOpen)}; recentInSession ${files.recentInSession}`);
+  mark = (await sess.log()).length;
+
+  title0 = await titleOf(sess);
+  await sess.ctrlKey('KeyS', 's', 83);
+  await sleep(EXIT_SETTLE_MS);
+  // the save leaves FL's "Buy FL Studio" window in front, which takes the keys: it is closed with Escape so that the next operation reaches FL; the save's writes come after it, so the save's operation ends after it
+  files.nagDismissed = /Buy FL Studio/i.test((await titleOf(sess)) ?? '');
+  if (files.nagDismissed) { await sess.key('Escape', 27); await sleep(EXIT_SETTLE_MS); }
+  mark = await recordOp(sess, ops, 'save', title0, mark, stem);
+  await sess.shot('files-saved.png');
+
+  // Save as: the key's binding in FL is not checked (Ctrl+Alt+S); a box it opens is closed with Escape, so the next operation reaches FL
+  // the same as the save: the trial's "Buy FL Studio" window takes the keys and the save's writes come after it, so the operation ends after it is closed
+  title0 = await titleOf(sess);
+  await sess.ctrlAltKey('KeyS', 's', 83);
+  await sleep(EXIT_SETTLE_MS);
+  files.saveAsNag = /Buy FL Studio/i.test((await titleOf(sess)) ?? '');
+  if (files.saveAsNag) { await sess.key('Escape', 27); await sleep(EXIT_SETTLE_MS); }
+  mark = await recordOp(sess, ops, 'saveAs', title0, mark, stem);
+
+  title0 = await titleOf(sess);
+  await sess.ctrlKey('KeyN', 'n', 78);
+  await sleep(EXIT_SETTLE_MS);
+  mark = await recordOp(sess, ops, 'new', title0, mark, stem);
+  await sess.shot('files-new.png');
+
+  const bytes0 = (await sess.ev(SIZE_OF_STATE)).bytes;
+  title0 = await titleOf(sess);
+  const closeFrom = mark;
+  const t4 = Date.now();
+  await sess.ev('window.__app.exitRequest(); true');
+  let st = await sess.state();
+  while (st && st.state === 'engine-idle' && Date.now() - t4 < EXIT_LIMIT_MS) { await sleep(250); st = await sess.state(); }
+  const ms = Date.now() - t4;
+  await sleep(EXIT_SETTLE_MS);
+  mark = await recordOp(sess, ops, 'close', title0, mark, stem);
+  files.closeRun = { state: st?.state ?? null, ms, bytesBefore: bytes0, bytesAfter: (await sess.ev(SIZE_OF_STATE)).bytes };
+  // Issue #1502: the scheduler's switches (fle-thread: switch) are left out of the close's lines: a wait that loops would fill the first 200 lines with them
+  const closeLines = (await sess.log()).map((l) => String(l)).slice(closeFrom).filter((l) => !/fle-thread: switch /.test(l));
+  files.closeSequence = closeLines.filter((l) => CLOSE_SEQ_RE.test(l)).slice(0, CLOSE_MAX).map((l) => l.slice(0, 240));
+  files.closeLines = closeLines.slice(0, CLOSE_ALL_MAX).map((l) => l.slice(0, 200));
+  files.recentCause = closeCauseOf(closeLines, files.closeRun.state, ms);
+  files.steps.push(`the page is left (exit request): the engine ${files.closeRun.state} after ${ms} ms; ${files.recentCause}`);
+  files.recentOps = ops;
+  files.webview2 = webView2Of((await sess.log()).map((l) => String(l)));
+  const hit = ops.flatMap((o) => o.recentWrites.map((w) => ({ ...w, op: o.op })))[0] ?? null;
+  files.recentWhere = hit ? `${hit.where}@${hit.op}` : 'none';
+  const settingsHit = ops.flatMap((o) => o.settingsWrites.map((w) => ({ ...w, op: o.op })))[0] ?? null;
+  files.settingsWhere = settingsHit ? `${settingsHit.where}@${settingsHit.op}` : 'none';
+
   files.keptBefore = traceLines(await sess.log());
   files.pageLogBefore = await pageSaveLines(sess);
   files.bytesBefore = (await sess.ev(SIZE_OF_STATE)).bytes;
@@ -644,12 +844,20 @@ async function filesRun(sess, port, files, project, opts) {
   files.filesReloadState = second.state.state;
   if (second.state.state !== 'engine-idle') throw new Error(`no engine-idle after the reload (state ${second.state.state}: ${second.state.error ?? ''})`);
   await sleep(3000);
+  await dismissConsent(sess, files);   // Issue #1502: the box is shown again at each start; it covers the Welcome in the picture
   await sess.shot('files-reloaded.png');
   files.restoredAfter = traceLines(await sess.log());
   files.pageLogAfter = await pageSaveLines(sess);
-  files.recentAfter = await nameInGuest(sess, project.name);
-  files.recentKept = files.recentAfter.found;
-  files.steps.push(`after the reload: the name in the guest memory ${files.recentKept}`);
+  files.recentModuleAfterReload = recentModuleOf(await tableWhenReady(sess));
+  // a recent item is one caption of the module (the name is not looked for: the saved project's file is put back into the guest memory at a start, whatever Recent holds)
+  files.recentKept = files.recentModuleAfterReload.present && files.recentModuleAfterReload.captions.length >= 1;
+  files.steps.push(`after the reload: the welcome's recent module ${files.recentModuleAfterReload.present ? `present, ${files.recentModuleAfterReload.captions.length} captions` : 'absent'}; recentKept ${files.recentKept}`);
+  files.readSideAfterReload = readSideOf(await sess.log());
+  // Issue #1502: the order, in the reloaded start, of the Recent list's reads (MRU) and the Welcome's messages: the list is read before or after the Welcome is laid out
+  files.orderAfterReload = (await sess.log()).map((l, i) => [i, String(l)]).filter(([, l]) => /TWelcomeWizard/.test(l) || (/MRU/.test(l) && !/not found/.test(l))).slice(0, 200).map(([i, l]) => `${i} ${l.slice(0, 160)}`);
+  await closeWelcome(sess);
+  files.browserAfterReload = await browserTabs(sess, 'files-browser-reloaded');
+  files.keptTabs = keptTabs(files.browserBefore, files.browserAfterOpen, files.browserAfterReload);
 
   const { live, total, consumed } = await journalOf(sess);
   files.logFilesAfter = startupLogs(live);
@@ -658,10 +866,104 @@ async function filesRun(sess, port, files, project, opts) {
   files.savedFiles = saved.length;
   files.savedPaths = saved.slice(0, LIST_MAX).map((r) => ({ path: r.key, bytes: r.data.length }));
   files.recentFiles = holding.map((r) => r.key);
-  files.recentWhere = holding.length > 0 ? 'file' : live.some((r) => r.op === 2 && holds(r.data, project.name)) ? 'registry' : 'unknown';
   files.journalBytes = total;
   files.journalParsed = consumed === total;
   files.bytes = (await sess.ev(SIZE_OF_STATE)).bytes;
+}
+
+/** a record of the user's files as lift/runtime/fle_reg.c replays it (restore_records: op, the key (UTF-16LE, the path), the name (empty), the type, the bytes) */
+export function fileRecord(guestPath, data) {
+  const key = Buffer.from(guestPath, 'utf16le');
+  const u32 = (n) => { const b = Buffer.alloc(4); b.writeUInt32LE(n); return b; };
+  return Buffer.concat([Buffer.from([REG_OP_FILE_PUT]), u32(key.length), key, u32(0), u32(0), u32(data.length), data]);
+}
+
+/** the saved records of the page are the journal's file, and the record is appended to it (the page holds no handle of it when the engine has stopped); the sizes before and after */
+const APPEND_RECORD = (b64) => `(async () => {
+  let d = await navigator.storage.getDirectory();
+  for (const s of ['fl', 'state']) d = await d.getDirectoryHandle(s, { create: true });
+  const f = await d.getFileHandle(${JSON.stringify(JOURNAL_FILE)}, { create: true });
+  const old = new Uint8Array(await (await f.getFile()).arrayBuffer());
+  const add = Uint8Array.from(atob(${JSON.stringify(b64)}), (c) => c.charCodeAt(0));
+  const w = await f.createWritable();
+  await w.write(new Blob([old, add]));
+  await w.close();
+  return { before: old.length, after: old.length + add.length };
+})()`;
+
+/** the encodings the positive control tries for the recent list's file (FL's own format is not known: pm-work/findings/recent-1409.md) */
+const RECENT_PROJECT = 'C:\\Users\\user\\Downloads\\persist-positive.flp';
+/** the registry's MRU key (the key FL opens 50 times at a start, not found: RegOpenKeyExW "MRU" -> 2): a value record of the journal (op 2, REG_SZ) under HKCU's key, as lift/runtime/fle_reg.c restores it */
+const MRU_KEY = 'Software\\Image-Line\\FL Studio 26\\MRU';
+const valueRecord = (keyPath, name, data) => {
+  const u32 = (n) => { const b = Buffer.alloc(4); b.writeUInt32LE(n); return b; };
+  const k = Buffer.from(keyPath, 'utf16le'), v = Buffer.from(name, 'utf16le');
+  return Buffer.concat([Buffer.from([2]), u32(k.length), k, u32(v.length), v, u32(1), u32(data.length), data]);
+};
+/** the forms of the positive control (round 4): the project file is put into the guest's files with its bytes (op 5, as a saved file), and FL's list names it in one or both places */
+const POSITIVE_FORMS = [
+  { name: 'registry-mru', mru: true, scr: false },
+  { name: 'scr-utf8', mru: false, scr: true },
+  { name: 'registry-mru-and-scr', mru: true, scr: true },
+];
+const formRecords = (form, demoBytes) => [
+  fileRecord(RECENT_PROJECT, demoBytes),
+  ...(form.mru ? [valueRecord(MRU_KEY, '1', Buffer.from(`${RECENT_PROJECT}\0`, 'utf16le'))] : []),
+  ...(form.scr ? [fileRecord(RECENT_FILE, Buffer.from(`${RECENT_PROJECT}\r\n`, 'utf8'))] : []),
+];
+const PROJECT_FILE_RE = /persist-positive\.flp/;
+const newPositive = () => ({ project: RECENT_PROJECT, from: null, bytes: 0, fileInVfs: false, moduleShown: false, variants: [], steps: [], error: null });
+const newVariant = (name, bytes) => ({
+  name, bytes, injected: null, exitState: null, reloadState: null, fileInVfs: false, projectLines: [], regLines: [], present: false, captions: [], restored: [], readSide: null,
+  webview2: null, stemInWebView2: 0, welcomeClasses: null, positiveStalls: 0, positiveReloadStalls: 0, steps: [], error: null,
+});
+/** the webview2 lines of a log: the calls FL makes into the Browser's WebView2 (the count, the methods, and the lines that name the control's project) */
+const webView2Of = (lines) => {
+  const wv = lines.filter((l) => /webview2: /.test(l));
+  const methods = {};
+  for (const l of wv) { const m = /webview2: (\S+)/.exec(l); if (m) methods[m[1]] = (methods[m[1]] ?? 0) + 1; }
+  return { count: wv.length, methods, named: wv.filter((l) => /persist-positive/.test(l)).slice(0, 20).map((l) => l.slice(0, 300)), lines: wv.slice(0, 120).map((l) => l.slice(0, 240)) };
+};
+
+/** the positive control (Issue #1409, ①): the start, the engine's stop (the page's exit request: the saved records are released), the record of the recent list appended to the journal, and the start after it; the Welcome window's recent module and the WebView2 calls are read then. The record is the only test input: the product's code does not take the path */
+async function positiveRun(sess, port, pc, makeRecords) {
+  const first = await start(sess, navigateTo(sess, port), pc, 'positiveStalls');
+  if (first.state.state !== 'engine-idle') throw new Error(`no engine-idle at the positive control's first start (state ${first.state.state})`);
+  await sess.ev('window.__app.exitRequest(); true');
+  let st = await sess.state();
+  const t0 = Date.now();
+  while (st && st.state === 'engine-idle' && Date.now() - t0 < EXIT_LIMIT_MS) { await sleep(250); st = await sess.state(); }
+  await sleep(EXIT_SETTLE_MS);
+  pc.exitState = st?.state ?? null;
+  const rec = Buffer.concat(makeRecords());
+  for (let i = 0; ; i++) {
+    try {
+      pc.injected = { ...(await sess.ev(APPEND_RECORD(rec.toString('base64')), 60000)), recordBytes: rec.length };
+      break;
+    } catch (e) {
+      if (i >= 9) throw e;
+      await sleep(1000);
+    }
+  }
+  pc.steps.push(`${pc.name}: the records (${rec.length} bytes) appended to the journal: ${JSON.stringify(pc.injected)}`);
+  const second = await start(sess, reloadPage(sess), pc, 'positiveReloadStalls');
+  pc.reloadState = second.state.state;
+  if (second.state.state !== 'engine-idle') throw new Error(`no engine-idle after the positive control's reload (state ${second.state.state}: ${second.state.error ?? ''})`);
+  await sleep(3000);
+  const lines = (await sess.log()).map((l) => String(l));
+  pc.projectLines = lines.filter((l) => PROJECT_FILE_RE.test(l)).slice(0, 12).map((l) => l.slice(0, 240));
+  pc.restored = lines.filter((l) => /vfs-restored: /.test(l) && PROJECT_FILE_RE.test(l)).slice(0, 5).map((l) => l.slice(0, 300));
+  pc.fileInVfs = pc.restored.length > 0;
+  pc.readSide = readSideOf(lines);
+  pc.regLines = withCounts(lines.filter((l) => /window-api: Reg(OpenKeyExW|QueryValueExW|EnumValueW)/.test(l)), REG_LINES_MAX);
+  pc.webview2 = webView2Of(lines);
+  pc.stemInWebView2 = pc.webview2.named.length;
+  const welcome = await tableWhenReady(sess);
+  const mod = recentModuleOf(welcome);
+  pc.present = mod.present;
+  pc.captions = mod.captions;
+  pc.welcomeClasses = [...new Set(welcome.all.map((w) => w.cls))];
+  pc.steps.push(`${pc.name}: the project file ${pc.fileInVfs ? 'is in the guest files' : 'is NOT in the guest files'} (restored lines ${pc.restored.length}); the welcome's recent module ${mod.present ? `present, ${mod.captions.length} captions` : 'absent'}; webview2 calls ${pc.webview2.count} (naming the project ${pc.stemInWebView2})`);
 }
 
 /** one page in a Chrome of its own (a new profile); fn gets the session */
@@ -706,9 +1008,29 @@ async function run(port, root, shots, opts) {
       out.steps.push(`default run failed: ${String(e?.message ?? e).slice(0, 300)}`);
     }
   }
-  const newFiles = () => ({ step: 'files', projectName: null, projectTitle: null, recentBefore: null, recentAfter: null, recentKept: false, recentWhere: 'unknown', recentFiles: [], savedFiles: 0, savedPaths: [], journalBytes: null, journalParsed: null, bytesBefore: null, bytes: null, firstElapsedMs: null, filesReloadElapsedMs: null, filesReloadState: null, filesStalls: 0, filesReloadStalls: 0, keptBefore: [], restoredAfter: [], pageLogBefore: null, pageLogAfter: null, stateAfterOpen: null, stopLines: [], exitRun: null, saveRun: null, logFilesBefore: null, logFilesAfter: null, project: null, tried: [], steps: [], error: null });
+  const newFiles = () => ({ step: 'files', projectName: null, projectTitle: null, recentInSession: null, nagDismissed: false, browserBefore: null, browserAfterOpen: null, browserAfterReload: null, changedAfterOpen: null, keptTabs: null, tableBefore: null, tableAfterOpen: null, recentModuleBefore: null, recentModuleAfterReload: null, recentKept: false, recentOps: [], recentWhere: 'none', settingsWhere: 'none', saveAsNag: false, readSide: null, readSideAfterReload: null, browserWindows: null, welcomeClasses: null, webview2: null, positiveControl: null, closeRun: null, closeSequence: null, closeLines: null, recentCause: null, recentFiles: [], savedFiles: 0, savedPaths: [], journalBytes: null, journalParsed: null, bytesBefore: null, bytes: null, firstElapsedMs: null, filesReloadElapsedMs: null, filesReloadState: null, filesStalls: 0, filesReloadStalls: 0, keptBefore: [], restoredAfter: [], pageLogBefore: null, pageLogAfter: null, stateAfterOpen: null, stopLines: [], logFilesBefore: null, logFilesAfter: null, project: null, tried: [], steps: [], error: null });
   // the projects to try, in order: the one given (--project), else the smallest demo projects (at most three; the next one is tried when the engine stops during the open)
   const candidates = opts.project ? [{ file: opts.project }] : demoProjects().slice(0, 3);
+  const positive = newPositive();
+  const demo = demoProjects()[0] ?? null;
+  if (!demo) positive.error = `no .flp under ${path.join(...DEMO_DIR)}`;
+  else {
+    const demoBytes = fs.readFileSync(demo.file);
+    positive.from = path.basename(demo.file);
+    positive.bytes = demoBytes.length;
+    for (const form of POSITIVE_FORMS) {
+      const pc = newVariant(form.name, Buffer.concat(formRecords(form, demoBytes)).length);
+      try {
+        await withPage(port, path.join(root, `profile-positive-${form.name}`), null, (sess) => positiveRun(sess, port, pc, () => formRecords(form, demoBytes)));
+      } catch (e) {
+        pc.error = String(e?.message ?? e).slice(0, 600);
+        pc.steps.push(`${form.name}: positive control failed: ${pc.error}`);
+      }
+      positive.variants.push(pc);
+    }
+  }
+  positive.fileInVfs = positive.variants.length > 0 && positive.variants.every((v) => v.fileInVfs);
+  positive.moduleShown = positive.variants.some((v) => v.present);
   let files = newFiles();
   if (candidates.length === 0) files.error = `no .flp under ${path.join(...DEMO_DIR)}`;
   for (const demo of candidates) {
@@ -728,6 +1050,7 @@ async function run(port, root, shots, opts) {
     if (files.stateAfterOpen?.state === 'engine-idle') break;
     files.steps.push(`${project.from}: the engine did not stay up after the open; the next project is tried`);
   }
+  files.positiveControl = positive;
   out.languageKept = out.registryKept;
   return { lang: out, files };
 }
@@ -760,13 +1083,14 @@ async function main() {
     const vite = await import(pathToFileURL(createRequire(path.join(appDir, 'package.json')).resolve('vite')).href);
     const port = await freePort();
     server = await vite.preview({ root: appDir, logLevel: 'silent', preview: { host: '127.0.0.1', port, strictPort: true } });
-    result = await run(port, root, shots, { language, filesOnly: argv.includes('--files-only'), exitBefore: argv.includes('--exit-before-reload'), saveAfterOpen: argv.includes('--save-after-open'), project: projAt >= 0 ? path.resolve(argv[projAt + 1] ?? '') : null });
+    result = await run(port, root, shots, { language, filesOnly: argv.includes('--files-only'), project: projAt >= 0 ? path.resolve(argv[projAt + 1] ?? '') : null });
   } finally {
     if (server) await server.close().catch(() => {});
     fs.rmSync(root, { recursive: true, force: true });
   }
   for (const s of result.lang.steps) log(s);
   for (const s of result.files.steps) log(s);
+  for (const f of result.files.positiveControl?.variants ?? []) for (const s of f.steps) log(s);
   log('loadavg', os.loadavg(), 'nproc', os.availableParallelism());
   process.stdout.write(JSON.stringify(result.lang) + '\n' + JSON.stringify(result.files) + '\n');
 }

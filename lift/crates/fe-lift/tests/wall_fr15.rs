@@ -41,8 +41,8 @@ fn work_dir() -> PathBuf {
     d
 }
 
-const FILES: [&str; 20] = [
-    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c", "fle_time.c", "fle_x87ctl.c",
+const FILES: [&str; 21] = [
+    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_glob.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c", "fle_time.c", "fle_x87ctl.c",
     "fle_mxcsr.c", "fle_x87.c", "fle_locale.c", "fle_dsound.c", "fle_audio_ring.c",
 ];
 
@@ -80,6 +80,7 @@ fn scen_exe() -> &'static PathBuf {
         let exe = dir.join("scen");
         let mut cmd = Command::new("clang");
         cmd.arg("-pie").arg("-o").arg(&exe);
+        cmd.arg(manifest().join("tests/support/mutex_real_stub.c"));
         for o in &objs {
             cmd.arg(o);
         }
@@ -96,7 +97,7 @@ struct Run {
     signal: Option<i32>,
 }
 
-/// The scenarios run with FLE_AUDIO_LEAD_MS=15, the lead that the hand computations of these tests (Learn: "typically about 15 milliseconds") use; the default of the runtime is 60 ms (S-audio-lead): `the_default_lead_is_60_ms...`.
+/// The scenarios run with FLE_AUDIO_LEAD_MS=15, the lead that the hand computations of these tests (Learn: "typically about 15 milliseconds") use; the default of the runtime is 300 ms (S-audio-lead, #1432): `the_default_lead_is_300_ms...`.
 fn run(args: &[&str]) -> Run {
     run_lead(args, Some("15"))
 }
@@ -145,7 +146,7 @@ fn the_three_dsound_rows_are_the_last_rows_after_the_588_and_no_pseudo_va_moved(
     // src/imports_table.rs: the rows are appended after decision 0132's 7 and decision 0136's 10 (decision 0015: append only). The pseudo-VA of row k (0-based) is 0x7FF900000000 + 0x10 * (k + 1) (tests/wall_fr13.rs checks the rule).
     let src = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
     let tail: Vec<&str> = src.lines().filter(|l| l.trim_start().starts_with("(\"") && l.contains("\"fle_imp_")).collect();
-    let n = tail.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4 - 1; // Issue #1391: the K32GetProcessMemoryInfo row is after them; Issue #1355: the 4 rows of webview2loader.dll are after these; // decision 0372 appends 1 row (tests/rows_0372) after those of decision 0267; decision 0267 appends 1 row (tests/rows_0267) after those of decision 0147; decision 0147 appends 1 row (tests/wall_fr20.rs) after those of decision 0144; decision 0140 appends 4 rows (tests/wall_fr16.rs) after these, decision 0144 2 rows (tests/wall_fr19.rs) after those
+    let n = tail.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4 - 1 - 1 - 7 - 13; // Issue #1538 appends 13 more (the second wave, the last rows of TABLE); // Issue #1382 appends 1 more (kernel32!CompareStringOrdinal, after the row of #1391); Issue #1370 appends 7 more (the imm32.dll rows) after that; Issue #1391: the K32GetProcessMemoryInfo row is after them; Issue #1355: the 4 rows of webview2loader.dll are after these; // decision 0372 appends 1 row (tests/rows_0372) after those of decision 0267; decision 0267 appends 1 row (tests/rows_0267) after those of decision 0147; decision 0147 appends 1 row (tests/wall_fr20.rs) after those of decision 0144; decision 0140 appends 4 rows (tests/wall_fr16.rs) after these, decision 0144 2 rows (tests/wall_fr19.rs) after those
     for (i, (dll, name)) in rows_0139::ROWS_0139.iter().enumerate() {
         let want = format!("(\"{dll}\", \"{name}\", \"fle_imp_{name}\", \"jmp_imp:{name}\"),");
         assert_eq!(tail[n - 3 + i].trim(), want, "row {i} of decision 0139");
@@ -169,7 +170,7 @@ fn the_list_of_scenarios() {
     let r = run(&["list"]);
     assert_eq!(r.code, Some(0));
     let names: Vec<&str> = r.out.iter().map(|s| s.as_str()).collect();
-    assert_eq!(names, ["enum", "create", "errors", "play", "stop_resume", "notify", "notify_alone", "rt_mixer", "late_write", "late_write_sine", "formats", "ring_header", "stop_setfx (stops)", "stop_duplicate (stops)", "stop_3d (stops)",
+    assert_eq!(names, ["enum", "create", "errors", "play", "stop_resume", "notify", "notify_alone", "notify_bytes", "rt_mixer", "rt_mixer_ext", "late_write", "late_write_sine", "formats", "ring_header", "stop_setfx (stops)", "stop_duplicate (stops)", "stop_3d (stops)",
         "stop_after_release (stops)", "stop_resample (stops)", "stop_second_primary (stops)", "stop_writeprimary (stops)", "stop_bad_this (stops)"]);
 }
 
@@ -330,9 +331,9 @@ fn play_moves_the_play_cursor_with_the_virtual_clock_and_the_write_cursor_leads_
 }
 
 #[test]
-/* S-audio-lead (the PM's decision on decision 0139): the default lead of the write cursor over the play cursor is 60 ms = floor(44100 * 60 / 1000) = 2646 frames; FLE_AUDIO_LEAD_MS changes it (30 ms = 1323 frames; a value outside 1..1000 is the default). */
-fn the_default_lead_is_60_ms_and_the_environment_changes_it() {
-    for (env, frames) in [(None, 2646u64), (Some("30"), 1323), (Some("15"), 661), (Some("0"), 2646), (Some("5000"), 2646), (Some("abc"), 2646)] {
+/* S-audio-lead (the PM's decision on decision 0139, raised by #1432): the default lead of the write cursor over the play cursor is 300 ms = floor(44100 * 300 / 1000) = 13230 frames; FLE_AUDIO_LEAD_MS changes it (30 ms = 1323 frames; a value outside 1..1000 is the default). */
+fn the_default_lead_is_300_ms_and_the_environment_changes_it() {
+    for (env, frames) in [(None, 13230u64), (Some("30"), 1323), (Some("15"), 661), (Some("0"), 13230), (Some("5000"), 13230), (Some("abc"), 13230)] {
         let r = run_lead(&["play"], env);
         assert_eq!(r.code, Some(0), "{env:?}: signal {:?} stderr {}", r.signal, r.err);
         let l = r.out.iter().find(|l| l.starts_with("ring after Play:")).unwrap_or_else(|| panic!("{env:?}: no ring line in {:?}", r.out));
@@ -344,8 +345,8 @@ fn the_default_lead_is_60_ms_and_the_environment_changes_it() {
 #[test]
 fn the_write_cursor_that_the_guest_sees_leads_the_play_cursor_by_15_ms_whatever_the_hand_over_lead() {
     // S-ds-write-cursor (0295): Learn GetCurrentPosition: "The write cursor always leads the play cursor, typically by about 15 milliseconds' worth of audio data". The write cursor that GetCurrentPosition returns is the play cursor + 661 frames (floor(44100 * 15 / 1000)),
-    // while the output is handed over up to consumed + the hand-over lead (S-audio-lead: 60 ms = 2646 frames by default, FLE_AUDIO_LEAD_MS): the two are separate quantities. The scenario and the hand computation of play_moves_the_play_cursor_... with the default lead and with 120 ms (5292 frames).
-    for (env, lead) in [(None, 2646u64), (Some("120"), 5292)] {
+    // while the output is handed over up to consumed + the hand-over lead (S-audio-lead: 300 ms = 13230 frames by default, FLE_AUDIO_LEAD_MS): the two are separate quantities. The scenario and the hand computation of play_moves_the_play_cursor_... with the default lead and with 120 ms (5292 frames).
+    for (env, lead) in [(None, 13230u64), (Some("120"), 5292)] {
         let r = run_lead(&["play"], env);
         assert_eq!(r.code, Some(0), "{env:?}: signal {:?} stderr {}", r.signal, r.err);
         let mut seen = 0;
@@ -406,6 +407,18 @@ fn the_virtual_clock_moves_to_the_next_notification_when_every_thread_waits() {
     for (k, l) in w.iter().enumerate() {
         assert!(l.starts_with(&format!("main alone with a sleeper: woke index {} at {} ticks", k % 2, 36_000_000_000u64 + 100_000 * (k as u64 + 1))), "{l}");
     }
+}
+
+#[test]
+fn byte_offsets_round_up_to_frames_and_the_last_byte_notifies_at_wrap() {
+    // Learn DSBPOSITIONNOTIFY: dwOffset is in bytes. A buffer of 882 frames of 4 bytes (3528 bytes); offsets 1 and 3527 are not on a frame boundary. Offset 1 is in frame 0 and is reached when the cursor passes
+    // it: the first frame that starts at or after byte 1 is frame 1 (227 ticks: ceil(10^7 / 44100) = 227). Offset 3527 is reached at frame 882 (ceil(3527 / 4) = 882), the wrap, 20 ms = 200000 ticks after the Play.
+    let o = ok(&["notify_bytes"]);
+    assert!(o.iter().any(|l| l == "SetNotificationPositions(byte offsets 1, 3527) 0"), "{o:?}");
+    let notices: Vec<&String> = o.iter().filter(|l| l.starts_with("byte notification:")).collect();
+    assert_eq!(notices.len(), 2, "{o:?}");
+    assert!(notices[0].starts_with("byte notification: index 0 at 36000000227 ticks"), "{}", notices[0]);
+    assert!(notices[1].starts_with("byte notification: index 1 at 36000200000 ticks"), "{}", notices[1]);
 }
 
 #[test]
@@ -479,13 +492,19 @@ fn the_engines_polling_mixer_runs_against_the_model_in_virtual_time_without_an_u
     let w = o.iter().find(|l| l.starts_with("rt_mixer: written")).unwrap();
     assert!(w.contains("the engine's underrun check fired 0 times"), "{w}");
     assert!(o.iter().any(|l| l.contains("against the sine: 0 mismatches")), "{o:?}");
-    // S-audio-lead: the same engine geometry (two blocks of 4096 frames) at the default lead (60 ms) and at 90 ms: the stream is the sine sample for sample (the output reads `lead` frames ahead of the play cursor; the half is rewritten before it is read)
-    for lead in [None, Some("90")] {
-        let r = run_lead(&["rt_mixer", "6"], lead);
-        assert_eq!(r.code, Some(0), "{lead:?}: {}", r.err);
-        assert!(r.out.iter().any(|l| l.contains("against the sine: 0 mismatches")), "{lead:?}: {:?}", r.out);
-        assert!(r.out.iter().any(|l| l.contains("the engine's underrun check fired 0 times")), "{lead:?}: {:?}", r.out);
-    }
+    // S-audio-lead: the same engine geometry (two blocks of 4096 frames) at 90 ms: the stream is the sine sample for sample (the output reads `lead` frames ahead of the play cursor; the half is rewritten before it is read). The mixer writes a half one block (4096 frames) before
+    // the play cursor reaches it, so a lead of more than one block hands out frames that are not written yet. Without an external consumer nothing puts such a frame over (S-ds-late-write takes effect only with one): the default lead (300 ms = 13230 frames) is checked with the external consumer below.
+    let r = run_lead(&["rt_mixer", "6"], Some("90"));
+    assert_eq!(r.code, Some(0), "90 ms: {}", r.err);
+    assert!(r.out.iter().any(|l| l.contains("against the sine: 0 mismatches")), "90 ms: {:?}", r.out);
+    assert!(r.out.iter().any(|l| l.contains("the engine's underrun check fired 0 times")), "90 ms: {:?}", r.out);
+    // the default lead with the external consumer of the browser (rt_mixer_ext: the read count follows the clock): a write after the hand-over is put over the frames not read yet (rewrite_unread), so the stream is the sine sample for sample and no frame is lost
+    let r = run_lead(&["rt_mixer_ext", "6"], None);
+    assert_eq!(r.code, Some(0), "default lead: {}", r.err);
+    assert!(r.out.iter().any(|l| l.contains("against the sine: 0 mismatches")), "default lead: {:?}", r.out);
+    assert!(r.out.iter().any(|l| l.contains("the engine's underrun check fired 0 times")), "default lead: {:?}", r.out);
+    let lw = r.out.iter().find(|l| l.starts_with("rt_mixer: late writes:")).unwrap_or_else(|| panic!("no late writes line: {:?}", r.out));
+    assert!(field(lw, "events") > 0 && field(lw, "applied") > 0 && field(lw, "lost") == 0, "{lw}");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -547,7 +566,7 @@ fn every_slot_of_every_vtable_is_filled_and_the_offsets_the_engine_calls_are_the
 // ---------------------------------------------------------------------------------------------
 // 7. Decision 0241 (aud1, PROVISIONAL): S-ds-late-write. With an external consumer (here the stand-in of harness/audio/sim_transport.c: the play position is a count the scenario sets, the ring is the C ring) a write that comes after the
 //    device handed the frames to the output takes effect while it is still at least the guard (256 frames: S-ds-rewrite-guard) ahead of the output's read position; nearer frames are counted as lost. The scenarios run with the
-//    default lead of the runtime, 60 ms = 2646 frames; a device of 8192 frames plays LOOPING from frame 0 and is synchronised at consumed 1000 (3646 frames handed over, all silent) unless the 4th number says another.
+//    lead of FLE_AUDIO_LEAD_MS=60 (2646 frames; `late` sets it, the default of the runtime is 300 ms); a device of 8192 frames plays LOOPING from frame 0 and is synchronised at consumed 1000 (3646 frames handed over, all silent) unless the 4th number says another.
 // ---------------------------------------------------------------------------------------------
 
 fn late(consumed: u64, first: u64, n: u64, presync: u64) -> Vec<String> {

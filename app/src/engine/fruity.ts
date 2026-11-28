@@ -55,6 +55,9 @@ export interface FruityModuleOpts {
   fleClipWrite?: (text: string) => void;
   fleClipRequest?: (id: number) => void;
   fleClipAnswer?: (id: number, text: string | null) => void;
+  /** #1406 (lift/harness/web/clip/fle_clip_lib.js): a question about the formats asks whether the clipboard holds text (fleClipProbe); the host answers through fleClipProbeAnswer (set by the library) */
+  fleClipProbe?: (id: number) => void;
+  fleClipProbeAnswer?: (id: number, has: boolean) => void;
 }
 export type CreateModule = (opts: FruityModuleOpts) => Promise<unknown>;
 export type GlueImporter = (glue: Uint8Array) => Promise<CreateModule>;
@@ -73,6 +76,8 @@ export interface FruityHost {
   /** #1389: the text of the engine's Copy; the operating system's clipboard text is asked by clipRead(id) and answered with answerClipRead */
   clipWrite?(text: string): void;
   clipRead?(id: number): void;
+  /** #1406: a question about the formats (whether the clipboard holds text); answered with answerClipProbe */
+  clipProbe?(id: number): void;
   /** decision 0280: see FruityModuleOpts.fleInputPoll / fleInputDone; absent = the input is taken at the idle only */
   inputPoll?(ptr: number, max: number): number;
   inputDone?(ptr: number, n: number): void;
@@ -146,6 +151,7 @@ export class FruityEngine {
       ...(host.fileDlg ? { fleFileDlg: (id: number, request: unknown) => host.fileDlg?.(id, request), fleFileDlgProgress: (id: number, done: number, total: number) => host.fileDlgProgress?.(id, done, total) } : {}),
       ...(host.clipWrite ? { fleClipWrite: (text: string) => host.clipWrite?.(text) } : {}),
       ...(host.clipRead ? { fleClipRequest: (id: number) => host.clipRead?.(id) } : {}),
+      ...(host.clipProbe ? { fleClipProbe: (id: number) => host.clipProbe?.(id) } : {}),
       preRun: [() => {
         if (!opts.ENV) throw new Error('the emscripten glue exposes no ENV (link with -sEXPORTED_RUNTIME_METHODS=ENV,...)');
         const t0 = performance.now();
@@ -214,7 +220,15 @@ export class FruityEngine {
     const clk = ex.fle_g3_clock_to as (t: number) => void;
     const display = typeof ex.fle_g3_display === 'function' ? (ex.fle_g3_display as (w: number, h: number) => number) : null;
     const syscmd = typeof ex.fle_g3_taskbar_iconic === 'function' && typeof ex.fle_g3_taskbar_syscommand === 'function' ? (ex.fle_g3_taskbar_syscommand as (lid: number, cmd: number) => number) : null;
-    return { mouse: (k, x, y, d) => mouse(k, x, y, d), key: (k, vk, sc, e) => key(k, vk, sc, e), clockTo: (t) => clk(t), ...(display ? { display: (w: number, h: number) => display(w, h) } : {}), ...(syscmd ? { syscommand: (lid: number, cmd: number) => syscmd(lid, cmd) } : {}) };
+    const hz = typeof ex.fle_g3_hz === 'function' ? (ex.fle_g3_hz as (hz: number) => number) : null;
+    return { mouse: (k, x, y, d) => mouse(k, x, y, d), key: (k, vk, sc, e) => key(k, vk, sc, e), clockTo: (t) => clk(t), ...(display ? { display: (w: number, h: number) => display(w, h) } : {}), ...(syscmd ? { syscommand: (lid: number, cmd: number) => syscmd(lid, cmd) } : {}), ...(hz ? { hz: (v: number) => hz(v) } : {}) };
+  }
+
+  /** Issue #1402 (lift/harness/fruity_idle.c fle_g3_dwm_count): the number of DwmFlush calls so far, or null when the wasm has no such export. Read at each idle (the rate the guest is paced at, as the page sees it). */
+  dwmFlushes(): number | null {
+    const f = (this.instance?.exports as Record<string, unknown> | undefined)?.fle_g3_dwm_count;
+    if (typeof f !== 'function') return null;
+    return (f as () => number)();
   }
 
   /**
@@ -267,6 +281,9 @@ export class FruityEngine {
 
   /** #1389: hands the operating system's clipboard text (or null: none) to the suspended engine; the library ignores an id it does not wait for */
   answerClipRead(id: number, text: string | null): void { this.opts.fleClipAnswer?.(id, text); }
+
+  /** #1406: hands the answer to a question about the formats (whether the clipboard holds text) to the suspended engine; the library ignores an id it does not wait for */
+  answerClipProbe(id: number, has: boolean): void { this.opts.fleClipProbeAnswer?.(id, has); }
 
   /** decision 0193: the next Save target the engine has finished writing (fle_filedlg_saved_poll of lift/runtime/fle_filedlg.c), or null; the bytes are copied */
   pollSaved(): { guestPath: string; size: number; data: Uint8Array } | null {

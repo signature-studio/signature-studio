@@ -10,6 +10,8 @@
 #include "fle_raster.h"
 #include "fle_desk.h"
 void fle_desk_wrote(uint32_t lid, int64_t x0, int64_t y0, int64_t x1, int64_t y1) __attribute__((weak));   /* fle_desk.c; a link list without it (the native tests) leaves it null */
+void fle_win_surface_made(uint32_t lid) __attribute__((weak));   /* fle_win.c (Issue #1483): a surface of new pixels was made for lid */
+void fle_win_area_wrote(uint32_t lid, fle_rrect r) __attribute__((weak));   /* fle_win.c (Issue #1483): the written rectangle of lid gets the controllers' colour where it is zero */
 
 
 uint64_t trace_call_count(void) __attribute__((weak));
@@ -426,6 +428,12 @@ static void ch_rows(int64_t y0, int64_t y1)
  * is handled like memmove: the rows (and, in a row, the columns) are visited in the direction that does not overwrite what is still to be read. The unused byte of a 32-bit pixel is copied by a plain SRCCOPY
  * between two surfaces of the same format (bytes, decision 0111) and is 0 otherwise. */
 typedef uint64_t fle_r_v2u64 __attribute__((vector_size(16), aligned(1)));
+static const uint8_t fle_r_z16[16] = { 0 };
+
+static inline __attribute__((always_inline)) int diff_vec_nz(fle_r_v2u64 d)
+{
+    return memcmp(&d, fle_r_z16, 16) != 0;
+}
 
 static inline __attribute__((always_inline)) fle_r_v2u64 diff_load_px4(const uint8_t *p, fle_r_v2u64 vm, int mask_alpha)
 {
@@ -458,6 +466,19 @@ static inline __attribute__((always_inline)) void diff_blit_row(uint8_t *to, con
 
     for (;;) {
         if (!span_open) {
+            for (; k + 32 <= cnt; k += 32, fp += 128, tp += 128) {
+                fle_r_v2u64 o, d;
+
+                memcpy(&o, tp, 16);       d  = o ^ diff_load_px4(fp, vm, mask_alpha);
+                memcpy(&o, tp + 16, 16);  d |= o ^ diff_load_px4(fp + 16, vm, mask_alpha);
+                memcpy(&o, tp + 32, 16);  d |= o ^ diff_load_px4(fp + 32, vm, mask_alpha);
+                memcpy(&o, tp + 48, 16);  d |= o ^ diff_load_px4(fp + 48, vm, mask_alpha);
+                memcpy(&o, tp + 64, 16);  d |= o ^ diff_load_px4(fp + 64, vm, mask_alpha);
+                memcpy(&o, tp + 80, 16);  d |= o ^ diff_load_px4(fp + 80, vm, mask_alpha);
+                memcpy(&o, tp + 96, 16);  d |= o ^ diff_load_px4(fp + 96, vm, mask_alpha);
+                memcpy(&o, tp + 112, 16); d |= o ^ diff_load_px4(fp + 112, vm, mask_alpha);
+                if (__builtin_expect(diff_vec_nz(d), 0)) break;
+            }
             for (; k + 16 <= cnt; k += 16, fp += 64, tp += 64) {
                 fle_r_v2u64 o, d;
 
@@ -465,7 +486,7 @@ static inline __attribute__((always_inline)) void diff_blit_row(uint8_t *to, con
                 memcpy(&o, tp + 16, 16); d |= o ^ diff_load_px4(fp + 16, vm, mask_alpha);
                 memcpy(&o, tp + 32, 16); d |= o ^ diff_load_px4(fp + 32, vm, mask_alpha);
                 memcpy(&o, tp + 48, 16); d |= o ^ diff_load_px4(fp + 48, vm, mask_alpha);
-                if (__builtin_expect((d[0] | d[1]) != 0u, 0)) {
+                if (__builtin_expect(diff_vec_nz(d), 0)) {
                     diff_store_px4(tp, fp, vm, mask_alpha);
                     diff_store_px4(tp + 16, fp + 16, vm, mask_alpha);
                     diff_store_px4(tp + 32, fp + 32, vm, mask_alpha);
@@ -488,7 +509,7 @@ static inline __attribute__((always_inline)) void diff_blit_row(uint8_t *to, con
                 memcpy(&o, tp + 16, 16); d |= o ^ diff_load_px4(fp + 16, vm, mask_alpha);
                 memcpy(&o, tp + 32, 16); d |= o ^ diff_load_px4(fp + 32, vm, mask_alpha);
                 memcpy(&o, tp + 48, 16); d |= o ^ diff_load_px4(fp + 48, vm, mask_alpha);
-                if (__builtin_expect((d[0] | d[1]) == 0u, 1)) {
+                if (__builtin_expect(!diff_vec_nz(d), 1)) {
                     gap += 16;
                     if (gap >= 128) {
                         df_add_span(span_x0, y, span_x1, y + 1);
@@ -513,7 +534,7 @@ static inline __attribute__((always_inline)) void diff_blit_row(uint8_t *to, con
 
         memcpy(&vo, tp, 16);
         dd = vo ^ vv;
-        if ((dd[0] | dd[1]) == 0u) {
+        if (!diff_vec_nz(dd)) {
             if (span_open) {
                 gap += 4;
                 if (gap >= 128) { df_add_span(span_x0, y, span_x1, y + 1); span_open = 0; }
@@ -626,9 +647,7 @@ uint64_t fle_r_blit(const fle_rsurf *d, const fle_rrect *clip, int64_t dx, int64
                 memcpy(to + (uint64_t)k * 4u, &vv, 16);
             }
             {
-                uint32_t lanes[4];
-                memcpy(lanes, &vacc, 16);
-                acc = lanes[0] | lanes[1] | lanes[2] | lanes[3];
+                acc = (uint32_t)(memcmp(&vacc, fle_r_z16, 16) != 0);
             }
             for (; k < cnt; k++) {
                 uint32_t v, o;
@@ -695,9 +714,7 @@ uint64_t fle_r_blit(const fle_rsurf *d, const fle_rrect *clip, int64_t dx, int64
                 memcpy(to + (uint64_t)k * 4u, &vv, 16);
             }
             {
-                uint32_t lanes[4];
-                memcpy(lanes, &vacc, 16);
-                acc = lanes[0] | lanes[1] | lanes[2] | lanes[3];
+                acc = (uint32_t)(memcmp(&vacc, fle_r_z16, 16) != 0);
             }
             for (; k < cnt; k++) {
                 uint32_t v, o;
@@ -1007,7 +1024,22 @@ fle_rsurf *fle_raster_window_surface(uint32_t lid, uint32_t w, uint32_t h)
     s->w = w;
     s->h = h;
     ws_fill_view(s);
+    if (fle_win_surface_made) fle_win_surface_made(lid);
     return &s->view;
+}
+
+/* #1382: the live drawing surfaces, their number and bytes (for the stop line of fle_gdi.c, mem_why). */
+void fle_raster_mem(uint64_t *n, uint64_t *bytes)
+{
+    uint32_t k;
+
+    *n = 0;
+    *bytes = 0;
+    for (k = 0; k < ws_n; k++)
+        if (ws[k]->live && ws[k]->bits) {
+            (*n)++;
+            *bytes += (uint64_t)ws[k]->w * ws[k]->h * 4u;
+        }
 }
 
 void fle_raster_window_destroyed(uint32_t lid)
@@ -1160,6 +1192,7 @@ void fle_raster_wrote(const fle_rsurf *surf, fle_rrect r, const char *api)
     if (!s) return;
     s->writes++;
     if (fle_desk_wrote) fle_desk_wrote(s->lid, r.x0, r.y0, r.x1, r.y1);   /* decision 0223: the desktop compositor (fle_desk.c) learns which part of a window's picture changed */
+    if (fle_win_area_wrote) fle_win_area_wrote(s->lid, r);
     if (evidence_seen || s->first_done) return;
     fle_r_clip(&r, &(fle_rrect){ 0, 0, (int64_t)s->w, (int64_t)s->h });
     for (int64_t y = r.y0; y < r.y1 && !any; y++) {

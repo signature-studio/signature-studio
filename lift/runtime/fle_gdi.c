@@ -5,6 +5,7 @@
  * clock, no thread other than the id of the calling one. */
 #define _GNU_SOURCE
 #include <inttypes.h>
+#include <malloc.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -133,6 +134,7 @@ typedef struct {
 } gdi_obj;
 
 #define GF_PLACEHOLDER 1u                   /* the 1-by-1 monochrome bitmap of a memory DC */
+#define GF_DELETE_PENDING 8u                /* #1382: a bitmap whose DeleteObject was refused while it was selected into a DC; freed when it is no longer selected (bitmap_pending_free) */
 #define GF_OPAQUE_PAL  2u                   /* a halftone palette: the entries are an implementation detail (the page), none are kept */
 #define GF_MODICON     4u                   /* decision 0118: a shared icon loaded from a module's RT_GROUP_ICON by LoadIconW(hInstance, name) (kind FLE_GDI_KIND_ICON) */
 
@@ -310,6 +312,41 @@ static gdi_dc *screen_state(const char *api, uint64_t h);
 static void default_objects(const char *api);
 static void sel_add(uint64_t h);
 static void sel_drop(uint64_t h);
+static void bitmap_pending_free(gdi_obj *o);
+
+/* #1382: at a stop of CreateDIBSection (the wasm memory is full), the pixel blocks alive, the malloc's use and the guest return address, in one line of the stop. */
+void fle_raster_mem(uint64_t *n, uint64_t *bytes);
+static void mem_why(char *buf, size_t size)
+{
+    uint64_t k, live = 0, dib_n = 0, dib_b = 0, pend_n = 0, pend_b = 0, sel_n = 0, sel_b = 0, ddb_n = 0, ddb_b = 0, sur_n = 0, sur_b = 0;
+    struct mallinfo mi = mallinfo();
+
+    for (k = 0; k < objs_n; k++) {
+        gdi_obj *o = &objs[k];
+        uint64_t b;
+
+        if (o->state != ST_LIVE) continue;
+        live++;
+        if (o->kind != FLE_GDI_KIND_BITMAP || !o->ext) continue;
+        if (o->fmt == FLE_GDI_BMP_DIB) {
+            gdi_dib *d = (gdi_dib *)o->ext;
+            b = (uint64_t)d->stride * (uint64_t)(d->height < 0 ? -(int64_t)d->height : (int64_t)d->height);
+            dib_n++;
+            dib_b += b;
+            if (o->flags & GF_DELETE_PENDING) { pend_n++; pend_b += b; }
+            if (o->sel) { sel_n++; sel_b += b; }
+        } else {
+            gdi_ddb *d = (gdi_ddb *)o->ext;
+            ddb_n++;
+            ddb_b += (uint64_t)d->stride * o->bm[1];
+        }
+    }
+    fle_raster_mem(&sur_n, &sur_b);
+    snprintf(buf, size, "out of memory (guest return address %#llx): live handles %llu; DIB %llu blocks %llu bytes (pending delete %llu/%llu, selected %llu/%llu); DDB %llu blocks %llu bytes; window surfaces %llu blocks %llu bytes; malloc in use %llu bytes, free %llu bytes",
+             (unsigned long long)fle_ld(R[4], 8), (unsigned long long)live, (unsigned long long)dib_n, (unsigned long long)dib_b, (unsigned long long)pend_n, (unsigned long long)pend_b,
+             (unsigned long long)sel_n, (unsigned long long)sel_b, (unsigned long long)ddb_n, (unsigned long long)ddb_b, (unsigned long long)sur_n, (unsigned long long)sur_b,
+             (unsigned long long)mi.uordblks, (unsigned long long)mi.fordblks);
+}
 
 static gdi_dc *need_mem_dc(const char *api, uint64_t h, const char *screen_why)
 {
@@ -389,15 +426,29 @@ static void ddb_release(gdi_obj *o)
     o->ext = NULL;
 }
 
+/* #1382: a bitmap whose DeleteObject was refused (the page's 0: it is selected into a DC) is freed when the last DC lets go of it. The guest drops the handle at once: the destructor
+ * of f_6aff60 calls DeleteObject on the bitmap and only then DeleteDC on the DC that holds it, and zeroes both handles after. A bitmap that Windows keeps alive for good would hold its
+ * pixels for the rest of the run (25 MB per theme switch at this size), and the wasm heap has no room for that. The return value of the refused call stays 0. */
+static void bitmap_pending_free(gdi_obj *o)
+{
+    o->flags &= (uint8_t)~GF_DELETE_PENDING;
+    bmp_live--;
+    if (o->fmt == FLE_GDI_BMP_DIB) dib_release(o);
+    else ddb_release(o);
+    obj_kill(o);
+}
+
 /* Deletes the memory DC in objs[i]: the objects selected into it are no longer selected (they are not deleted: the SelectObject page asks the
  * application to select the original objects back and nothing in the pages says that the DC deletes what is selected into it), the placeholder
  * goes with the DC. The slot keeps its kind so that a second DeleteDC is told from a handle that was never a DC. */
 static void dc_destroy(int64_t i)
 {
     gdi_dc *dc = (gdi_dc *)objs[i].ext;
+    gdi_obj *bo = live_obj(dc->bmp);
     int64_t ph;
 
     sel_drop(dc->bmp);
+    if (bo && bo->sel == 0 && (bo->flags & GF_DELETE_PENDING)) bitmap_pending_free(bo);
     sel_drop(dc->brush);
     sel_drop(dc->pen);
     sel_drop(dc->font);
@@ -794,6 +845,7 @@ void fle_imp_DeleteObject(void)
     }
     if (o->kind == FLE_GDI_KIND_BITMAP && (o->flags & GF_PLACEHOLDER)) fle_stop(api, "handle is the placeholder bitmap of a memory DC: the pages give no rule for deleting it");
     if (o->sel) {
+        if (o->kind == FLE_GDI_KIND_BITMAP) o->flags |= GF_DELETE_PENDING;
         R[0] = 0;
         return;
     }
@@ -1304,7 +1356,12 @@ void fle_imp_CreateDIBSection(void)
     if (!fle_host_size_fits(bytes)) fle_stop(api, "out of memory");
     bits = (uint8_t *)calloc(1, (size_t)bytes);
     d = (gdi_dib *)calloc(1, sizeof *d);
-    if (!bits || !d) fle_stop(api, "out of memory");
+    if (!bits || !d) {
+        char why[480];
+
+        mem_why(why, sizeof why);
+        fle_stop(api, why);
+    }
     d->bits = bits;
     d->width = (uint32_t)w;
     d->height = h;
@@ -2178,7 +2235,14 @@ static uint32_t brush_color(const char *api, const char *pre, uint64_t hbr, int 
 
     *hollow = 0;
     if (hbr_is_arg && hbr >= 1u && hbr <= FLE_GDI_SYS_COLOR_COUNT) return sys_colors[hbr - 1u];       /* a system colour index plus 1 (FillRect page; the table of decision 0123) */
-    if (!o) pixel_stop(api, pre, hbr_is_arg ? "hbr is not a live brush of this runtime nor a system colour index plus 1 (0 to 30)" : "the brush selected into the DC is gone");
+    if (!o) {
+        if (hbr_is_arg) {
+            char epre[120];
+            snprintf(epre, sizeof epre, "%s (hbr 0x%" PRIx64 ")", pre, hbr);
+            pixel_stop(api, epre, "hbr is not a live brush of this runtime nor a system colour index plus 1 (0 to 30)");
+        }
+        pixel_stop(api, pre, "the brush selected into the DC is gone");
+    }
     switch (o->kind) {
     case FLE_GDI_KIND_BRUSH:
         if (o->u[0] == FLE_GDI_BS_PATTERN) pixel_stop(api, pre, "the brush is a pattern brush (CreatePatternBrush): the pixels of a pattern fill are not implemented (decision 0132, S-patternbrush)");
@@ -2481,7 +2545,11 @@ void fle_imp_PatBlt(void)
     uint64_t n;
 
     fle_gdi_check_thread(api);
-    if (!fle_r_rop3_valid(rop & ~UINT32_C(0x40000000), &idx)) pixel_stop(api, pre, "rop is not one of the 256 ternary raster-operation codes of the page");
+    if (!fle_r_rop3_valid(rop & ~UINT32_C(0x40000000), &idx)) {
+        char epre[200];
+        snprintf(epre, sizeof epre, "painting a rectangle with the selected brush (rop 0x%x, %d x %d at (%d, %d))", (unsigned)rop, (int)w, (int)h, (int)x, (int)y);
+        pixel_stop(api, epre, "rop is not one of the 256 ternary raster-operation codes of the page");
+    }
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -3738,7 +3806,11 @@ void fle_imp_StretchDIBits(void)
         dr = dev_rect(dc, &t, xd, yd, wd, hd);
         if (sx0 < whole.x0 || sy0 < whole.y0 || ex > whole.x1 || ey > whole.y1) {
             /* the source rectangle is partly outside the image: only a 1:1 copy has a defined place for the part that is inside (S-source-outside); a stretched one stops */
-            if ((wd < 0 ? -(int64_t)wd : wd) != aw || (hd < 0 ? -(int64_t)hd : hd) != ah) pixel_stop(api, pre, "the source rectangle is not inside the image and the copy is stretched: which destination pixels it covers is not on the page");
+            if ((wd < 0 ? -(int64_t)wd : wd) != aw || (hd < 0 ? -(int64_t)hd : hd) != ah) {
+                char epre[260];
+                snprintf(epre, sizeof epre, "pixel transfer from a DIB (StretchDIBits rop 0x%x, iUsage %u, %d x %d to (%d, %d) from %d x %d at (%d, %d))", (unsigned)rop, (unsigned)usage, (int)wd, (int)hd, (int)xd, (int)yd, (int)ws, (int)hs, (int)xs, (int)ys);
+                pixel_stop(api, epre, "the source rectangle is not inside the image and the copy is stretched: which destination pixels it covers is not on the page");
+            }
             fle_r_clip(&in, &whole);
             if (fle_r_empty(&in)) {
                 R[0] = 0;
@@ -3829,9 +3901,10 @@ void fle_imp_StretchBlt(void)
     int32_t x = (int32_t)(uint32_t)R[2], y = (int32_t)(uint32_t)R[8], wd = (int32_t)(uint32_t)R[9], hd = (int32_t)(uint32_t)fle_arg(5);
     int32_t xs = (int32_t)(uint32_t)fle_arg(7), ys = (int32_t)(uint32_t)fle_arg(8), ws = (int32_t)(uint32_t)fle_arg(9), hs = (int32_t)(uint32_t)fle_arg(10);
     uint32_t rop = (uint32_t)fle_arg(11);
-    static const char pre[] = "pixel transfer between DCs";
+    char pre[220];
 
     fle_gdi_check_thread(api);
+    snprintf(pre, sizeof pre, "pixel transfer between DCs (StretchBlt rop 0x%x, %d x %d to (%d, %d) from %d x %d at (%d, %d))", (unsigned)rop, (int)wd, (int)hd, (int)x, (int)y, (int)ws, (int)hs, (int)xs, (int)ys);
     blit_call(api, pre, R[1], x, y, wd, hd, fle_arg(6), xs, ys, rop, 1, ws, hs);
 }
 
@@ -4493,6 +4566,7 @@ uint64_t fle_gdi_dc_font(uint64_t hdc)
 }
 #define GDI_TEXT_STOP(Name, Why) void fle_imp_##Name(void) { if (fle_text_hook) fle_text_hook(#Name, R[1]); fle_stop(#Name, Why " (decision 0111)"); }
 GDI_TEXT_STOP(ExtTextOutW, GDI_WHY_GLYPH)
+GDI_TEXT_STOP(TextOutW, GDI_WHY_GLYPH)
 GDI_TEXT_STOP(GetTextMetricsW, GDI_WHY_TEXT)
 GDI_TEXT_STOP(GetTextExtentPoint32W, GDI_WHY_TEXT)
 GDI_TEXT_STOP(GetTextExtentPointW, GDI_WHY_TEXT)

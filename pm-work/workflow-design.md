@@ -54,8 +54,12 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
     - `Data\Patches\Scores\Chopping\Riff machine step 1\`: 24 件・6,311 B(#1387)。
     - `Data\Patches\Scores\Chopping\Riff machine step 2\`: 19 件・2,807 B(#1387)。
   - #1373 で足した 2 件(`ci/resources-prefixes.txt` の 17〜18 行目。demo の曲の素材で、曲のフォルダ単位)。`Data\Patches\Misc\Used by demo projects\DEDZII - NIGHT TERROR\`: 4 件・877,543 B。`Data\Patches\Misc\Used by demo projects\Mehran Abbasi - With You\`: 5 件・694,532 B。
-  - 接頭辞で取った物は、作業ツリーの `lift/out-app/host-extra/resources/` に入るだけ。エンジンの VFS に載るのは、起動の seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)か、pack の lazy 指定に行が在る物だけ。接頭辞を足した Issue は、その行も足す。
+  - 接頭辞で取った物は、作業ツリーの `lift/out-app/host-extra/resources/` に入り、ラベルによらず全ての作業で、その写しを `lift/out-app/host/resources/` に置く(`fe-build bundle` が読むのは host だけ。下の「問題 A」)。エンジンの VFS に載るのは、起動の seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)か、pack の lazy 指定に行が在る物だけ。接頭辞を足した Issue は、その行も足す。
+  - 問題 A(#1480 の判定の落ち方。決定): 作業の抽出の木(`host/`)は、作業の開始時の commit の seed 表で作られる。作業者が main を取り込むと seed 表の `resources/` の行(#1387 の Riff machine の 100 件)が増え、木に無いファイルを `pack-seed.mjs` が読んで ENOENT で落ちた。言語等の取り出し(`extra-resources`)を、ラベル `resources` によらず全ての作業で取り(鍵は変えない。fail-on-cache-miss のため extract が必ず保存する)、`host/resources/` に cp -a で置く。seed 表の `resources/` の行は 373 件(`@lazy-file:` を含む。pack-seed は lazy の行も読む)で、接頭辞の一覧が全て覆う(検査済み)。作業の途中で木を作り直す案は、インストーラを作業の中で読むため、採らない。
 - 抽出の表は、`ci/extract-dlls.tsv` と `lift/plugins/*/plugin.tsv` の行の和で、後者は `app/scripts/extract-fl.mjs` が `app/scripts/lib/plugin-rows.mjs` で読んで足す。抽出の鍵(agent.yml の extract-tree-・deploy.yml の host-)は、その plugin.tsv を入力に含む。
+- プラグインの Data(素材)は `lift/plugins/<名前>/data.tsv` で宣言し(#1478)、同じ `plugin-rows.mjs` の `pluginRows()` が seed の行を作る。agent.yml の extract-tree-(保存・復元の 2 つ)の鍵は `lift/plugins/*/data.tsv` を入力に含む。spec/workflow.test.sh は、その 2 項目(plugin.tsv・data.tsv)を旧版との比較の前に除く。
+- 木に無い内蔵のプラグインの DLL と Data(第 2 波の連鎖の対策)。`tools/place-plugin-dlls.mjs` は、作業ツリーの `lift/plugins/*/plugin.tsv`・`data.tsv` の行のうち `lift/out-app/host/` に無い実物を、`plugin-builtin` の取り出しの木(`lift/out-app/host-extra/plugins/`)から sha256 で照合して複写する。置き先と綴りは `plugin-rows.mjs`(extract-fl と同じ)。在る物は触らない。`guard/judge.sh` が受け入れの前に呼ぶ(失敗しても判定は続き、行は判定の出力に残す)。
+- 限界: `host-extra/plugins` の外の DLL(`Shared\` など。`ci/extract-dlls.tsv` が扱う)は置けず、skipped に数える。判定は main を取り込まない(取り込みは push の段の pull だけ)ので、道具が置けるのは作業ツリーの行の分だけ。
 
 - 実機のビーコン(ラベル `perf-beacons` の作業だけ)。extract が R2 の `fl-web-cache` の `perf/` から、直近 3 日(UTC の今日と前の 2 日)の `*.json` を、最大 1000 件・合計 100 MB で取り、`$RUNNER_TEMP/perf` に置いて、鍵 `perf-beacons-${{ github.run_id }}` でキャッシュに保存する。work は同じ鍵で復元し、`lift/out-app/host-extra/perf/` に置く(commit はしない)。鍵を run ごとにするのは、ビーコンが増え続けて内容で決まる鍵が使えず、同じ run の extract と work だけが同じ鍵を読むため。公開の artifact は使わない。リポジトリは公開で、artifact も公開されるため、依頼者の実機のビーコン(個人を特定しうる値を含む)を置けない。R2 の鍵は extract だけが持ち、作業者の段には渡さない。ラベルの無い run では、これらの段は動かない。
 
@@ -85,6 +89,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 - ラベル `failed` が無い。ただし、本文が `/retry` で始まる `issue_comment` のときだけ、`failed` は無視される(start が `failed` を外す)。
 
 判定の理由は select の標準エラーに 1 件ずつ出す(「起動しなかった理由」を Actions のログで見られる)。
+- 読みの上限: `gh api` の応答が既定の maxBuffer(1 MB)を超えると ENOBUFS で select が落ち、起動しない(#1371 がこれで起動しなかった。閉じた #1370 のブロッカーの一覧は本文を含めて 1,129,714 バイト)。`tools/select-targets.mjs` は maxBuffer を 256 MB にし、読む項目を `--jq` で絞る(本文は取らない)。100 件を超える依存は 2 ページ目を読まない(未対応。今の件数は 44 件)。試験は `spec/workflow.test.sh` の (g2)。
 
 ## 6. ラベル(承認後に PM が作る。エージェントは作らない)
 
@@ -150,6 +155,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 18. **M7 の目標**: P3 の再生中の命令数のうち、直接 wasm の割合が 99% 以上。
 19. **依存の変更**: 外部プラグインの 3 件(027・028・029)は、音声の経路の修正(040)の後に入れる。
 20. **同じファイルを変える Issue は `blocked by` でつなぐ**(PM の起票の規則)。同じ生成物の入力(`lift/harness/web/pack.args`・`lift/harness/web/seed.args`・`lift/crates/fe-build/tests/plan/*.txt` など)を変える Issue が並行すると、push の段の pull で衝突し、作業が失われる(#1341 は #1319 と衝突して 3 回失敗した)。後から起票する側を、先に入る側の `blocked by` にする。
+21. **cfhex の除外**: `guard/scan.sh` の 32 桁の 16 進の検査(cfhex)は、`lift/crates/*/tests/` の下の `*.rs`・`*.txt`・`*.tsv`・`*.hex` の行だけ除く。試験の機械語・画素のデータは 32 桁の 16 進を多く含み、識別子ではないため(`gdi.rs`・`gdi_bulk.rs` で 54 件の誤検出)。試験の外では今まで通り検査し、vendor・cfhost・python・mask・wranglergen は、試験の場所でも効く(`spec/guard.test.sh`)。
 
 ## 11. 依頼者の指示との対応
 
@@ -163,9 +169,11 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 | PM 資料は `pm-work/` | この文書を含め、PM 資料は `pm-work/` に置く |
 | Issues・Milestones・ラベル・PR への書き込みは承認まで禁止 | この文書は書き込みを行わない。ラベル・Issue は承認後に PM が作る |
 
-## 12. 本番のデプロイ前のスモーク(deploy.yml)
+## 12. 本番のデプロイ前のスモーク(e2e.yml の build)
 
-`fe-build bundle` の後、`fe-build upload`・wrangler の前に、2 つの検査の段を置く。(1) `tools/boot-check/boot-bundle.mjs` で起動を確かめ、状態が `engine-idle`・`standIn` が偽・`error` が null のときだけ通す(boot-bundle の `error` が null でも、状態が idle とは限らないので、状態を別に見る)。(2) `tools/smoke/welcome-flow.mjs` で Welcome 窓の 4 つの閉じ方(「No thanks」→ Default、Escape、「No thanks」→ Default の 1 回クリック、「I'm in」→ Default)を、流れごとに別の起動で走らせ、4 件とも `error` が無く、trap せず、idle に戻り、プロジェクトが開き、窓が閉じたときだけ通す。判定は、deploy.yml の中の `jq -e` の段が行う(道具の終了コードは流れの成否を表さないため)。どちらかが落ちれば、後の upload・wrangler は飛び、本番は更新されない(既定の `success()`)。判定の式は `spec/workflow.test.sh` の (m) が、fixture で実際に動かして確かめる。`HostFilesUnsupported` の件数は、正常時の値が未確認のため判定に入れない。時間の上限は、起動の段 15 分、流れの段 30 分。Chrome は runner の画像の `google-chrome` を使う(作業ジョブの boot-check と同じ)。作業ジョブの判定(judge)には、まだ入れていない。判定には取り直した main の engine と bundle を作り直す段が要り、作業ジョブの時間が大きく増えるため、deploy のログで `fe-build engine` の所要時間を見てから決める。
+`fe-build bundle` の後、`fe-build upload`・wrangler の前に、2 つの検査の段を置く。(1) `tools/boot-check/boot-bundle.mjs` で起動を確かめ、状態が `engine-idle`・`standIn` が偽・`error` が null のときだけ通す(boot-bundle の `error` が null でも、状態が idle とは限らないので、状態を別に見る)。(2) `tools/smoke/welcome-flow.mjs` で Welcome 窓の 4 つの閉じ方(「No thanks」→ Default、Escape、「No thanks」→ Default の 1 回クリック、「I'm in」→ Default)を、流れごとに別の起動で走らせ、4 件とも `error` が無く、trap せず、idle に戻り、プロジェクトが開き、窓が閉じたときだけ通す。判定は、e2e.yml の build の中の `jq -e` の段が行う(道具の終了コードは流れの成否を表さないため)。どちらかが落ちれば、build は落ち、e2e と deploy は動かず、本番は更新されない(既定の `success()`)。判定の式は `spec/workflow.test.sh` の (m) が、fixture で実際に動かして確かめる。`HostFilesUnsupported` の件数は、正常時の値が未確認のため判定に入れない。時間の上限は、起動の段 15 分、流れの段 30 分。Chrome は runner の画像の `google-chrome` を使う(作業ジョブの boot-check と同じ)。作業ジョブの判定(judge)には、まだ入れていない。判定には取り直した main の engine と bundle を作り直す段が要り、作業ジョブの時間が大きく増えるため、deploy のログで `fe-build engine` の所要時間を見てから決める。
+
+ビルド直後の初回は冷える(OS のファイルのキャッシュ)。`boot-bundle` は、冷たい起動を 1 回(`coldMs`)と、温かい起動を 3 回行い、`elapsedMs` は温かい 3 回の中央値、`samples` に 3 回の値を出す(問題 B: runner の揺れ(7〜17 秒)で、変更と無関係な作業が 12,500 ms の門で偶然落ちた(#1401・#1415)ため。受け入れの式は変えず、見る値の揺れを減らす)。`welcome-flow` の流れごとの値は変えない。実機の初回の起動は、別の測定(実機のビーコン)で見る。
 
 ## 13. 時間切れと待ちの固まり
 
@@ -181,7 +189,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 本番の bundle の入力(作業者の受け入れと同じにする)。`fe-build bundle` が読むのは、seed 表の行の host ファイル(`pack-seed.mjs` が SHA-256 を照合して入れる)と、`pack.args` の lazy 指定、それに `pack_step_for` が見つけた `error-offline.html`(`lift/out-app/host-extra/resources/System/Internet/`)だけである。seed 表の行は、言語・テーマ・テンプレート・demo・Blocks・内蔵プラグインの DLL の多くを含み、deploy は `extract-fl` で host に取り出す。作業者の resources の木(`ci/resources-prefixes.txt`)は、deploy の「resources を取り出す」の段も取り出すので、オフラインの頁が本番の bundle に入る(それまでは、deploy の木に無いので黙って省かれた)。木の中の余分な物は、seed 表に無いため bundle に入らない(写しの要らない理由)。内蔵プラグインの木(`host-extra/plugins`)と起動用の実行ファイル(`host-extra/exe`)は、bundle の入力ではなく、道具(tools/plugin-hooks・tools/feat-c1-hidpi)だけが読む。bundle の中身は、「bundle の中身を確かめる」の段が、オフラインの頁と、言語・テーマ・テンプレートの代表 1 件ずつを manifest で確かめる。
 
-作業者の受け入れの連鎖で作られる物は、deploy の連鎖でも作られる(`spec/workflow.test.sh` が、`pack.args` の参照を検査する。#1337 の OTT の wasm は `fe-build bundle` が作り、その入力は `fe-build external` が取る。deploy.yml は 100 行以内で、シェルスクリプトを run に書かないため、作る段は fe-build に置く)。
+作業者の受け入れの連鎖で作られる物は、deploy の連鎖でも作られる(`spec/workflow.test.sh` が、`pack.args` の参照を検査する。#1337 の OTT の wasm は `fe-build bundle` が作り、その入力は `fe-build external` が取る。deploy.yml は 100 行以内、e2e.yml は 200 行以内(「19」)、シェルスクリプトを run に書かないため、作る段は fe-build に置く)。
 
 外部プラグインの wasm(`pack.args` の `lift/out-app/plugins/` の lazy 指定)は、インストーラが `lift/out-app/external` に在る時だけ bundle に入る。作業者の run では、ラベル `plugin-external` の Issue だけがインストーラを置くので、他の Issue の受け入れの bundle は、その lazy 指定を省き、省いた物を標準エラーに 1 行ずつ出す。`fe-build bundle` は、3 件が 1 つも無ければ省き、一部だけ在る・一致しないときは止まる。deploy は「resources を取り出す」の段で 3 件を必ず取るので、wasm は必ず入り、「bundle の中身を確かめる」の段が、`pack.args` の外部プラグインの lazy の全てが manifest の lazy に在ることを確かめる(無ければ deploy を失敗にする)。将来、Serum 2・Vital の build が重くなったら、build の結果を R2 のキャッシュに置く(鍵は入力のハッシュ)。
 
@@ -218,15 +226,36 @@ deploy で `[skip ci]` を使わない(依頼者の指示。main の push が de
 
 ## 18. 版ごとの関数名の表(実機の trap の関数を引く。#1404)
 
-- deploy は `fe-build bundle` の後・`fe-build upload` の前に、`lift/out-app/gen/wasm-func-names.tsv` を `gzip -9` して、artifact `func-names-<版>`(版は manifest の `bundle.version`。保存は 90 日)に上げる。表が無ければ段は落ち、deploy は止まる。スモークを通った版の物だけを上げる(upload・wrangler で落ちた版の artifact は残る)。
-- 取り出し: `gh run list -w deploy.yml` で版の run の ID を探し、`mkdir -p <dir>/func-names-<版> && gh run download <ID> -n func-names-<版> -D <dir>/func-names-<版>`。道具は `node tools/perf-beacons/summary.mjs <記録の dir> --stops --func-names-dir <dir>`(`--func-names <file>` は、フォルダ名 `func-names-<版>` の中の file だけ)。trap の `wasm-function[N]` は、記録の版の表で名前に引かれ、指紋に ` [fn=名前]` と出る。
+- e2e.yml の build は `fe-build bundle` の後に、`lift/out-app/gen/wasm-func-names.tsv` を `gzip -9` して、artifact `func-names-<版>`(版は manifest の `bundle.version`。保存は 90 日)に上げる。表が無ければ段は落ち、e2e の run は失敗する。スモークを通った版の物だけを上げる(deploy の upload・wrangler で落ちた版の artifact は残る)。
+- 取り出し: `gh run list -w e2e.yml` で版の run の ID を探し、`mkdir -p <dir>/func-names-<版> && gh run download <ID> -n func-names-<版> -D <dir>/func-names-<版>`。道具は `node tools/perf-beacons/summary.mjs <記録の dir> --stops --func-names-dir <dir>`(`--func-names <file>` は、フォルダ名 `func-names-<版>` の中の file だけ)。trap の `wasm-function[N]` は、記録の版の表で名前に引かれ、指紋に ` [fn=名前]` と出る。
 - 表が無い版は ` [fn=? 表が無い版]`、表に無い番号は ` [fn=? 表に無い番号]` と出る。この変更より前に deploy された版は artifact が無く、取り出せない(その版の trap は ` [fn=? 表が無い版]` のまま)。
 - 試験: `spec/perf-funcnames.test.mjs`(合成の表と記録)と、`spec/workflow.test.sh` の (w)(deploy の段の並び・名前・保存の日数・段の動き)。
 
-## 19. E2E の門(deploy.yml。Issue #1407)
+## 19. E2E の門(e2e.yml と deploy.yml。Issue #1407)
 
-- 位置と段: 「bundle の中身を確かめる」の後・関数名の表と `fe-build upload` の前に、2 段。`node tools/e2e/run.mjs --scenarios smoke --displays 4k-dpr1,4k-dpr2,4k-random`(Chromium・本番と同じ配信。依存は `npx playwright install chromium`、--with-deps は使わない)と、`jq -e -s -f tools/e2e/judge.jq`(判定)。artifact は `e2e-<github.sha>`(30 日、`if: always()`)。
-- 判定: 全 4 行が servedHeadersMatch で error が無く、各シナリオの pageErrors・consoleErrors・stuckToasts・failedRequests が 0。印(`expectFail`。例 #1406)の付いたシナリオは ok を問わず、通ったら標準エラーに警告を出す(落とさない)。
+- 構成(2 つのワークフロー。2026-11-26 に分けた)。`.github/workflows/e2e.yml`(`name: e2e`。`push` で起動)は 2 つの job を持つ。`build`: engine と bundle を作り、起動の確認・流れ A〜D・bundle の中身・関数名の表を検査し、`app/dist` と `lift/out-app/bundle` を R2 のキャッシュに保存する(保存は build の最後の段)。`e2e`: `needs: build`。`strategy.matrix` の 1 シャードずつ、キャッシュから取り、`node tools/e2e/run.mjs ${{ matrix.args }}` を動かし、`jq -e -s -f tools/e2e/judge.jq` で判定し、artifact `e2e-<matrix.name>-<github.sha>` を上げる(30 日、`if: always()`)。`.github/workflows/deploy.yml` は、`workflow_run`(`workflows: [e2e]`・`types: [completed]`)で起動する 1 つの job `deploy` を持つ。job の `if` は `github.event.workflow_run.conclusion == 'success'` で、e2e の run が成功した後にだけ動く。checkout と鍵の `bundle-<sha>` は `workflow_run.head_sha`(e2e の run と同じ commit)を使う。キャッシュから取り、`fe-build upload`・本番の manifest の確認・wrangler を行う。
+- 位置の理由。旧版は 1 つの job の中で E2E を直列に動かしていた(スモーク 3 シナリオ × 4 表示で約 10 分)。シナリオを増やすと deploy が延びるため、E2E を並列のシャード(matrix の 1 行ずつ)に分けた。deploy.yml は e2e.yml が成功した後にだけ動く。どれかのシャードが落ちれば e2e の run は失敗し、deploy は動かず、本番は替わらない。
+- 2 つに分けた理由(依頼者の指示 L-007 を守る)。3 つの job に分けた版は deploy.yml が 160 行になり、上限を 220 行に緩めていた。E2E の並列を保ったまま、E2E を e2e.yml に移し、deploy.yml は 1 つの job に戻して 100 行以内に収めた。
+- シャードを増やす: `e2e.yml` の `e2e` の `strategy.matrix.include` に、`{name: <名前>, args: "--scenarios <集合> --displays <表示>"}` を 1 行足す。`name` は artifact の名前に入るので、一意にする。増やすのは `args` の文字列だけで、job の構成は変えない。将来は、シナリオを分ける `--shard i/n` と、領域(`--area`)の行を、同じ matrix に足す。
+- キャッシュ: e2e.yml の build は `bundle-${{ github.sha }}` で保存し(この run だけ。`fail-on-cache-miss: true` で取得の段が鍵の無いまま進むのを防ぐ)、e2e の取得も同じ鍵を使う。deploy.yml は `bundle-${{ github.event.workflow_run.head_sha }}` で取る(e2e の run と同じ commit)。置く物は `app/dist` と `lift/out-app/bundle`(raw・br・manifest.json)。公開の artifact には置かない(FL の資源は R2 のキャッシュだけに置く。agent.yml と同じ方針)。大きさは見積もり(raw の lazy と engine の合計は 586 MB を実測。seed と br は未計測で、合計は約 1 GB 前後と見込む)。取得の段の前に `fe-build endpoint` を呼ぶ(runs-on/cache の接続先は GITHUB_ENV から読む。「15」)。
+- demo の曲(`Data/Demo projects`・46 件。file-open-demo と resilience が `lift/out-app/host/resources/` から読む)。build は `resources を取り出す` の後に `lift/out-app/host-extra/resources/Data/Demo projects` を `demo-${{ github.sha }}` で保存する。e2e と e2e-full(20)の取得の段は同じ鍵を `fail-on-cache-miss: true` で取り、`lift/out-app/host/resources/Data/` に `cp -a` で置く。bundle の木(`lift/out-app/host/`)は build では触らない(bundle の入力と、host の鍵の保存を変えない)。bundle の鍵と path は変えない(deploy が取る)。
+- 鍵の渡し方: R2 のキャッシュの鍵は、e2e.yml の build の段と、e2e と deploy のキャッシュの取得の段だけに渡す。e2e の run・判定・artifact の段には鍵を渡さない。R2_ARTIFACT の鍵は e2e.yml の build だけ。CLOUDFLARE_API_TOKEN は deploy.yml の wrangler の段だけ。
+- 判定(`tools/e2e/judge.jq`): 行数とシナリオ数は決め打ちしない(シャードごとに 1 表示の 1 行か、random の 2 行)。1 行以上あり、全ての行が servedHeadersMatch で error が無く、印(`expectFail`)の無いシナリオは ok が真で、pageErrors・consoleErrors・stuckToasts・failedRequests が 0。印(`expectFail`。例 #1406)の付いたシナリオは ok を問わず、通ったら標準エラーに警告を出す(落とさない)。
+- 既に在る欠陥は、`expectFail`(Issue の番号つき)にして、門は新しい退行だけを止める。`expectFail` のシナリオの、`pageErrors`・`consoleErrors`・`failedRequests` は 0 を求める(`stuckToasts` は、その Issue が扱う表示の欠陥なので問わない。数は JSON に出る)。
+- 停止の理由(`engineStop`: 製品の beacon の `engine.exit` と、エンジンのログの停止の報告)と、窓の表の取得の再試行の数(`dumpRetries`)は、シナリオの JSON に出す。1 本だけ動かすのは `--only <シナリオ名>`(試験の道具。門は使わない)。
 - 120 Hz に届かない事実(achievedFps)は JSON に出るが、門は落とさない(runner に GPU が無い)。
-- 落ちれば E2E の段が失敗し、後の関数名の表・upload・wrangler は飛ぶ(既定の `success()`)。§14 の門(人が verified.txt に足す形)とは別物で、毎回の run の結果で決まり、静かには閉じない。
-- 既知の限界: 段に時間の上限を付けていない(100 行の制約の内。ハングすれば deploy が止まるので、その時は run を取り消す)。
+- 時間の上限: e2e の job は `timeout-minutes: 120`(ハングを止める)。旧版の既知の限界(段に上限が無く、止まれば run を取り消すしかなかった)を、job の構成に改めて解消した。
+- 行数の制約(依頼者の決まり L-007 の 100 行): deploy.yml は 100 行以内、e2e.yml は 200 行以内。どちらも 1 行 80 字以内・シェルスクリプトを実行しない・ローカル action と再利用ワークフローと composite action を使わない・Makefile を作らない。`guard/deploy-lint.sh` が、ファイル名で上限を決めて検査する。deploy.yml の `if:` は e2e の成功の 1 つだけを許す。e2e.yml の `if:` は、ブランチ・イベントで段を飛ばさない。台帳 L-007 の書き換えは PM が行う。
+
+## 20. 全シナリオの E2E(e2e-full.yml。非ゲート。Issue #1407・#1485)
+
+- 構成。`.github/workflows/e2e-full.yml`(`name: e2e-full`)は、`workflow_run`(`workflows: [e2e]`・`types: [completed]`)で起動する。job `shard` は e2e が成功した時だけ動き、領域とシャードの matrix を、`run.mjs --area <領域> --shard i/n` で回す。job `report` は `always()` で、全シャードの結果から網羅の表を作る。
+- 群(concurrency)。`group` は e2e の結論が success の時だけ `e2e-full-main`(新しい成功が古い run を取り消す)、それ以外は run ごと(`e2e-full-${{ github.run_id }}`)。
+- 群を分けた理由: e2e が取り消された時も workflow_run は来て、その skip の run が、同じ群で動く正しい run を `cancel-in-progress` で取り消していた(実例 45880900455。約 45 分の run が最後まで走らなかった)。
+- 別のワークフローにした理由: e2e.yml に足すと deploy(e2e の成功を待つ)が全シナリオを待つことになる。e2e-full は deploy の前提ではない。落ちても本番は替わらない(非ゲート)。
+- matrix の決め方: シャード数は、`.min` の最小件数とシナリオのファイル数の多い方を 30 で割って切り上げる。ただし、シナリオのファイル数で頭打ちにする(空のシャードは `run.mjs` が「no scenario is selected」で落ちるため)。今の matrix は 52 行(上限 80)。領域の Issue がシナリオを足したら n を増やす。増やさないと、1 シャードが予算 35 分を超え、超えた分は skipped になって赤になる。
+- 表示は `4k-dpr1,4k-dpr2` の 2 行(random は使わない)。1 job の上限は 60 分。`--budget 35m` の後は新しいシナリオを始めない。
+- 結果の読み方: 表は領域ごとに、シナリオ・結果(シナリオ×表示)・ok・印つき(既知の欠陥の失敗)・印なし(門の失敗。ここを直す)・網羅(機能)・通ったシナリオ数と最小(`.min`)を出す。印なしの失敗は、表の下に id と表示で並ぶ。
+- 判定は 2 段。各シャードは `run.mjs` の受け入れ(印なしの失敗で赤)。report は `tools/e2e/judge-coverage.jq` で、領域ごとの `.min` を下回ると赤。
+- 公開の artifact は、結果の JSON(保持 14 日)と coverage.json だけ。画像は上げない。R2 の鍵は、キャッシュの取得の段だけに渡す。
+- 未確認: 各シャードの実時間(cargo build と bundle の取得を含む)は、この runner ではまだ計測していない。

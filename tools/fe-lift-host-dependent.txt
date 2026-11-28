@@ -1,0 +1,15 @@
+# fe-lift の host 依存の試験(tools/fe-lift-test.mjs の --host-dependent の既定)。1 行に 1 件: <試験の binary> <試験名>。`#` の行は注釈。
+# host の CPU との比較で、runner の CPU の種類により結果が変わる試験。失敗しても門を落とさない。通れば、それでよい。
+# 入れるのは、試験の本文を読んで、host の答えが CPU の種類で変わると分かる物だけ。固定の仕様どおりの命令(整数・IEEE の演算・SDM で定義された flag)の比較は、ここに入れない。
+# RCPPS の近似の表は、AMD と Intel で違う。基準の run では通り、Intel の run(#1415)で落ちた(pm-work/findings/fe-lift-test-baseline.md §2)。
+a2a_remaining rcpps_matches_host
+a2a_remaining rcpps_all_2e32_inputs_match_host
+a2a_remaining rcp_table_header_matches_host_dump
+# RSQRTPS・RSQRTSS の近似も、CPU の種類で host の答えが違う(RCPPS と同じ理由)。
+sse_legacy rsqrtps_matches_host
+sse_legacy rsqrtss_matches_host
+sse_legacy rsqrtps_all_2e32_inputs_match_host
+# x87 の F2XM1・FSINCOS の端の丸めは、CPU の種類で違う(host と比べる。PM が確認済み)。
+x87_trans x87_trans_differs_from_the_host_by_less_than_the_sdm_error_bound
+# BSF/BSR: 源が 0 のときの CF と出力先は SDM で未定義。AMD EPYC 7763 の run で host の CF が 1 になって落ち、Intel の run では通った(pm-work/findings/view-11-1-null-call-2026-11-25.md)。
+int_more2 bsf_bsr_match_host

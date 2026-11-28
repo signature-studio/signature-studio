@@ -142,6 +142,16 @@ export const utf8Length = (s: string): number => new TextEncoder().encode(s).len
 export const PERF_UI_WINDOWS_MAX = 8;
 export const PERF_UI_CLASS_MAX = 60;
 const HZ_FITS = ['match', 'engine-slower', 'display-slower', 'page-behind', 'unknown'];
+/** Issue #1418: the optional `warns` block: the APIs the engine answered without a model (lift/runtime/fle_env.c fle_warn), each with its number of calls; at most this many names */
+export const PERF_WARNS_TOP = 20;
+const PERF_WARN_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+/** the `warns` block has the shape the page sends: at most PERF_WARNS_TOP names, each a plain API name with a whole, non-negative count */
+export function warnsValid(w: unknown): boolean {
+  if (typeof w !== 'object' || w === null || Array.isArray(w)) return false;
+  const entries = Object.entries(w as Record<string, unknown>);
+  return entries.length <= PERF_WARNS_TOP && entries.every(([k, v]) => PERF_WARN_NAME.test(k) && typeof v === 'number' && Number.isSafeInteger(v) && v >= 0);
+}
+
 /** decision 0216: the failure codes of the optional `files` block (src/files/usage.ts FailCode is this list); a code outside it is a problem, so a name cannot travel as a "code" */
 export const PERF_FILES_FAIL_CODES = ['name', 'conflict', 'quota', 'locked', 'notfound', 'kind', 'zip-format', 'zip-crc', 'zip-method', 'zip-encrypted', 'zip-size', 'unsafe-path', 'cancelled', 'unsupported', 'security', 'io', 'other'] as const;
 
@@ -384,6 +394,8 @@ export function beaconProblems(b: unknown): string[] {
       else for (const [k, v] of Object.entries(fa)) { if (!(PERF_FILES_FAIL_CODES as readonly string[]).includes(k)) out.push(`files.fail.${k}: not a failure code of the list`); num(`files.fail.${k}`, v, 0, 1e9, true); }
     }
   }
+  // Issue #1418: optional `warns` (the calls answered without a model, by API name); absent in a record from before this field
+  if (b.warns !== undefined && !warnsValid(b.warns)) out.push('warns: not a map of at most 20 API names to whole counts');
   assetsBlock(b.assets, num, out);
   // decision 0212: optional; which display the page asked for and what the engine uses
   const g = b.guestScreen;

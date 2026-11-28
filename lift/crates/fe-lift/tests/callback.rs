@@ -287,6 +287,7 @@ fn driver() -> &'static PathBuf {
             .arg(&rt)
             .arg(&obj)
             .arg(rt.join("fle_env.c"))
+            .arg(rt.join("fle_glob.c"))
             .arg(rt.join("fle_imports.c"))
             .arg("-o")
             .arg(&exe)
@@ -691,6 +692,8 @@ fn all_runtime_sources() -> Vec<PathBuf> {
         })
         .collect();
     v.sort();
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
     v
 }
 

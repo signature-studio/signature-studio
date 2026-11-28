@@ -275,9 +275,9 @@ fn each_new_thunk_is_answered_under_its_own_dll_and_no_other_dll() {
         let (st, c) = gen(&[(dll, name), (other, name), (dll, "SendMessageA"), ("kernel32.dll", "GetProcAddress")]);
         assert_eq!(st.handled[format!("jmp_imp:{name}").as_str()], 1, "{dll}!{name}");
         assert_eq!(c.matches(&format!("fle_imp_{name}(); return;")).count(), 1, "{dll}!{name}: only the thunk of its own dll is answered");
-        for k in [1u64, 2] {
+        for (k, want) in [(1u64, format!("{other}!{name}")), (2, format!("{dll}!SendMessageA"))] {
             let va = IB + 0x1040 + 0x10 * k;
-            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{name}: thunk {k} stays unsupported");
+            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{want}\"); }}")), "{dll}!{name}: thunk {k} stops by name");
         }
     }
 }
@@ -297,8 +297,8 @@ fn the_apis_that_stay_unanswered_by_decision_0123_are_not_rows() {
 // 2. The driver: the real fle_win.c, fle_class.c, fle_thread.c and the files they work with; a stub guest window procedure that logs every message
 // ---------------------------------------------------------------------------------------------
 
-const RT_FILES: [&str; 21] = [
-    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
+const RT_FILES: [&str; 22] = [
+    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_glob.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
     "fle_time.c", "fle_gdc.c", "fle_gdi.c", "fle_cursor.c", "fle_raster.c", "fle_monitor.c", "fle_ole.c", "fle_reg.c",
 ];
 const RT_EXTRA: [&str; 4] = ["fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c"];
@@ -307,7 +307,7 @@ fn clang_c(src: &Path, obj: &Path, strict: bool) {
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-c"]);
     if strict {
-        cmd.arg("-Werror");
+        cmd.arg("-Werror").arg("-Wno-deprecated-declarations");
     }
     let cc = cmd.arg("-I").arg(src_dir()).arg("-I").arg(rt_dir()).arg(src).arg("-o").arg(obj).env("TMPDIR", work_dir().join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed for {}: {}", src.display(), String::from_utf8_lossy(&cc.stderr));
@@ -327,6 +327,9 @@ fn objs() -> &'static Vec<PathBuf> {
             clang_c(&base.join(name), &o, is_ours);
             v.push(o);
         }
+        let mo = dir.join("mutex_real_stub.o");
+        clang_c(&manifest().join("tests/support/mutex_real_stub.c"), &mo, true);
+        v.push(mo);
         v
     })
 }

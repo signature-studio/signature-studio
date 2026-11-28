@@ -1,0 +1,3 @@
+# Fruity Delay (Effects). hook: the three Delphi hook points (inputs/plugin-hooks.tsv). omit: - (the setjmp entry is found automatically, #1370).
+key	guest	role	sha256	size	hook	args	omit
+effects.fruity-delay.fruity_delay_x64.dll	Plugins\Fruity\Effects\Fruity Delay\Fruity Delay_x64.dll	本体	a1865c0fd97c59f300a5a6536b6f625d194e6b52511c8bbc4c2824204b0f88d2	3773440	rva:0x17bc0,0x31d70,0x31d90	--pdata	-

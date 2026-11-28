@@ -53,7 +53,8 @@ export interface KeyDecision {
  *  - not forwarded and not suppressed (the browser keeps them): Tab (unless `sendTab`), Ctrl+W (and Cmd+W). Tab is how the keyboard leaves the desktop; Ctrl+W closes the tab (a page cannot stop it anyway).
  *  - F5 is the engine's (FL: show / hide the Playlist; Learn WM_KEYDOWN: a key message goes to the window with the focus): it is forwarded and the browser's reload is suppressed, like every other key of the table. Neither Chromium's reserved list (kReservedCommandIds) nor Firefox's `reserved="true"` keys contain F5, so a page may cancel it.
  *  - not forwarded: the Meta keys (the OS takes them), an IME composition (keyCode 229 / isComposing), a code the table does not know.
- *  - every other key is forwarded and its browser action suppressed (space and arrows scroll, Backspace, Ctrl+S, Ctrl+P, F1, ...), only while the desktop has the focus (the caller attaches this to the desktop element).
+ *  - every other key is forwarded and its browser action suppressed (space and arrows scroll, Backspace, Ctrl+S, Ctrl+P, Ctrl+V, F1, ...), only while the desktop has the focus (the caller attaches this to the desktop element).
+ *    Ctrl+V is one of them (Issue #1482): no paste event comes, the engine's GetClipboardData reads the clipboard through the Clipboard API (app/src/engine/clipboard.ts).
  */
 export function keyPolicy(e: KeyEventLike, opts: { sendTab?: boolean } = {}): KeyDecision {
   if (e.isComposing || e.keyCode === 229) return { forward: false, prevent: false, why: 'ime' };

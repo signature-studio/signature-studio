@@ -137,7 +137,7 @@ fn clang(name: &str, src: &str) -> PathBuf {
     std::fs::write(&c, src).unwrap();
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-I"]).arg(&rt);
-    for f in ["fle_locale.c", "fle_imports.c"] {
+    for f in ["fle_locale.c", "fle_imports.c", "fle_glob.c", "fle_env.c"] {
         cmd.arg(rt.join(f));
     }
     let cc = cmd.arg("-o").arg(&exe).arg(&c).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
@@ -330,7 +330,7 @@ int main(void)\n{{\n    pthread_t t;\n    RUN(fle_imp_SetThreadLocale, 0x7f, 0, 
         .args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pthread", "-I"])
         .arg(&rt)
         .arg(rt.join("fle_locale.c"))
-        .arg(rt.join("fle_imports.c"))
+        .arg(rt.join("fle_imports.c")).arg(rt.join("fle_glob.c")).arg(rt.join("fle_env.c"))
         .arg("-o")
         .arg(&exe)
         .arg(&c)

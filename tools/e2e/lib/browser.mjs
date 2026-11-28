@@ -10,7 +10,7 @@ export const DISPLAY = { width: 3840, height: 2160, refreshHzTarget: 120 };
 const ISOLATION = [
   '--password-store=basic',
   '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
-  '--no-proxy-server', '--disable-ipv6', '--disable-quic',
+  '--disable-ipv6', '--disable-quic',
   '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-default-apps', '--disable-domain-reliability',
   '--no-pings', '--metrics-recording-only', '--disable-client-side-phishing-detection', '--disable-breakpad', '--disable-extensions', '--safebrowsing-disable-auto-update', '--disable-search-engine-choice-screen', '--no-service-autorun',
   '--disable-features=OptimizationHints,MediaRouter,Translate,CertificateTransparencyComponentUpdater,NetworkTimeServiceQuerying,AutofillServerCommunication,OptimizationGuideModelDownloading,SafeBrowsingEnhancedProtection,PrivacySandboxSettings4,Variations,SafeBrowsing,SafeBrowsingHashPrefixRealTimeLookups,HashPrefixRealTimeLookups,SafeBrowsingOnUIThread,SafeBrowsingNewGmsApiForBrowseUrlDatabaseCheck',
@@ -18,15 +18,18 @@ const ISOLATION = [
   '--force-color-profile=srgb', '--disable-lcd-text', '--mute-audio',
 ];
 
-/** the frame clock: 'begin' (BeginFrame control, lib/browser.mjs startFrameClock) or 'raf' (the page's own rAF, the frame-rate limit off) */
-export function browserArgs(clock) {
+/** the frame clock: 'begin' (BeginFrame control, lib/browser.mjs startFrameClock) or 'raf' (the page's own rAF, the frame-rate limit off). The loopback is
+ *  sent through the proxy (lib/proxy.mjs: the access token goes with every request, as the edge of the access service does in production) */
+export function browserArgs(clock, proxyPort) {
   const window = `--window-size=${DISPLAY.width},${DISPLAY.height}`;
-  if (clock === 'begin') return [window, '--enable-begin-frame-control', '--run-all-compositor-stages-before-draw', ...ISOLATION];
-  return [window, '--disable-frame-rate-limit', '--disable-gpu-vsync', ...ISOLATION];
+  const proxy = `--proxy-server=http://127.0.0.1:${proxyPort}`;
+  const via = [proxy, '--proxy-bypass-list=<-loopback>'];
+  if (clock === 'begin') return [window, '--enable-begin-frame-control', '--run-all-compositor-stages-before-draw', ...via, ...ISOLATION];
+  return [window, '--disable-frame-rate-limit', '--disable-gpu-vsync', ...via, ...ISOLATION];
 }
 
-export async function launchBrowser(clock = 'raf') {
-  return chromium.launch({ headless: true, args: browserArgs(clock) });
+export async function launchBrowser(clock = 'raf', proxyPort) {
+  return chromium.launch({ headless: true, args: browserArgs(clock, proxyPort) });
 }
 
 /** a page of its own (a new context: its own profile, permissions and headers). The viewport is the CSS size of the display at this DPR. */

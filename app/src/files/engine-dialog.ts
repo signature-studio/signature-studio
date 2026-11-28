@@ -3,6 +3,7 @@
 //   Open  -> the chosen File objects (read from the OPFS) with the guest paths they get on the engine's virtual volume; a project (.flp) brings the files next to it
 //   Save  -> the guest path of the target; when the engine has finished writing it, the bytes are copied back to the chosen OPFS path (the 'saved-file' message of decision 0193)
 // A transient user activation is not needed anywhere here: nothing opens a browser chooser.
+import './files.css';
 import { OpfsFs, describeError, memoryNotice } from './opfs.ts';
 import { baseName, joinPath, normalizePath, parentOf, uniqueName } from './paths.ts';
 import { Explorer } from './explorer.ts';
@@ -49,6 +50,13 @@ export class EngineFiles {
       try { fs = await this.fs(); } catch (e) { cancel(`the browser's file storage is not available (${describeError(e)})`); return; }
       if (!fs.persistent && !this.notedMemory) { this.notedMemory = true; this.log('warn', memoryNotice(fs.why)); }
       if (disposed) return;
+      if (request.manage) {
+        // Issue #1521: File > Manage files: the plain file window (nothing is chosen); closing it ends the engine's wait
+        const ex = new Explorer(root, fs, { close: () => cancel('closed by the person') });
+        await ex.navigate(this.lastDir);
+        if (!disposed) this.explorer = ex;
+        return;
+      }
       const config = configOf(request, this.lastDir);
       filesUsage.c.engine[config.mode]++;
       const ex = new Explorer(root, fs, { close: () => cancel('cancelled by the person') }, {

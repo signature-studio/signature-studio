@@ -112,3 +112,138 @@
 173	#1416	View メニューの項目(View > #11 > #1)で、null の関数の呼び出し(indirect call to 0)で engine が止まる: 呼び出し元と、null になった理由を特定して直す	Task
 174	#1417	crash-hunt の続き: 残りの経路・Settings の全タブと言語・テーマの切り替え・Browser の各タブ・上部バーの部品と Mixer のインサートを踏み、停止を集める	Task
 175	#1418	暫定で止めている API(1,261 箇所)を、Windows の失敗の返り値で続けるように直す: 返り値の規約ごとに分類し、失敗が正規の結果である API から直す	Task
+178	#1419	Browser の面の iframe(`about:srcdoc`)が、『Blocked script execution』の console エラーを、2 万件以上出し続ける: 原因を直す	Task
+179	#1420	Mehran Abbasi の曲を開くと、Elastique の間接呼び出し(`0xb2844c0`)で止まる	Task
+176	#1421	DEDZII の曲を File > Open で開くと、約 5 秒後に engine が終了コード 134 で止まる(本番と同じ配信の E2E で再現): 停止の理由を特定して直す	Task
+180	#1422	計測の道具に 3 つの指標を足す: P2 の 1 秒窓の最小 fps と入力の落ち数、P3 の PCM の 8192 フレーム反復。A/B の比較の道具 tools/ab を作る	Task
+181	#1423	連続入力の間に描画の要求と仮想時計が止まる: ゲストのスケジューラ地点で描画の要求を受け、描画の通知を 100 ms まとめず、仮想時計を実時間へ合わせる	Task
+182	#1424	保留中の連続したマウスの移動を 1 件にまとめ、入力の待ち行列が満杯の時に入力が落ちる数を減らす(fle_input.c)	Task
+183	#1425	音声のミキサーが、ウィンドウの処理(WndProc・TIMERPROC)の中で回らない: 深度 2 の切り替えを DispatchMessage の WndProc・TIMERPROC に限って許し、スレッドの優先度を既定で有効にする	Task
+184	#1426	DirectSound の通知位置をバイト単位で受け、再生の状態は音声の準備の後に公開する(fle_dsound.c)	Task
+185	#1427	ファイル選択の回答を待つ間も、ゲストの他のスレッド(音声のミキサー)が回り、回答が届く: 選択の待ちを、ホストへ制御を返す協調的な待ちにする	Task
+186	#1428	パスの予約文字(コロン(NTFS のストリーム)・<・>・|・二重引用符など)を含む呼び出しで、engine を止めない: Windows の返り値に従う	Task
+187	#1429	リフ マシーンの窓を開くと、Sytrus の中の呼び出し(`indirect call to 0xcccccccccccccccc`)で engine が止まる: 原因を特定して直す	Task
+188	#1430	リフ マシーンで Accept を押すと、Piano roll にノートが作られる(`notes` ≥ 1)	Task
+190	#1432	起動から first idle の後、無入力の 10 秒で、音声の途切れが 1 件出る(DPR 1)	Task
+191	#1433	F10 の Settings の General タブをスクロールすると、DPR 1 で、窓の外の 683 画素が変わる(#1384 の直しが DPR 1 で不完全)	Task
+041	#1434	内蔵エフェクト 1: Control Surface・Distructor・EQUO を、1 プラグイン 1 wasm で入れる	Task
+042	#1435	内蔵エフェクト 2: Edison・Effector・Emphasis を、1 プラグイン 1 wasm で入れる	Task
+043	#1436	内蔵エフェクト 3: Emphasizer・FL Studio Mobile Rack FX・Frequency Shifter を、1 プラグイン 1 wasm で入れる	Task
+044	#1437	内蔵エフェクト 4: Frequency Splitter・Fruity 7 Band EQ・Fruity Bass Boost を、1 プラグイン 1 wasm で入れる	Task
+045	#1438	内蔵エフェクト 5: Fruity Big Clock・Fruity Blood Overdrive・Fruity Center を、1 プラグイン 1 wasm で入れる	Task
+046	#1439	内蔵エフェクト 6: Fruity Chorus・Fruity Compressor・Fruity Convolver を、1 プラグイン 1 wasm で入れる	Task
+047	#1440	内蔵エフェクト 7: Fruity Delay・Fruity Delay Bank・Fruity Fast Dist を、1 プラグイン 1 wasm で入れる	Task
+048	#1441	内蔵エフェクト 8: Fruity Fast LP・Fruity Flanger・Fruity Flangus を、1 プラグイン 1 wasm で入れる	Task
+049	#1442	内蔵エフェクト 9: Fruity Formula Controller・Fruity Free Filter・Fruity HTML NoteBook を、1 プラグイン 1 wasm で入れる	Task
+050	#1443	内蔵エフェクト 10: Fruity LSD・Fruity Limiter・Fruity Love Philter を、1 プラグイン 1 wasm で入れる	Task
+051	#1444	内蔵エフェクト 11: Fruity Multiband Compressor・Fruity Mute 2・Fruity NoteBook を、1 プラグイン 1 wasm で入れる	Task
+052	#1445	内蔵エフェクト 12: Fruity NoteBook 2・Fruity PanOMatic・Fruity Parametric EQ を、1 プラグイン 1 wasm で入れる	Task
+053	#1446	内蔵エフェクト 13: Fruity Parametric EQ 2・Fruity Peak Controller・Fruity Phase Inverter を、1 プラグイン 1 wasm で入れる	Task
+054	#1447	内蔵エフェクト 14: Fruity Phaser・Fruity Reeverb・Fruity Reeverb 2 を、1 プラグイン 1 wasm で入れる	Task
+055	#1448	内蔵エフェクト 15: Fruity Scratcher・Fruity Send・Fruity Soft Clipper を、1 プラグイン 1 wasm で入れる	Task
+056	#1449	内蔵エフェクト 16: Fruity Spectroman・Fruity Squeeze・Fruity Stereo Enhancer を、1 プラグイン 1 wasm で入れる	Task
+057	#1450	内蔵エフェクト 17: Fruity Stereo Shaper・Fruity Vocoder・Fruity WaveShaper を、1 プラグイン 1 wasm で入れる	Task
+058	#1451	内蔵エフェクト 18: Fruity Wrapper・Fruity X-Y Controller・Fruity X-Y-Z Controller を、1 プラグイン 1 wasm で入れる	Task
+059	#1452	内蔵エフェクト 19: Fruity dB Meter・Gross Beat・Hardcore を、1 プラグイン 1 wasm で入れる	Task
+060	#1453	内蔵エフェクト 20: Hyper Chorus・Low Lifter・Luxeverb を、1 プラグイン 1 wasm で入れる	Task
+061	#1454	内蔵エフェクト 21: Maximus・Multiband Delay・Newtime を、1 プラグイン 1 wasm で入れる	Task
+062	#1455	内蔵エフェクト 22: Newtone・Patcher・Pitch Shifter を、1 プラグイン 1 wasm で入れる	Task
+063	#1456	内蔵エフェクト 23: Pitcher・Razer Chroma・Soundgoodizer を、1 プラグイン 1 wasm で入れる	Task
+064	#1457	内蔵エフェクト 24: Spreader・Transient Processor・Transmitter を、1 プラグイン 1 wasm で入れる	Task
+065	#1458	内蔵エフェクト 25: Transporter・Tuner・VFX Color Mapper を、1 プラグイン 1 wasm で入れる	Task
+066	#1459	内蔵エフェクト 26: VFX Envelope・VFX Key Mapper・VFX Keyboard Splitter を、1 プラグイン 1 wasm で入れる	Task
+067	#1460	内蔵エフェクト 27: VFX Level Scaler・VFX Script・VFX Sequencer を、1 プラグイン 1 wasm で入れる	Task
+068	#1461	内蔵エフェクト 28: Vintage Chorus・Vintage Phaser・Vocodex を、1 プラグイン 1 wasm で入れる	Task
+069	#1462	内蔵エフェクト 29: Wave Candy を、1 プラグイン 1 wasm で入れる	Task
+070	#1463	内蔵インストゥルメント 1: 3x Osc・Autogun・BassDrum を、1 プラグイン 1 wasm で入れる	Task
+071	#1464	内蔵インストゥルメント 2: BeepMap・BooBass・Dashboard を、1 プラグイン 1 wasm で入れる	Task
+072	#1465	内蔵インストゥルメント 3: DirectWave・Drumaxx・Drumpad を、1 プラグイン 1 wasm で入れる	Task
+073	#1466	内蔵インストゥルメント 4: FL Keys・FL Slayer・FL Studio Mobile を、1 プラグイン 1 wasm で入れる	Task
+074	#1467	内蔵インストゥルメント 5: FL Studio Mobile Rack・FPC・Fruit Kick を、1 プラグイン 1 wasm で入れる	Task
+075	#1468	内蔵インストゥルメント 6: Fruity DX10・Fruity Dance・Fruity DrumSynth Live を、1 プラグイン 1 wasm で入れる	Task
+076	#1469	内蔵インストゥルメント 7: Fruity Envelope Controller・Fruity Granulizer・Fruity Keyboard Controller を、1 プラグイン 1 wasm で入れる	Task
+077	#1470	内蔵インストゥルメント 8: Fruity Slicer・Fruity Video Player・Fruity Voltage Controller を、1 プラグイン 1 wasm で入れる	Task
+078	#1471	内蔵インストゥルメント 9: Fruity Wrapper・GMS・Harmless を、1 プラグイン 1 wasm で入れる	Task
+079	#1472	内蔵インストゥルメント 10: Harmor・MIDI Out・Minisynth を、1 プラグイン 1 wasm で入れる	Task
+080	#1473	内蔵インストゥルメント 11: Morphine・Ogun・Patcher を、1 プラグイン 1 wasm で入れる	Task
+081	#1474	内蔵インストゥルメント 12: Plucked!・PoiZone・ReWired を、1 プラグイン 1 wasm で入れる	Task
+082	#1475	内蔵インストゥルメント 13: Sakura・Sawer・SimSynth を、1 プラグイン 1 wasm で入れる	Task
+083	#1476	内蔵インストゥルメント 14: Slicex・Soundfont Player・Toxic Biohazard を、1 プラグイン 1 wasm で入れる	Task
+084	#1477	内蔵インストゥルメント 15: Wasp・Wasp XT・Wave Traveller を、1 プラグイン 1 wasm で入れる	Task
+192	#1478	内蔵プラグインの Data(551 件・22 フォルダ)を、プラグインごとの `data.tsv` で宣言し、共有の seed 表に行を足さずに、起動の後の取得で配信する	Task
+193	#1479	第 2 波の束の `plugin.tsv` が入っても、`plugins.rs` の試験『160 本が像の領域に入る』が、同じ DLL の重複で落ちない形にする	Task
+194	#1480	マウスカーソルを、ゲストの画素 1 つ = 物理画素 1 つの大きさで出す: 高 DPR で、大きくならない	Task
+195	#1481	ページから、HTML のヘッダー・サイドバー・状態の表示を無くし、FL の画面だけを、ウィンドウいっぱいに出す	Task
+196	#1482	『貼り付け』だけのコンテキストメニューを出さない。クリップボードは Clipboard API だけを使い、ページ読み込み時に権限を求める。権限が無い時のトーストは出さない	Task
+197	#1483	ページ読み込み時の描画が、ランダムに不完全になる(画面の左側が真っ黒のまま残る)	Task
+198	#1484	Plugin Database が空で、Plugin Manager が起動しない: 内蔵プラグインを FL の一覧に出し、Plugin Manager を開けるようにする	Task
+199	#1485	E2E の基盤を、機能の一覧を軸にした形に拡げる: シナリオの登録・機能のインベントリ・網羅率(`coverage.json`)・シャード・DPR の指定	Task
+200	#1486	E2E の領域 page: ページとブラウザ(表示の鮮明さ・サイズ変更・DPR の変化・再読み込み・WebGL の喪失・console・配信のヘッダー・ビーコン)の、期待する結果のシナリオを機能ごとに足す	Task
+201	#1487	E2E の領域 input: マウス・キーボード・タッチ・カーソル・クリップボード・コンテキストメニュー・ツールチップの、期待する結果のシナリオを機能ごとに足す	Task
+202	#1488	E2E の領域 file: New・テンプレート・Open・Save・Export・Import・demo の曲・ドラッグ&ドロップ・再読み込みをまたぐ保持の、期待する結果のシナリオを機能ごとに足す	Task
+203	#1489	E2E の領域 menus: File・Edit・Add・Patterns・View・Options・Tools・Help の全ての項目(全階層)の効果を、期待する結果つきのシナリオで足す	Task
+204	#1490	E2E の領域 windows: Channel Rack・Playlist・Piano roll・Mixer・Browser・Step sequencer・Event editor・Plugin picker・Project picker と、窓の操作の、期待する結果のシナリオを機能ごとに足す	Task
+205	#1491	E2E の領域 audio: 再生・停止・録音・ループ・メトロノーム・テンポ・カウントイン・音量・ミュート・ソロ・レンダリングの、音声の期待する結果のシナリオを機能ごとに足す	Task
+206	#1492	E2E の領域 settings: F10 の設定の全 16 頁、言語 7、テーマ 13 の、効果と再読み込みをまたぐ保持のシナリオを機能ごとに足す	Task
+207	#1493	E2E の領域 plugins: 内蔵プラグインの全て(窓・パラメータ・音声)と外部プラグイン(OTT・Serum 2・Vital)の、期待する結果のシナリオを一覧から生成して足す	Task
+208	#1494	E2E の領域 topbar: 上部バーの約 40 個の部品の、左クリック・右クリック・ホイール・ドラッグの効果(表示の値を含む)のシナリオを機能ごとに足す	Task
+209	#1495	E2E の領域 resilience: ランダムな操作の列・アイドル・窓の開閉・プロジェクトの開閉・再読み込みの繰り返し・停止からの回復の、耐久のシナリオを足す	Task
+210	#1496	E2E の領域 visual: 窓の種類・テーマ・言語・DPR ごとの画素のゴールデン(ハッシュ)と、縁の鮮明さ・黒い領域 0 の、見た目のシナリオを足す	Task
+211	#1497	E2E の領域 perf: 起動の時間・描画の fps と遅延・アイドルの CPU・メモリ・マウス 1000 Hz の下の音声の途切れを、基準との比の粗い上限で門にするシナリオを足す	Task
+212	#1498	E2E の領域 delivery: manifest.json の lazy の全ての取得と sha256、ヘッダー・圧縮・オフライン・キャッシュ・ビーコンの形の、期待する結果のシナリオを足す	Task
+213	#1499	FL の Plugin Manager(外部の PluginManager.exe)を、VM の中で動かす: 実行ファイルの起動の要求を、同じ engine の中の、もう 1 つのゲストに結ぶ	Task
+214	#1500	fe-lift の試験: 試験の native な link が未定義のシンボルで落ち、約 730 件が新しく失敗する(`fle_thread.c` の `__real_pthread_mutex_unlock`・`fle_glob.c` の関数・`fle_clip_host_probe`)	Task
+215	#1501	FL の Plugin Manager を VM の中で動かす(段 B): 起動の要求を、同じ engine の中のゲストのスレッドに結び、窓を出す	Task
+216	#1502	FL の Recent(最近開いたファイル)を、ページの再読込をまたいで保持する(続き): 閉じる時の FL の後始末を時間の枠つきで走らせ、書かれた Recent を journal に載せる	Task
+217	#1503	ツマミの右クリックのメニューを開くと、許可済みのクリップボードを読んでしまう: メニューを開く時は読まず、貼り付けを選んだ時だけ読む	Task
+218	#1504	DEDZII を開いた後、ファイル管理の状態表示(fx-status)が 10 秒を超えて残る: 残る条件を特定して直す	Task
+219	#1505	Settings の Theme の頁に、テーマのタイルが出ず、13 件のテーマを切り替えられない: 頁の一覧が見つからない原因を特定して直す	Task
+220	#1506	E2E の基盤を直す: `--displays` の宣言・印つきの失敗の停止の判定・予算の分け方・所要時間と失敗の記録	Task
+221	#1507	E2E の windows と settings を、表示の倍率(DPR)に依らない位置で書く	Task
+222	#1508	E2E の plugins を、挿入の手順と観測を直して書く	Task
+223	#1509	E2E の topbar・page・resilience・perf を直す	Task
+224	#1510	F8 で Plugin list を開くと Channel rack が見えないままになり、F12 で Plugin list が残る	Task
+225	#1511	FL が読み込もうとして見つからない共有の DLL を、全て棚卸しし、足す束の Issue の下書きを作る(Shared・ffmpeg・Python・System の DLL)	Task
+226	#1512	共有の DLL 1: LAMEenc_x64.dll を実モジュールにして、MP3 の書き出しの止まりを直す	Task
+227	#1513	共有の DLL 2: WavpackDLL_x64.dll と oggio_x64.dll を実モジュールにして、既定の曲の読み込みの 126 と OGG の書き出しを揃える	Task
+228	#1514	共有の DLL 3: EasyFLAC_x64.dll を実モジュールにして、FLAC の音声の読み書きを揃える	Task
+229	#1515	分離 wasm のプラグインを含む曲を再生すると、協調スレッドが `SuspendError: trying to suspend JS frames` で失敗する(5 回中 3 回)	Task
+230	#1516	インラインフックの登録の上限を直す: `IH_MAX_MODS` が 8 で、第 2 波の DLL を 3 本足すと、engine が起動の前に止まる	Task
+231	#1517	fe-wasmgen: `movmskps`・`movmskpd`・`pmovmskb` の 64 ビット宛先で、wasm の型の検査が落ちる(`i64x2.bitmask` の結果の型)	Task
+232	#1518	関数の入口の seed を足す仕組みを入れる: `--reloc-seeds`・`--rva-tables`(fe-lift・fe-wasmgen)と、plugin の seed の複写(fe-build)	Task
+233	#1519	File→Open で、ブラウザのネイティブのファイル選択を出さず、OPFS のファイル管理の窓を出す: 窓の答えを FL へ返す	Task
+234	#1520	起動の順序を直す: 黒い canvas に HTML のモーダルでダウンロードの進捗を出し、起動の直前に消してから、FL のネイティブのスプラッシュを出す(スプラッシュは FL の表示のコードを lift して出す)	Task
+235	#1521	File メニューに『Manage files』を足す(『Revert to last backup』と『Exit』の間)。選ぶと OPFS のファイル管理の窓が出る	Task
+236	#1522	`wall_fr15` のエンジンの協調のミキサーの試験が、main で `rt_mixer: MISMATCH at 8193` で落ちる: 先読みの値(#1432)か通知位置の丸め(#1426)で、モデルと出力が食い違う	Task
+237	#1523	realmod の名前が 59 字を超えると、engine が起動の前に止まる: 名前の作業域を広げ、key の長さを生成の段で検査する	Task
+238	#1524	`tools/plugin-run` の場面の選び方を直す: 名前の部分一致で別の曲を選ぶ・名前を持つ曲が無い(場面 (a) を足す)	Task
+239	#1525	`fe-build`: Edison の build が、`the units of the compile lists are not written by gen: ["m10-01.c", "m10-02.c", "m10-03.c"]` で止まる	Task
+240	#1526	E2E の audio: Wave の書き出しが保存されず、その後の再生・画の判定が 22 本落ちる(窓の後始末と、保存されない原因の切り分け)	Task
+241	#1527	E2E の menus: 予算で 246 本が飛ばされ、項目の判定が 73 本落ちる(shard の割り方・項目の指定・閉じない箱)	Task
+242	#1528	E2E の visual: 描画の停止(Target crashed)の後、残りの 49 本が 1 ms で error になる(ページの作り直しと、error を受理しない判定)	Task
+243	#1529	製品: エンジンが止まる 4 系統(外部の取得の失敗・Sytrus の demo 2 本・Edit > #3 とその乱操作・書き出しの形式)	Task
+244	#1530	E2E の file: テンプレートを開いた後の判定が 37 本落ちる(タイトルが読めない・Problems の箱が残る疑い)と、Ctrl+O の箱を前提にした本	Task
+245	#1531	E2E の settings: 前回は DPR 1 で合格していた 14 本が落ちる(テーマ 11・表示 2・波形 1)。共通の準備(resetProject・Problems の箱)の変更が候補	Task
+246	#1532	E2E の input と delivery: 印の無い失敗 17 本(desk のクリック・タッチ・ホイール・F5/F6/F9・ヒントバー・カーソル・lazy の配信)を、道具と製品に切り分けて直す	Task
+247	#1533	E2E の visual: 印の無い失敗 12 本(テーマ・窓の縁の画素の比較)を画像で切り分ける(道具の誤り・製品の見た目の変化・確認できない)	Task
+248	#1534	E2E の印: 閉じた Issue を指す残りの印(#1499・#1419・#1429・基準の一覧の閉じた番号)を、開いている Issue か new に直し、閉じた番号の印を検査する試験を足す	Task
+249	#1535	Plugin database の Installed に、プラグインの行が出ない: 分類データ(Data\Patches\Plugin database の .nfo)を VFS に入れ、E2E の『行がある』判定を画素の読みに直す	Task
+250	#1536	`fe-lift` の全体の試験が main で 2 件落ちる: `fle_event.c` の `<unistd.h>`(#1502)と `wall_fr9t` の trace の `rsp` の揺れ	Task
+251	#1537	プラグインを足すと、既存のプラグインが `indirect call to 0` で止まる: 溢れている上限を特定して直す	Task
+252	#1538	第 2 波の DLL が使う import のうち runtime に無い物を、全件、表にして実装する: 実装しない物は名前つきの停止にする	Task
+253	#1539	共有の DLL の行を足す: `ildsp_x64.dll` を実モジュールにし、`Shared\module\` の DLL の出所を確かめる(出所が無ければ行は足さない)	Task
+254	#1540	`cargo test -p fe-build` が main で 2 件落ちる: `the_second_wave_is_160_dlls_and_fits_the_image_area`(`File exists`)と `the_second_wave_with_its_data_fits_the_limits`(`fruity-delay-bank` の guest path が一意でない)	Task
+255	#1541	DPR を実行中に 1.8 から 1.75 へ変えると、engine が終了コード 5 で止まる: 再現して、一度目の停止の原因を特定して直す	Task
+256	#1542	起動の最中(最初の idle の前)に入力を送ると、Delphi の例外 0xEEDFADE を処理する frame が見つからず、engine が SIGABRT で止まる(間欠。乱数の DPR 2.29 の `context-menu-none`)	Task
+257	#1543	共有の DLL 4: Elastique_x64.dll を実モジュールにして、既定の曲を開いた時の『Problems loading the project』の箱を消す	Task
+258	#1544	内蔵インストゥルメント 16: FLEX を、1 プラグイン 1 wasm で入れる	Task
+259	#1545	プラグインを足すと `preBootBytes` が増える: プラグインの DLL・wasm・seed を、起動の前に取らないようにする	Task
+260	#1546	プラグインの再生・描画で、間接呼び出しの呼び先が画素・文字の形になって engine が止まる: 書いた場所を特定して直す	Task
+261	#1547	第 2 波で停止の型により束から外した plugin を、(B) の後に入れ直す: 追跡の表と受け入れ	Task
+262	#1548	起動の間のスプラッシュの提示が約 2 fps しか出ない: 毎秒の提示の数を測り、60 fps 以上に上げる	Task
+263	#1549	製品: 起動の時に OPFS の hkcu.log の getSize が失敗すると、engine が error のまま戻らず、同じ page の後続の本が連鎖して落ちる(e2e-full の最新の run で 33 本)	Task
+264	#1550	製品: メニューや F8 から開いた箱(TSpeechForm・TPlugListForm・TWAVRenderForm・TTapTempoForm・TPythonForm)が、Esc・OK・Cancel で閉じない(e2e-full の最新の run で 17 本)	Task
+265	#1551	E2E の plugins: 一覧(Installed)の読みが本の開始位置から始まり、共有の page では一覧が見えないため、282 本が一覧の段で止まる(印の受理の後ろに隠れている)	Task
+266	#1552	ildsp_x64.dll を実モジュールにし直す: ポインタ経由の入口を全て入口にし、デモの曲を開いても止まらない	Task
+267	#1553	tools/plugin-run が、インストゥルメント(generators.*)を名前で解決できる	Task
+268	#1554	opengl32 を WebGL2 へ橋渡しする: FLEX の engine から始める	Task

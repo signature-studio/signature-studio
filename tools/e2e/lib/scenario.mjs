@@ -1,0 +1,133 @@
+// The scenario registry (Issue #1485). A scenario is a file of tools/e2e/scenarios/<area>/ that default-exports defineScenario({...}); run.mjs finds the files itself.
+// Pure: no browser, no page, so that the tests (tools/e2e/test) and --list can use it without Playwright.
+export const AREAS = ['page', 'input', 'file', 'menus', 'windows', 'audio', 'settings', 'plugins', 'topbar', 'resilience', 'visual', 'perf', 'delivery'];
+export const DEFAULT_DISPLAYS = ['4k-dpr1', '4k-random'];
+const SCENARIO_ID = /^([a-z]+)\/([a-z0-9][a-z0-9-]*)$/;
+const FEATURE_ID = /^([a-z]+)\/[^/\s]+\/[^/\s]+$/;
+const MARK = /^#\d+$/;
+
+/** one mark: `#<Issue の番号>` or 'new' (a defect found by this scenario, not yet an Issue) */
+const oneMark = (m) => {
+  if (m === 'new' || (typeof m === 'string' && MARK.test(m))) return m;
+  throw new Error(`expectFail ${JSON.stringify(m)}: use null, '#<Issue の番号>', 'new' or a list of them`);
+};
+
+/** the mark of a known defect: null (none), one mark, or a list of marks (a scenario with two known defects: each one is a mark) */
+export function checkMark(expectFail) {
+  if (expectFail === null || expectFail === undefined) return null;
+  if (Array.isArray(expectFail)) {
+    if (expectFail.length === 0) throw new Error('expectFail: an empty list (use null)');
+    return expectFail.map(oneMark);
+  }
+  return oneMark(expectFail);
+}
+
+/** a scenario's marks as a list: none (null), one mark, or a list of marks */
+export const marksOf = (e) => (e === null || e === undefined ? [] : [e].flat());
+
+/** the marks of a set of scenarios: each mark is 'new' or an issue of the set's allowed list (a mark outside that list is refused) */
+export function checkMarks(scenarios, allowed) {
+  for (const sc of scenarios) {
+    for (const m of marksOf(sc.expectFail)) {
+      if (m === 'new') continue;
+      if (!MARK.test(String(m)) || !Array.isArray(allowed) || !allowed.includes(m)) {
+        throw new Error(`scenario ${sc.name ?? sc.id}: expectFail ${JSON.stringify(m)} is not one of the allowed marks (${(allowed ?? []).join(', ')}) or new`);
+      }
+    }
+  }
+}
+
+/** the area of a scenario ID (`<領域>/<名前>`) or a feature ID (`<領域>/<種類>/<名前>`); null when the area is not one of the 13 */
+export function areaOf(id) {
+  const m = /^([a-z]+)\//.exec(String(id));
+  return m && AREAS.includes(m[1]) ? m[1] : null;
+}
+
+/** the mark of a known stop (expectStop): null, `#<Issue の番号>` or 'new', named in the error as expectStop; it needs a known failure (expectFail) */
+function stopMark(v, id, expectFail) {
+  if (v === undefined || v === null) return null;
+  let mark;
+  try {
+    mark = checkMark(v);
+  } catch {
+    throw new Error(`scenario ${id}: expectStop ${JSON.stringify(v)}: use '#<Issue の番号>' or 'new'`);
+  }
+  if (expectFail === null) throw new Error(`scenario ${id}: expectStop needs expectFail (a stop is allowed only in a known failure)`);
+  return mark;
+}
+
+/** the least time (ms) a scenario needs left in its display row's budget to start: a non-negative number */
+export function needsOf(ms, id = '?') {
+  if (ms === undefined || ms === null) return 0;
+  if (typeof ms !== 'number' || !(ms >= 0)) throw new Error(`scenario ${id}: needsMs is a number of ms from 0`);
+  return ms;
+}
+
+/**
+ * defineScenario({ id, area?, covers, displays, expectFail, expectStop?, needsMs?, run(ctx) }).
+ * id is `<領域>/<名前>` (area is its first part; `area`, when given, must agree). covers: the feature IDs the scenario checks (`<領域>/<種類>/<名前>`).
+ * displays: the display names (default DEFAULT_DISPLAYS). expectFail: null, '#<Issue>' or 'new'. expectStop: null, '#<Issue>' or 'new': the engine's stop is a known
+ * part of the failure (it needs expectFail; without it, a stop fails the scenario). needsMs: the least time left in the row's budget to start (default 0).
+ * run(ctx) returns { ok, notes, results }.
+ */
+export function defineScenario(s) {
+  if (!s || typeof s !== 'object') throw new Error('defineScenario needs an object');
+  const m = SCENARIO_ID.exec(String(s.id ?? ''));
+  if (!m) throw new Error(`scenario id ${JSON.stringify(s.id)}: use <領域>/<名前> (lower case, digits, hyphens)`);
+  if (!AREAS.includes(m[1])) throw new Error(`scenario ${s.id}: area ${m[1]} is not one of ${AREAS.join(', ')}`);
+  if (s.area !== undefined && s.area !== m[1]) throw new Error(`scenario ${s.id}: area ${s.area} does not match the id`);
+  const covers = s.covers ?? [];
+  if (!Array.isArray(covers)) throw new Error(`scenario ${s.id}: covers is an array of feature IDs`);
+  for (const c of covers) {
+    const f = FEATURE_ID.exec(String(c));
+    if (!f || !AREAS.includes(f[1])) throw new Error(`scenario ${s.id}: cover ${JSON.stringify(c)} must be a feature ID (<領域>/<種類>/<名前>, the area one of the 13)`);
+  }
+  if (new Set(covers).size !== covers.length) throw new Error(`scenario ${s.id}: covers repeats a feature`);
+  const displays = s.displays ?? DEFAULT_DISPLAYS;
+  if (!Array.isArray(displays) || displays.length === 0) throw new Error(`scenario ${s.id}: displays is a non-empty array`);
+  if (typeof s.run !== 'function') throw new Error(`scenario ${s.id}: run(ctx) is a function`);
+  const expectFail = checkMark(s.expectFail);
+  const expectStop = stopMark(s.expectStop, s.id, expectFail);
+  return { kind: 'scenario', id: s.id, name: s.id, area: m[1], covers: [...covers], displays: [...displays], expectFail, expectStop, needsMs: needsOf(s.needsMs, s.id), run: s.run };
+}
+
+/** a scenario of the older set form ({ name, expectFail, expectStop?, run, beforeLoad?, expect?, displays? }; scenarios/<set>/index.mjs, set = smoke, browser-face or regression):
+ *  it has no covers, and each runs in a page of its own. displays: the names it declares (default: the three of the older form) */
+export function legacyScenario(s, set = 'smoke') {
+  const displays = s.displays ?? ['4k-dpr1', '4k-dpr2', '4k-random'];
+  if (!Array.isArray(displays) || displays.length === 0) throw new Error(`scenario ${s.name}: displays is a non-empty array`);
+  const expectFail = checkMark(s.expectFail ?? null);
+  return {
+    kind: 'legacy', id: s.name, name: s.name, area: set, covers: [], displays: [...displays], expectFail,
+    expectStop: stopMark(s.expectStop, s.name, expectFail), needsMs: 0, expect: s.expect ?? null, beforeLoad: s.beforeLoad, run: s.run,
+  };
+}
+
+/** the sort order of the shards and of the output: the IDs in ascending string order */
+export function sortById(list) {
+  return [...list].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/** the scenarios of one shard `i/n` (1-based): the sorted list's index % n === i - 1 (deterministic) */
+export function shardOf(list, i, n) {
+  return sortById(list).filter((_, k) => k % n === i - 1);
+}
+
+/**
+ * the theme and the language a visual scenario starts in, read from its ID (visual/theme-<slug>-<kind>, visual/(text-)language-<code>…); '' for the others.
+ * It orders the run only: each scenario sets its own state (lib/visual.mjs `ensure`). The ones that start in the same state run one after another, so that
+ * the theme and the language are changed once per group (a change is about 30 s on the Settings window).
+ */
+export function startOf(id) {
+  const t = /^visual\/theme-(.+)-(?:golden|edge|text|black)$/.exec(String(id));
+  const l = /^visual\/(?:text-)?language-([a-z]{2})(?:-|$)/.exec(String(id));
+  return { theme: t ? t[1] : '', language: l ? l[1] : '' };
+}
+
+/** the list in the order it runs: by the start state (the theme, then the language), stable; the scenarios of the other areas keep their order */
+export function runOrder(list) {
+  return list
+    .map((sc, i) => ({ sc, i, s: startOf(sc.id) }))
+    .sort((a, b) => a.s.theme.localeCompare(b.s.theme) || a.s.language.localeCompare(b.s.language) || a.i - b.i)
+    .map((x) => x.sc);
+}

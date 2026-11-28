@@ -1,0 +1,33 @@
+id	kind	name	expected	how
+file/new/ctrl-n	new	New project (Ctrl+N)	an empty project: the engine idle, the main form stays, no drop-down is left; the title changes when a project was open	Ctrl+N (lib/common.mjs resetProject)
+file/open/ctrl-o	open	Open window (Ctrl+O)	the page's file manager window shows and the file uploaded into it opens	Ctrl+O; the file uploaded into the window, chosen, Open (lib/file.mjs openDataFile)
+file/open/upload-single	open	Open: one file uploaded	the project opens: the engine idle, no stop, the title changes or the file's name is in the engine log	Ctrl+O, one .flp to the box
+file/open/upload-multiple	open	Open: several files at once	two files are uploaded into the window at once and both are listed; the first is chosen (FL's Open allows one file) and opens; the engine idle, no stop	Ctrl+O, two .flp uploaded into the window, one chosen (lib/file.mjs openFilesAtOnce, choose 1)
+file/open/folder	open	Open: a folder given to the window	the window does not open a folder as a project: it refuses it (Choose a file) and Cancel closes it; the engine idle, no stop; the result is in the notes	Ctrl+O, a folder uploaded into the window (scenarios/file/open-folder.mjs)
+file/open-recent/welcome-list	open-recent	Open recent (the Welcome window's recent list)	after a reload the Welcome window's recent module (TRecentFilesModule) lists the project; not in this build (#1409)	open, reload, the window table
+file/save/ctrl-s	save	Save (Ctrl+S)	the engine writes the project and the page lists the written file (name .flp, size > 0)	Ctrl+S; the trial window (TInAppShopForm) is closed; wait for window.__app.saved (lib/file.mjs saveByKey)
+file/save/save-as	save	Save as	the engine's Save dialog opens; Cancel closes it; the engine idle	File > #5; Cancel (#fx-close)
+file/save/new-version	save	Save new version	the engine writes a new version: the page lists the file (size > 0)	File > #6; wait for window.__app.saved
+file/save/as-template	save	Save as template	the engine asks for a template (a window or the dialog); the engine idle, no stop	File > #7
+file/import/midi	import	Import: MIDI file	the .mid is given to the box; the box closes; the engine idle, no stop	File > #8 > #0, the .mid to the box
+file/export/wav	export	Export: Wave file	the engine renders and the page lists a .wav with size > 0	File > #9 > #0; wait for window.__app.saved
+file/export/mp3	export	Export: MP3 file	the page lists a .mp3 with size > 0	File > #9 > #1
+file/export/ogg	export	Export: OGG file	the page lists a .ogg with size > 0	File > #9 > #2
+file/export/flac	export	Export: FLAC file	the page lists a .flac with size > 0	File > #9 > #3
+file/export/midi	export	Export: MIDI file	the page lists a .mid with size > 0	File > #9 > #4
+file/export/m4a	export	Export: M4A file	the page lists a file with size > 0	File > #9 > #5
+file/export/last-format	export	Export: Last exported format(s)	the page lists a file with size > 0	File > #9 > #6
+file/export/master	export	Export: Master (mastering)	the mastering window opens; the engine idle, no stop	File > #9 > #7
+file/export/all-playlist-tracks	export	Export: All playlist tracks (sub-menu)	the sub-menu opens (a drop-down is shown)	File > #9 > #9
+file/export/all-playlist-track-groups	export	Export: All playlist track groups (sub-menu)	the sub-menu opens (a drop-down is shown)	File > #9 > #10
+file/export/video	export	Export: Video file	the engine's video dialog or window opens; the engine idle	File > #9 > #11
+file/export/project-data-files	export	Export: Project data files	the project's data files are listed in the file manager (rows > 0)	File > #9 > #12
+file/drop/desktop	drop	Drop a file onto the desktop	the desktop does not open a dropped file (the file manager window takes drops): the engine idle, the title unchanged	CDP drag (lib/file.mjs dropFile) onto the desktop
+file/persist/saved-project	persist	Saved project after a reload	the saved project's name is in the guest's memory after a reload (the file comes back)	Ctrl+S, reload (lib/common.mjs persist)
+file/persist/recent-list	persist	Recent list after a reload	the Welcome window's recent module shows the project after a reload; not kept in this build (#1409)	open, reload, TRecentFilesModule in the window table
+file/info/project-info	info	Project info	the project info window opens and shows the project (its details are in the window)	not covered: the item is not in the File drop-down (10 items, menus.tsv); its place is not read
+file/import/audio	import	Import: audio file	the audio file is given to the box; the box closes; the engine idle, no stop	not covered: the Import sub-menu item for audio is not read (File > #8 > #n unknown)
+file/import/project	import	Import: another project	the other project is given to the box; the engine idle, no stop	not covered: the Import sub-menu item for a project is not read (File > #8 > #n unknown)
+file/open/opfs-window	open	Open: the page's file manager window	File > #3 (or Ctrl+O) shows the page's file manager window (#fx-input-files inside #filedlg); no browser file chooser opens (the filechooser count is 0)	File > #3; the window's Upload input is found; Playwright filechooser events counted (scenarios/file/open-shows-opfs-window.mjs)
+file/open/opfs-demo	open	Open: a demo song through the window	the demo song is uploaded into the window (the browser's storage), chosen and opened: the title changes; the engine idle, no stop; no browser chooser	Ctrl+O; the song to the window's Upload; the row chosen; Open (lib/file.mjs openDataFile)
+file/save/opfs-window	save	Save as: the name in the window	the Save window shows; the name typed and Save writes the project into the browser's storage: the page lists it and the stored file has its size	File > #5; the name in #fx-filename; Save (#fx-ok) (scenarios/file/save-shows-opfs-window.mjs)

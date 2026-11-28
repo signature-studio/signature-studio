@@ -6,7 +6,7 @@
 import { sha256Hex } from '../bundle/sha256.ts';
 import { DeskPresenter, type DeskApi, type DeskSurface } from './desk.ts';
 import { GlDeskPresenter, webgl2Usable, type DeskShow, type GlSurface, type SceneApi } from './desk-gl.ts';
-import { DeskGate } from './desk-link.ts';
+import { DeskGate, PRESENTER_IMAGE, PRESENTER_SCENE } from './desk-link.ts';
 import { QuietClock } from './desk-sleep.ts';
 import { watchContextLoss, type ContextLossTarget } from './ctx-resync.ts';
 import type { EngineToRender, FromWorker, RenderToEngine, ToRender } from './protocol.ts';
@@ -155,6 +155,8 @@ function makeDeskPresenter(scene: boolean): DeskShow {
 function startDesk(scene: boolean): void {
   if (presenter || !canvas || !port) return;
   try { presenter = makeDeskPresenter(scene); } catch (e) { log('error', `desktop not shown: ${String((e as Error)?.stack ?? e)}`); return; }
+  // Issue #1520: the engine composes while it runs (its scheduler's points), and only for a presenter that exists: the mode is told through the shared block
+  gate?.setPresenter(presenter instanceof GlDeskPresenter ? PRESENTER_SCENE : PRESENTER_IMAGE);
   startLoop();
 }
 

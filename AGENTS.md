@@ -43,7 +43,7 @@
 - commit の名義を変えない(環境の git の設定のまま)。commit・タグ・PR に Claude の行を付けない。
 - 必要の無いブランチを作らない。
 - 他のプロジェクトのセッション、portal の道具、依頼者の設定と資格情報に触れない。
-- リポジトリの外に、ファイル・ユニット・設定を作らない。一時ファイルはリポジトリの中の `.tmp-*` に置き、終わったら消す。
+- リポジトリの外に、ファイル・ユニット・設定を作らない。一時ファイルはリポジトリの中の `.tmp-*` に置き、終わったら消す。唯一の例外: 依頼者の指示(台帳 L-088)で作った、`~/.config/systemd/user/signature-studio-boot-notify.service`(インスタンスの起動を、監査・受付のセッションへ通知する)。通知(`kind="boot"` の `<agent-message>`)を受けたら、状態を取り直して(`git pull`・`gh run list`・`gh issue list` の failed・running・`opencode api session.active`)、`.tmp-watch.sh` が動いていなければ、background で起動し直す。
 - 製品の作業は Actions で行う。このマシンでは行わない。
 - GitHub Actions の実行は、依頼者が承認した(台帳 L-027)。作業ジョブの起動は Issues のイベント(`.github/workflows/agent.yml`)だけが行い、`gh workflow run` を手で打たない。`schedule` と `workflow_dispatch` は置かない。`app/`・`lift/`・`ci/` に触れる push は main の `deploy.yml` を動かすので、報告に書く。
 
@@ -61,5 +61,5 @@
 - `tools/`: 製品の検査の道具と、駆動の道具(`select-targets.mjs`: 起動する Issue を選ぶ。`task-accept.mjs`: 本文から受け入れコマンドを取り出す)。判定ではハーネス扱い
 - `guard/`: 判定の道具(`judge.sh` が全体の判定。`scan.sh`・`flags.sh`・`deploy-lint.sh` を使う)
 - `spec/`: テスト(`spec/guard.test.sh`・`spec/workflow.test.sh`)
-- `.github/workflows/`: `agent.yml`(作業フロー)、`deploy.yml`(製品のデプロイ)
+- `.github/workflows/`: `agent.yml`(作業フロー)、`e2e.yml`(製品のビルドと E2E)、`deploy.yml`(E2E が通った後のデプロイ)、`e2e-full.yml`(全シナリオ・非ゲート)
 - `pm-work/`: PM 資料。計画(`pm-work/plan.md`)、設計(`pm-work/workflow-design.md`)、依頼者の指示の台帳(`pm-work/ledger/instructions.tsv`)

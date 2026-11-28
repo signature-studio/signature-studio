@@ -5,11 +5,12 @@
 // style sheets (CSSOM, which the CSP does not stop) and its background from the page, and the bridge (window.chrome.webview) is made by the page as the window's own object once the
 // document has loaded. The frame runs no script of its own (sandbox: allow-same-origin only), so the pointer and keyboard input stay with the frame and are not sent to the engine.
 import type { FromWorker } from '../engine/protocol.ts';
+import { suppressContextMenu } from '../input/context-menu.ts';
 
 /** the mark this Issue puts on the face's iframe (tools/browser-panel/measure.mjs counts the iframes that carry it) */
 export const FACE_ATTR = 'data-fl-webview2';
-/** what the face shows where its document has no background: the colour the error page's own CSS names outside its body (a choice: FL sets no colour on the controller) */
-export const FACE_BACKGROUND = '#142028';
+/** what the face shows where its document has no background: the desktop's colour (fle_desk.h FLE_DESK_BACKGROUND, Issue #1483: the face is laid over the desktop, so it has the desktop's colour and no other until its page is loaded) */
+export const FACE_BACKGROUND = '#05070a';
 
 export interface FaceBounds { left: number; top: number; right: number; bottom: number }
 export interface FaceRect { left: number; top: number; width: number; height: number }
@@ -57,6 +58,23 @@ export function splitStyles(html: string): { markup: string; styles: string[] } 
     return '';
   });
   return { markup, styles };
+}
+
+/** the document without its scripts and its event handlers (Issue #1419): the frame has no allow-scripts, so it cannot run them, and each one that the page reaches logs
+ *  "Blocked script execution" as an error on every load of the document; the handlers are removed from their tags, the rest of the markup is kept */
+export function withoutScripts(html: string): string {
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/<script\b[^>]*>/gi, '')
+    .replace(/<[a-z][^>]*>/gi, (tag) => tag.replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/gi, ''));
+}
+
+/** the document without what the page's CSP (shared/headers.ts: style-src and font-src 'self') stops in the frame: its inline style attributes and its data: fonts (Issue #1419);
+ *  each one logs an error on every load. A font that cannot load is the fallback font, which is the face's look without the rule */
+export function withoutCspBlocked(html: string): string {
+  return html
+    .replace(/<[a-z][^>]*>/gi, (tag) => tag.replace(/\sstyle\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/gi, ''))
+    .replace(/@font-face\s*\{[^}]*\bdata:[^}]*\}/gi, '');
 }
 
 /** a reference that names a file of the bundle (not an absolute URL, a fragment, or a root-relative path) */
@@ -221,6 +239,7 @@ export class WebView2Face {
     const win = frame.contentWindow as FaceWindow | null;
     const doc = frame.contentDocument;
     if (!win || !doc) { this.host.log('warn', 'the face has no document to set up'); return; }
+    suppressContextMenu(win);   // Issue #1482: a frame's events do not reach the page's document
     doc.documentElement.style.background = FACE_BACKGROUND;
     doc.adoptedStyleSheets = this.styles.map((css) => {
       const sheet = new win.CSSStyleSheet();
@@ -255,7 +274,7 @@ export class WebView2Face {
     let markup = '', styles: string[] = [];
     if (bytes && resource !== null) {
       const html = new TextDecoder().decode(bytes);
-      const refs = await rewriteRefs(html, dirOf(resource), (p) => this.host.resource(p), (b) => URL.createObjectURL(new Blob([b.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' })));
+      const refs = await rewriteRefs(withoutCspBlocked(withoutScripts(html)), dirOf(resource), (p) => this.host.resource(p), (b) => URL.createObjectURL(new Blob([b.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' })));
       ({ markup, styles } = splitStyles(refs));
     }
     if (seq !== this.navSeq || !this.frame) return;

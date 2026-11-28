@@ -197,6 +197,8 @@ fn runtime_objs() -> &'static Vec<PathBuf> {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let mut v = Vec::new();
         for s in srcs {
             let o = dir.join(s.file_name().unwrap().to_string_lossy().replace(".c", ".o"));
@@ -339,7 +341,7 @@ fn clang(name: &str, src: &str) -> PathBuf {
         .args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-Wno-unused-value", "-fPIE", "-pthread", "-I"])
         .arg(rt())
         .arg(rt().join("fle_sys.c"))
-        .arg(rt().join("fle_imports.c"))
+        .arg(rt().join("fle_imports.c")).arg(rt().join("fle_glob.c")).arg(rt().join("fle_env.c"))
         .arg("-o")
         .arg(&exe)
         .arg(&c)

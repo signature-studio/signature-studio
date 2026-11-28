@@ -1,0 +1,81 @@
+id	kind	name	expected	how
+page/canvas/fills-window	canvas	the canvas fills the window	the canvas is the window: its CSS size is the window's, at the corner	the canvas box (getBoundingClientRect) against innerWidth and innerHeight, after File > New
+page/canvas/size-matches-window	canvas	the canvas CSS size equals the window	the CSS size is the window size within 1 px, at 0,0	the canvas box against innerWidth and innerHeight
+page/canvas/device-pixels	canvas	the canvas has the room's device pixels	canvas width and height = the room (CSS px) x the device pixel ratio, rounded, within 1 px	canvas.width and height against the #stage size times devicePixelRatio
+page/canvas/picture-size	canvas	the picture has the canvas's size	the engine's picture is canvas.width x canvas.height	deskDumpBase64 size against the canvas attributes
+page/canvas/no-scrollbars	canvas	the page does not scroll	the document is no bigger than the window	scrollWidth and scrollHeight against innerWidth and innerHeight
+page/canvas/pointer-maps-guest	canvas	a pointer at a guest pixel is that pixel	the pointer line reads the guest pixel (within 1)	move the mouse to a guest pixel (lib/guest.mjs pointAt); read #pointer-info
+page/canvas/info-reports-ratio	canvas	the canvas line names the ratio and the guest screen	the line says the device pixel ratio and the guest screen in device px	#canvas-info text against devicePixelRatio and the guest size
+page/crisp/dpr-1	crisp	the canvas is crisp at DPR 1	CSS size x DPR = canvas pixels (within 0.5), canvas = room device px (within 1), picture = canvas, on the device grid	lib/page.mjs crispNow (geometry and the picture size)
+page/crisp/dpr-1-25	crisp	the canvas is crisp at DPR 1.25	as page/crisp/dpr-1	as page/crisp/dpr-1
+page/crisp/dpr-1-5	crisp	the canvas is crisp at DPR 1.5	as page/crisp/dpr-1	as page/crisp/dpr-1
+page/crisp/dpr-1-75	crisp	the canvas is crisp at DPR 1.75	as page/crisp/dpr-1	as page/crisp/dpr-1
+page/crisp/dpr-2	crisp	the canvas is crisp at DPR 2	as page/crisp/dpr-1	as page/crisp/dpr-1
+page/crisp/dpr-2-5	crisp	the canvas is crisp at DPR 2.5	as page/crisp/dpr-1	as page/crisp/dpr-1
+page/crisp/dpr-3	crisp	the canvas is crisp at DPR 3	as page/crisp/dpr-1	as page/crisp/dpr-1
+page/crisp/random	crisp	the canvas is crisp at two random ratios (1.01 to 3.00)	as page/crisp/dpr-1 at each of the two ratios the runner draws	as page/crisp/dpr-1 on the 4k-random display
+page/crisp/screen-pixels	crisp	the screenshot has the engine's pixels	the sampled pixels of the screenshot equal the picture (outside the WebView2 faces)	Page.captureScreenshot decoded in the page, sampled against the picture
+page/resize/grow	resize	the window grows	the canvas follows, stays crisp, and the main form is the screen	setViewportSize (60 % to 100 %); crispNow; the window table main form
+page/resize/shrink	resize	the window shrinks	the canvas follows, stays crisp, and the main form is the screen	setViewportSize (60 %); crispNow; the window table main form
+page/resize/narrow	resize	the window becomes narrow and tall	the canvas takes the room's aspect ratio and stays crisp	setViewportSize (30 % of the width); the canvas size against the room
+page/resize/repeated	resize	the window is resized again and again	ten resizes each settle and are crisp; the last canvas is the first one's	ten setViewportSize calls; crispNow after each
+page/resize/min-limit	resize	a window smaller than the engine's smallest screen	the guest screen is 640 x 480 and it fits the window	setViewportSize below 640 x 480 device px; the guest size and the canvas box
+page/resize/engine-told	resize	the engine is told the new screen	the page's last record of a change is sent to the engine, for the new room	window.__app.screen.resizes (the last record: sent true, the room)
+page/resize/window-table	resize	the engine's main window follows the window	the main form is the screen's size, at 0,0	the window table (TFruityLoopsMainForm) against the guest size
+page/resize/picture-kept	resize	the engine draws at the new size	after a resize the File menu changes the picture	setViewportSize; the File menu opens and closes; the picture hash changes
+page/dpr-change/up-2	dpr-change	the page moves to a monitor of DPR 2 while it runs	the canvas is crisp at 2 and the picture draws	Emulation.setDeviceMetricsOverride (physical size kept); crispNow; File menu
+page/dpr-change/down-1-5	dpr-change	the page moves to a monitor of DPR 1.5 while it runs	the canvas is crisp at 1.5 and the picture draws	as page/dpr-change/up-2 at 1.5
+page/dpr-change/keeps-drawing	dpr-change	the engine keeps drawing after a ratio change	after the change to 1.75 the File menu changes the picture and the engine is idle	as page/dpr-change/up-2 at 1.75
+page/dpr-change/back-to-start	dpr-change	back at the start ratio, the page is as it was	the canvas size after the way back equals the size at the start; crisp	ratio 1.5 and back; the canvas size before and after
+page/dpr-change/sweep	dpr-change	the ratio is changed through six steps	at 1.25, 1.5, 1.75, 2, 2.5 and 3 the canvas settles and is crisp	six ratio changes in turn; crispNow at each
+page/zoom/50	zoom	the page at a browser zoom of 50 %	the ratio is 0.5 of the start's; the canvas is crisp; the picture draws	lib/page.mjs zoomCase (the ratio and the CSS viewport change, the physical size kept)
+page/zoom/67	zoom	the page at a browser zoom of 67 %	as page/zoom/50 at 0.67	as page/zoom/50
+page/zoom/75	zoom	the page at a browser zoom of 75 %	as page/zoom/50 at 0.75	as page/zoom/50
+page/zoom/90	zoom	the page at a browser zoom of 90 %	as page/zoom/50 at 0.9	as page/zoom/50
+page/zoom/100	zoom	the page at its own zoom of 100 %	the same as the start; crisp; the picture draws	as page/zoom/50 at 1
+page/zoom/110	zoom	the page at a browser zoom of 110 %	as page/zoom/50 at 1.1	as page/zoom/50
+page/zoom/125	zoom	the page at a browser zoom of 125 %	as page/zoom/50 at 1.25	as page/zoom/50
+page/zoom/150	zoom	the page at a browser zoom of 150 %	as page/zoom/50 at 1.5	as page/zoom/50
+page/zoom/175	zoom	the page at a browser zoom of 175 %	as page/zoom/50 at 1.75	as page/zoom/50
+page/zoom/200	zoom	the page at a browser zoom of 200 %	as page/zoom/50 at 2	as page/zoom/50
+page/zoom/250	zoom	the page at a browser zoom of 250 %	as page/zoom/50 at 2.5	as page/zoom/50
+page/zoom/300	zoom	the page at a browser zoom of 300 %	as page/zoom/50 at 3	as page/zoom/50
+page/zoom/restart-notice	zoom	the log says FL keeps its scale until it is restarted	after a ratio other than the start's, the page log holds the notice (Issue #1348)	the page log (#log) text after a change of the ratio
+page/fullscreen/request	fullscreen	full screen is requested	the document is in full screen, the File menu draws, the engine is idle	requestFullscreen on the document (a user gesture first); fullscreenElement; the picture hash
+page/fullscreen/release	fullscreen	full screen is left and the page is as it was	after exitFullscreen the document is out of full screen, the canvas fills the window, crisp, and the picture draws	exitFullscreen; fullscreenElement; the canvas box; crispNow; the picture hash
+page/fullscreen/toggle	fullscreen	full screen is entered and left twice	each time the state asked for, and the picture draws	two requests and exits; fullscreenElement after each
+page/visibility/hidden-then-visible	visibility	the page is hidden and visible again	after visible the engine draws again (the File menu changes the picture)	document.visibilityState set to hidden and visibilitychange dispatched (the test's shim: headless does not hide a tab); the picture hash
+page/visibility/presents-resume	visibility	the presenter draws again after visible	the presenter's count grows after the page is visible	desk presents (window.__app.perf.snapshot) before and after the hidden period
+page/visibility/engine-keeps-running	visibility	the engine keeps running while hidden	the engine is never error or exited while hidden; idle when visible	the engine state polled for 4 s while hidden
+page/focus/blur-then-focus	focus	the window loses and gets back the focus	after the focus is back the engine draws again	document.hasFocus shim and the window's blur and focus events; the picture hash
+page/focus/desktop-takes-keys	focus	a click on the desktop gives it the keyboard	the focused element is #desktop after a click on it	a click on the desktop; document.activeElement
+page/focus/engine-keeps-running	focus	the engine keeps running without the focus	the engine is never error or exited without the focus; idle when it is back	the engine state polled for 3 s without focus
+page/reload/20-times	reload	the page reloads twenty times	each reload runs the start to the idle engine, the project opens, and the window table reads	persist (page.reload, then startProject) twenty times at DPR 1
+page/reload/picture-after	reload	after a reload the windows are drawn	no 64 x 64 tile inside a window is black after the start	blackInWindows after persist
+page/history/hash	history	the history moves back and forward over fragments	the fragments come back in order; the engine draws and is idle	location.hash, history.back and forward; the picture hash
+page/history/navigate	history	a real navigation to the page and back	each document starts the engine to idle and the project opens	page.goto and page.goBack (two loads of the document) at DPR 1
+page/webgl/gl-presenter	webgl	the picture is drawn with WebGL2	the presenter's mode is gl and a change of the picture shows	window.__app.perf.snapshot desk.mode; the File menu picture hash
+page/webgl/context-loss-restore	webgl	the picture comes back after the WebGL context is lost and restored	after webglcontextlost and webglcontextrestored the picture draws again	NOT COVERED: the desk's context is in the render Worker (not reachable from the page); a GPU-process kill crashed the page target in this runner (observed)
+page/console/no-errors	console	the console has no error for eight seconds of idle	0 console errors and 0 uncaught exceptions	page console and pageerror events for 8 s and one picture change
+page/console/warnings-bounded	console	the console writes few warnings at idle	at most 10 warnings in 8 s of idle (the first measured value is the baseline)	page console warning events for 8 s
+page/html/only-canvas	html	the page shows the canvas and nothing else	no visible element other than the canvas, its holders and the WebView2 faces, besides the standing ones	lib/page.mjs VISIBLE_CHECK (computed style and box of every element)
+page/html/no-data-image	html	no image is written out as text	the page's text has no data: picture	document.body.textContent
+page/html/status-line	html	the status line says the engine's state	#status data-state equals the engine state (engine-idle)	#status dataset against window.__app.state
+page/html/title	html	the title names FL Studio and the project	the title has FL Studio and more	document.title
+page/html/desktop-focusable	html	the desktop can take the keyboard and is named	#desktop has tabindex 0, role application and an aria-label	the attributes of #desktop
+page/frame/not-mostly-black	frame	the first picture is not mostly black	fewer than half of the 64 x 64 tiles are black	noBlackRegions against the picture size
+page/frame/no-black-in-windows	frame	no window is left black	no 64 x 64 tile whose centre lies in a window is black	blackInWindows: the picture and the window table
+page/headers/isolation	headers	the document is cross-origin isolated	COOP, COEP and CORP have the values of app/shared/headers.ts; crossOriginIsolated is true	fetch of / in the page; the header values; crossOriginIsolated
+page/headers/csp	headers	the document's CSP is the product's	the Content-Security-Policy header equals CSP of app/shared/headers.ts	fetch of / in the page
+page/headers/privacy	headers	the document asks for no indexing, no sniffing, no referrer	X-Robots-Tag, X-Content-Type-Options and Referrer-Policy have the values of PRIVACY_HEADERS	fetch of / in the page
+page/headers/manifest-cache	headers	the manifest is served under the cache rule	status 200, JSON, and Cache-Control of cacheControlFor	fetch of /assets/manifest.json in the page
+page/beacon/first-idle	beacon	the first beacon is sent at the first idle and accepted	the page's beacon record has first-idle with the server's 2xx	window.__app.perf.history
+page/beacon/shape	beacon	the beacon has the record's shape	version 3 and beaconProblems (app/shared/perf.ts) empty	the request body of window.__app.perf.sendNow (waitForRequest)
+page/beacon/own-origin	beacon	the beacon goes to the page's own origin only	the request is to the page's origin, POST /__perf	the request URL of the beacon
+page/beacon/no-personal-data	beacon	the beacon has no personal data	no field beyond the record's, no IP address, no token, no local host, no cookie	the request body and headers
+page/beacon/size-limit	beacon	the beacon is under the server's limit	its size is at most PERF_MAX_BODY (app/shared/perf.ts)	byte length of the request body
+page/beacon/accepted	beacon	the server accepts the beacon and stores it	HTTP 204 and X-Perf-Stored yes	window.__app.perf.sendNow answer
+page/beacon/periodic	beacon	a beacon is sent every 30 s while the engine runs	at least one more beacon in 35 s	window.__app.perf.sent before and after 35 s
+page/beacon/display-meter	beacon	the beacon carries the screen meter and the engine's rate	display and hz are present in the snapshot	window.__app.perf.snapshot
+page/start/reaches-idle	start	the start reaches the idle engine	state engine-idle with no error or exit	window.__app.state
+page/start/first-idle-seconds	start	the start's time to the first idle is measured	a number of seconds above 0 (a measurement, the target is in the beacon)	the beacon's startup block

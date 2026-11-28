@@ -26,6 +26,9 @@
 #include "fle_callback.h"
 #include "fle_ole.h"
 #include "fle_filedlg.h"
+#include "fle_thread.h"
+/* weak: a link without fle_win.c (the unit tests of this file) has no window-API trace (fle_win.c); Issue #1409: the trace of SHGetKnownFolderPath */
+int fle_win_api_trace_on(void) __attribute__((weak));
 
 #define HR_E_NOINTERFACE 0x80004002u
 #define HR_E_FAIL 0x80004005u
@@ -806,19 +809,24 @@ static int env_picker(const fle_filedlg_request *rq, uint16_t ***paths, unsigned
 }
 
 /* ---- the browser picker (decision 0193, fpick1, PROVISIONAL; always compiled since decision 0243) ----
- * The user is the person at the page. Show() hands the request to the page through fle_filedlg_host_pick (an ASYNC import, JSPI: harness/web/filedlg/fle_filedlg_lib.js; the native test supplies a stub), the engine's
- * stack is suspended while the person chooses, and the answer comes back as text, one line per item: `<role> TAB <ptr> TAB <size> TAB <guest path, UTF-8>`, after a first line `OK` (or `CANCEL`, then the lines are ignored).
+ * The user is the person at the page. Show() hands the request to the page through fle_filedlg_host_pick (SYNCHRONOUS: it records the request and returns NULL at once). Then Show() waits cooperatively: while the answer is
+ * NULL it gives the processor to the other guest threads (fle_thread_sleep, so the mixer keeps running) and polls the page through fle_filedlg_host_poll (an ASYNC import, JSPI: harness/web/filedlg/fle_filedlg_lib.js,
+ * which also lets the host run its tasks; the native test supplies stubs). The answer comes back as text, one line per item: `<role> TAB <ptr> TAB <size> TAB <guest path, UTF-8>`, after a first line `OK` (or `CANCEL`, then the lines are ignored).
  * role R = a chosen file: its bytes were read into a malloc'd block (ptr, size) by the page's script and are put on the virtual volume here; E = an extra file of the same choice (a sibling of the project, put on
  * the volume, not part of the dialog's result); S = a Save target (no bytes yet; the engine writes it). The environment variables of the native harness (FLE_FILEDLG_PICK*, FLE_FILEDLG_SAVE*) are read first and win. */
 #ifdef __EMSCRIPTEN__
 extern const char *fle_filedlg_host_pick(const char *request_json);   /* the page's JS library (fle_filedlg_lib.js) */
+extern const char *fle_filedlg_host_poll(void);
 #define FLE_HAS_HOST_PICK 1
+#define FLE_HAS_HOST_POLL 1
 #else
 int fle_vfs_make_dirs(const uint16_t *wdir) __attribute__((weak));
 int fle_vfs_put_file(const uint16_t *wpath, uint8_t *data, uint64_t size) __attribute__((weak));
 int fle_vfs_file_state(const uint16_t *wpath, uint64_t *size, unsigned *opens, uint64_t *wt, const uint8_t **data) __attribute__((weak));
 extern const char *fle_filedlg_host_pick(const char *request_json) __attribute__((weak));   /* a native link list may supply a stub (the tests); without it the harness environment answers */
+extern const char *fle_filedlg_host_poll(void) __attribute__((weak));
 #define FLE_HAS_HOST_PICK (fle_filedlg_host_pick != NULL)
+#define FLE_HAS_HOST_POLL (fle_filedlg_host_poll != NULL)
 #endif
 
 static void json_str(FILE *f, const uint16_t *w)
@@ -940,8 +948,13 @@ static int browser_picker(const fle_filedlg_request *rq, uint16_t ***paths, unsi
     }
     fputs("]}", f);
     fclose(f);
-    ans = (char *)fle_filedlg_host_pick(buf);   /* suspends the engine until the person has answered */
+    ans = (char *)fle_filedlg_host_pick(buf);   /* at once: the request is with the page (NULL = not answered yet) */
     free(buf);
+    while (ans == NULL && FLE_HAS_HOST_POLL) {
+        if (fle_thread_sleep == NULL) fle_stop("filedlg", "the browser picker waits for the person through the guest scheduler, and fle_thread.c is not linked (decision 0122)");
+        fle_thread_sleep("filedlg", 1);   /* the other guest threads run meanwhile (the mixer) */
+        ans = (char *)fle_filedlg_host_poll();   /* yields one host task while the person has not answered */
+    }
     if (ans == NULL) return 0;
     copy = ans;
     v = calloc(64, sizeof *v);
@@ -992,6 +1005,24 @@ static int browser_picker(const fle_filedlg_request *rq, uint16_t ***paths, unsi
     fprintf(stderr, "filedlg: THE %s WAS MADE BY THE PERSON AT THE PAGE (%u item%s); the file stays in this tab's memory, it is not uploaded\n", rq->save ? "SAVE TARGET" : "SELECTION", k, k == 1 ? "" : "s");
     *paths = v;
     *n = k;
+    return 1;
+}
+
+/* File > Manage files (Issue #1521, fle_hle.c): the page shows its file window (the plain file manager, with no choice to make) and the guest
+ * waits for the person to close it, as it waits for a dialog; the answer is not used. Without a host picker nothing is shown. */
+int fle_filedlg_manage_open(void)
+{
+    static const char req[] = "{\"manage\":true,\"save\":false,\"options\":0,\"filterIndex\":0,\"title\":null,\"okLabel\":null,\"fileName\":null,\"defaultExt\":null,\"folder\":null,\"filters\":[]}";
+    char *ans;
+
+    if (!FLE_HAS_HOST_PICK) return 0;
+    ans = (char *)fle_filedlg_host_pick(req);
+    while (ans == NULL && FLE_HAS_HOST_POLL) {
+        if (fle_thread_sleep == NULL) fle_stop("filedlg", "the file window waits for the person through the guest scheduler, and fle_thread.c is not linked (decision 0122)");
+        fle_thread_sleep("filedlg", 1);
+        ans = (char *)fle_filedlg_host_poll();
+    }
+    free(ans);
     return 1;
 }
 
@@ -1585,6 +1616,7 @@ void fle_imp_SHGetKnownFolderPath(void)
     else if (guid_eq(&g, &FOLDERID_ProgramFilesCommon) || guid_eq(&g, &FOLDERID_ProgramFilesCommonX64)) text = "C:\\Program Files\\Common Files";
     else if (guid_eq(&g, &FOLDERID_ProgramFilesCommonX86)) text = "C:\\Program Files (x86)\\Common Files";
     else if (guid_eq(&g, &FOLDERID_ProgramData)) text = "C:\\ProgramData";
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) fprintf(stderr, "shell-api: SHGetKnownFolderPath %s -> %s\n", gt, text != NULL ? text : "(not modelled)");
     if (text == NULL) fle_stop(api, "a KNOWNFOLDERID that the model does not know (Profile, Documents, Desktop, Downloads, RoamingAppData, LocalAppData, ProgramFiles[X64|X86|Common|CommonX64|CommonX86], ProgramData only)");
     w = fle_w_from_ascii(text);
     fle_st(pp, 8, task_wstr(w, fle_w_len(w)));

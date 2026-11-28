@@ -109,11 +109,9 @@ describe('attachDesktopInput', () => {
     expect(el.captured).toEqual([1]);
     expect(d.defaultPrevented).toBe(true);
   });
-  it('the context menu is suppressed while the desktop takes input, not otherwise', () => {
+  it('the browser\'s context menu is not the desktop\'s to cancel: it is cancelled for the page (context-menu.ts), enabled or not', () => {
     const a = make(true); const e1 = new Event('contextmenu', { cancelable: true }); a.el.dispatchEvent(e1);
-    expect(e1.defaultPrevented).toBe(true);
-    const b = make(false); const e2 = new Event('contextmenu', { cancelable: true }); b.el.dispatchEvent(e2);
-    expect(e2.defaultPrevented).toBe(false);
+    expect(e1.defaultPrevented).toBe(false);
   });
   it('a disabled desktop (engine starting or stopped) sends nothing and keeps every key and click for the browser', () => {
     const { el, raws } = make(false);

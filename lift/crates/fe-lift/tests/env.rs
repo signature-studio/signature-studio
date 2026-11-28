@@ -6,28 +6,202 @@
 mod fsx_common;
 use fsx_common::*;
 
+// Issue #1412: the block starts with the Windows session's standard variables. The values are the virtual paths and the
+// SHGetFolderPathW answers of this environment (fle_env.h); PATHEXT, OS, NUMBER_OF_PROCESSORS and PROCESSOR_ARCHITECTURE are
+// the Windows values of this environment (choices: no Microsoft page is read for them here).
+const STANDARD_ENV: [(&str, &str); 22] = [
+    ("SystemRoot", r"C:\Windows"),
+    ("SystemDrive", "C:"),
+    ("windir", r"C:\Windows"),
+    ("USERNAME", "user"),
+    ("USERPROFILE", r"C:\Users\user"),
+    ("APPDATA", r"C:\Users\user\AppData\Roaming"),
+    ("LOCALAPPDATA", r"C:\Users\user\AppData\Local"),
+    ("ProgramData", r"C:\ProgramData"),
+    ("ProgramFiles", r"C:\Program Files"),
+    ("ProgramFiles(x86)", r"C:\Program Files"),
+    ("CommonProgramFiles", r"C:\Program Files\Common Files"),
+    ("TEMP", r"C:\Users\user\AppData\Local\Temp"),
+    ("TMP", r"C:\Users\user\AppData\Local\Temp"),
+    ("COMPUTERNAME", "DESKTOP-0000001"),
+    ("OS", "Windows_NT"),
+    ("PATH", r"C:\Windows\System32;C:\Windows"),
+    ("PATHEXT", ".COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC"),
+    ("NUMBER_OF_PROCESSORS", "1"),
+    ("PROCESSOR_ARCHITECTURE", "AMD64"),
+    ("HOMEDRIVE", "C:"),
+    ("HOMEPATH", r"\Users\user"),
+    ("USERDOMAIN", "DESKTOP-0000001"),
+];
+
 #[test]
-fn environment_starts_empty_and_hides_the_host() {
-    // Decision 0018: nothing from the host. The test process itself has PATH and HOME set; the virtual block does not.
+fn environment_starts_with_the_windows_session_variables() {
+    // Decision 0018 (the host is never read): the names that only other systems have are not in the block.
     assert!(std::env::var_os("PATH").is_some());
+    let mut body = String::from("    static uint16_t b[512];\n");
+    for (name, _) in STANDARD_ENV {
+        body.push_str(&format!("    {{ uint64_t n = CALL(fle_imp_GetEnvironmentVariableW, W(\"{name}\"), A(b), 512); printf(\"{name} %llu %s\\n\", U(n), AS(b)); }}\n"));
+    }
+    body.push_str("    { uint64_t n = CALL(fle_imp_GetEnvironmentVariableW, W(\"systemroot\"), A(b), 512); printf(\"lower %llu %s\\n\", U(n), AS(b)); }\n");
+    body.push_str("    { int i; static const char *none[] = { \"HOME\", \"USER\", \"SHELL\", \"PWD\", \"LANG\" }; for (i = 0; i < 5; i++) { uint16_t n[16]; int k; for (k = 0; none[i][k]; k++) n[k] = (uint8_t)none[i][k]; n[k] = 0; SETLE(0); printf(\"%s %llu %u\\n\", none[i], U(CALL(fle_imp_GetEnvironmentVariableW, A(n), A(b), 512)), LE()); } }\n");
+    let l = lines("env-standard", &body);
+    let mut want: Vec<String> = STANDARD_ENV.iter().map(|(n, v)| format!("{n} {} {v}", v.len())).collect();
+    want.push(format!("lower {} {}", r"C:\Windows".len(), r"C:\Windows"));
+    for n in ["HOME", "USER", "SHELL", "PWD", "LANG"] {
+        want.push(format!("{n} 0 203")); // ERROR_ENVVAR_NOT_FOUND
+    }
+    assert_eq!(l, want);
+}
+
+#[test]
+fn standard_values_are_the_shgetfolderpath_answers() {
+    // The values of the block come from the same constants as the SHGetFolderPathW answers (fle_env.h): each pair must agree.
     let l = lines(
-        "env-empty",
+        "env-shgfp",
         r#"
-    static uint16_t b[64];
-    const char *names[] = { "PATH", "HOME", "USERPROFILE", "TEMP", "TMP", "USER", "SystemRoot", "windir", "COMPUTERNAME" };
+    static uint16_t sh[260], ev[260];
+    static const struct { int csidl; const char *name; } pairs[] = {
+        { 0x1a, "APPDATA" }, { 0x1c, "LOCALAPPDATA" }, { 0x23, "ProgramData" }, { 0x26, "ProgramFiles" }, { 0x2a, "ProgramFiles(x86)" },
+        { 0x2b, "CommonProgramFiles" }, { 0x24, "SystemRoot" }, { 0x28, "USERPROFILE" },
+    };
     int i;
-    for (i = 0; i < 9; i++) {
-        uint16_t n[32]; size_t k;
-        for (k = 0; names[i][k]; k++) n[k] = (uint8_t)names[i][k];
+    for (i = 0; i < 8; i++) {
+        uint16_t n[32]; int k;
+        for (k = 0; pairs[i].name[k]; k++) n[k] = (uint8_t)pairs[i].name[k];
         n[k] = 0;
-        SETLE(0);
-        printf("%s %llu %u\n", names[i], U(CALL(fle_imp_GetEnvironmentVariableW, A(n), A(b), 64)), LE());
+        CALL(fle_imp_SHGetFolderPathW, 0, pairs[i].csidl, 0, 0, A(sh));
+        CALL(fle_imp_GetEnvironmentVariableW, A(n), A(ev), 260);
+        printf("%s|%s\n", AS(sh), AS(ev));
     }
 "#,
     );
-    let names = ["PATH", "HOME", "USERPROFILE", "TEMP", "TMP", "USER", "SystemRoot", "windir", "COMPUTERNAME"];
-    let want: Vec<String> = names.iter().map(|n| format!("{n} 0 203")).collect(); // ERROR_ENVVAR_NOT_FOUND
-    assert_eq!(l, want);
+    assert_eq!(l.len(), 8);
+    for line in &l {
+        let (sh, ev) = line.split_once('|').unwrap();
+        assert_eq!(sh, ev, "the SHGetFolderPathW answer and the block value differ");
+    }
+}
+
+#[test]
+fn environment_names_are_case_insensitive_and_only_windows_names_are_set() {
+    // The names of the test: HOME, USER, SHELL, PWD and LANG are the names of other systems (none is set here).
+    let l = lines(
+        "env-case",
+        r#"
+    static uint16_t b[64];
+    uint64_t n;
+    n = CALL(fle_imp_GetEnvironmentVariableW, W("PATH"), A(b), 64); printf("%llu\n", U(n));
+    n = CALL(fle_imp_GetEnvironmentVariableW, W("path"), A(b), 64); printf("%llu %s\n", U(n), AS(b));
+"#,
+    );
+    assert_eq!(l, ["30".to_string(), r"30 C:\Windows\System32;C:\Windows".to_string()]);
+}
+
+#[test]
+fn one_block_for_set_get_expand_and_the_two_environment_strings() {
+    // Issue #1412: Set, Get, Expand, GetEnvironmentStringsW and GetEnvironmentStrings (the ANSI export) read and write one block.
+    // The block has the 22 standard names and the one that Set adds; the two blocks hold the same characters (ASCII names and values).
+    let l = lines(
+        "env-one-block",
+        r#"
+    static uint16_t b[128];
+    uint64_t n;
+    uint16_t *wb; char *ab;
+    size_t i, entries = 0; int same = 1, zed = 0, azed = 0;
+    CALL(fle_imp_SetEnvironmentVariableW, W("Zed"), W("x"));
+    n = CALL(fle_imp_GetEnvironmentVariableW, W("ZED"), A(b), 128); printf("get %llu %s\n", U(n), AS(b));
+    n = CALL(fle_imp_ExpandEnvironmentStringsW, W("%SystemRoot%\\system32\\%zed%"), A(b), 128); printf("expand %llu %s\n", U(n), AS(b));
+    wb = (uint16_t *)(uintptr_t)CALL(fle_imp_GetEnvironmentStringsW);
+    ab = (char *)(uintptr_t)CALL(fle_imp_GetEnvironmentStrings);
+    for (i = 0; wb[i]; i++) {
+        size_t s = i;
+        entries++;
+        if (wb[s] == 'Z' && wb[s + 1] == 'e' && wb[s + 2] == 'd' && wb[s + 3] == '=' && wb[s + 4] == 'x' && wb[s + 5] == 0) zed = 1;
+        while (wb[i]) i++;
+    }
+    for (i = 0;; i++) {
+        if ((uint16_t)(uint8_t)ab[i] != wb[i]) { same = 0; break; }
+        if (wb[i] == 0 && wb[i + 1] == 0) break;
+    }
+    for (i = 0; ab[i]; ) { if (ab[i] == 'Z' && ab[i + 1] == 'e' && ab[i + 2] == 'd' && ab[i + 3] == '=' && ab[i + 4] == 'x' && ab[i + 5] == 0) azed = 1; while (ab[i]) i++; i++; }
+    printf("entries %zu zed %d ansi-zed %d same %d\n", entries, zed, azed, same);
+    CALL(fle_imp_FreeEnvironmentStringsW, A(wb));
+    CALL(fle_imp_FreeEnvironmentStringsA, A(ab));
+    printf("delete %llu\n", U(CALL(fle_imp_SetEnvironmentVariableW, W("zed"), 0)));
+    n = CALL(fle_imp_GetEnvironmentVariableW, W("Zed"), A(b), 128); printf("gone %llu\n", U(n));
+    wb = (uint16_t *)(uintptr_t)CALL(fle_imp_GetEnvironmentStringsW);
+    entries = 0;
+    for (i = 0; wb[i]; i++) { entries++; while (wb[i]) i++; }
+    printf("entries-after %zu\n", entries);
+"#,
+    );
+    assert_eq!(
+        l,
+        [
+            "get 1 x",
+            r"expand 22 C:\Windows\system32\x",
+            "entries 23 zed 1 ansi-zed 1 same 1",
+            "delete 1",
+            "gone 0",
+            "entries-after 22",
+        ]
+    );
+}
+
+#[test]
+fn fl_variables_set_by_the_guest_are_seen_by_get_and_expand() {
+    // Issue #1412 (seen in the engine's log of the DEDZII open, run 45541813190): FL sets its own variables with SetEnvironmentVariableW when it starts. The
+    // values have no trailing backslash (FLStudioFactoryData is the install folder, so %FLStudioFactoryData%\Data\... has one backslash).
+    // Get and ExpandEnvironmentStringsW read them from the same block.
+    let l = lines(
+        "env-fl",
+        r#"
+    static uint16_t b[256];
+    uint64_t n;
+    CALL(fle_imp_SetEnvironmentVariableW, W("FLStudioFactoryData"), W("C:\\Program Files\\Image-Line\\FL Studio 21"));
+    CALL(fle_imp_SetEnvironmentVariableW, W("FLStudioUserData"), W("C:\\Users\\user\\Documents\\Image-Line\\FL Studio"));
+    n = CALL(fle_imp_ExpandEnvironmentStringsW, W("%FLStudioFactoryData%\\Data\\Patches\\x.wav"), A(b), 256); printf("%llu %s\n", U(n), AS(b));
+    n = CALL(fle_imp_ExpandEnvironmentStringsW, W("%FLStudioUserData%\\Presets\\"), A(b), 256); printf("%llu %s\n", U(n), AS(b));
+    n = CALL(fle_imp_GetEnvironmentVariableW, W("flstudiouserdata"), A(b), 256); printf("%llu %s\n", U(n), AS(b));
+    printf("%llu\n", U(CALL(fle_imp_SetEnvironmentVariableW, W("FLStudioUserData"), 0)));
+    n = CALL(fle_imp_ExpandEnvironmentStringsW, W("%FLStudioUserData%"), A(b), 256); printf("%llu %s\n", U(n), AS(b));
+"#,
+    );
+    assert_eq!(
+        l,
+        [
+            r"60 C:\Program Files\Image-Line\FL Studio 21\Data\Patches\x.wav",
+            r"54 C:\Users\user\Documents\Image-Line\FL Studio\Presets\",
+            r"44 C:\Users\user\Documents\Image-Line\FL Studio",
+            "1",
+            "19 %FLStudioUserData%",
+        ]
+    );
+}
+
+#[test]
+fn observation_lines_for_the_first_200_calls_of_each_api() {
+    // Issue #1412 (observation, always on): the first 200 calls of each environment API write one line to stderr: the API, the name
+    // (or the expanded text), what happened and the length. Only the first 200 of each API are written.
+    let o = run(
+        "env-observe",
+        r#"
+    static uint16_t b[64];
+    int i;
+    for (i = 0; i < 205; i++) CALL(fle_imp_GetEnvironmentVariableW, W("PATH"), A(b), 64);
+    for (i = 0; i < 3; i++) CALL(fle_imp_ExpandEnvironmentStringsW, W("x"), A(b), 64);
+    CALL(fle_imp_SetEnvironmentVariableW, W("FLStudioFactoryData"), W("C:\\FL"));
+    CALL(fle_imp_SetEnvironmentVariableW, W("FLStudioFactoryData"), 0);
+"#,
+    );
+    assert!(o.ok, "{}", o.stderr);
+    let get: Vec<&str> = o.stderr.lines().filter(|l| l.starts_with("env: GetEnvironmentVariableW")).collect();
+    assert_eq!(get.len(), 200);
+    assert_eq!(get[0], r#"env: GetEnvironmentVariableW "PATH" found 30"#);
+    let expand: Vec<&str> = o.stderr.lines().filter(|l| l.starts_with("env: ExpandEnvironmentStringsW")).collect();
+    assert_eq!(expand, [r#"env: ExpandEnvironmentStringsW "x" expanded 1"#; 3]);
+    assert!(o.stderr.contains(r#"env: SetEnvironmentVariableW "FLStudioFactoryData" set 5"#), "{}", o.stderr);
+    assert!(o.stderr.contains(r#"env: SetEnvironmentVariableW "FLStudioFactoryData" deleted 0"#), "{}", o.stderr);
 }
 
 #[test]

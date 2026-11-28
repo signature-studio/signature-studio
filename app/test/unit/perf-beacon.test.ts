@@ -42,8 +42,8 @@ describe('buildBeacon', () => {
     expect(b.error).toBeNull();
   });
   it('carries the engine\'s wasm memory against the limit of its memory section (decision 0170); null before the first idle and for a stand-in', () => {
-    expect(buildBeacon({ ...base, wasmMemoryBytes: 1024 * 1048576 }).memory).toEqual({ wasmBytes: 1024 * 1048576, wasmLimitBytes: 2048 * 1048576, wasmFraction: 0.5 });
-    expect(buildBeacon(base).memory).toEqual({ wasmBytes: null, wasmLimitBytes: 2048 * 1048576, wasmFraction: null });
+    expect(buildBeacon({ ...base, wasmMemoryBytes: 1024 * 1048576 }).memory).toEqual({ wasmBytes: 1024 * 1048576, wasmLimitBytes: 4096 * 1048576, wasmFraction: 0.25 });
+    expect(buildBeacon(base).memory).toEqual({ wasmBytes: null, wasmLimitBytes: 4096 * 1048576, wasmFraction: null });
     expect(buildBeacon({ ...base, wasmMemoryBytes: null }).memory.wasmFraction).toBeNull();
   });
   it('before the first idle there is no start-up time (not a guess)', () => {

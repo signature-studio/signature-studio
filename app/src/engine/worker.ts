@@ -11,14 +11,15 @@ import { ReportThrottle } from './report-throttle.ts';
 import { TaskbarReport } from './taskbar-report.ts';
 import type { EngineToRender, FromWorker, GuestTextBest, GuestTextNear, RenderToEngine, ToWorker } from './protocol.ts';
 import type { CursorPictureMsg } from './cursor-picture.ts';
-import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
+import type { FileDlgAnswer, FileDlgItem, FileDlgRequest } from './filedlg.ts';
 import { osStateKey, osStateOf } from './os-state.ts';
 import { deskGen, readDeskState, type DeskApi, type DeskState } from './desk.ts';
 import { sceneGen } from './desk-gl.ts';
-import { DeskGate } from './desk-link.ts';
+import { DeskGate, PRESENTER_NONE, PRESENTER_SCENE } from './desk-link.ts';
 import { RingReader, takenAtSchedulerPoint } from '../input/ring.ts';
 import { IN, SC } from '../input/events.ts';
-import { openRegState, type RegState } from './regstore.ts';
+import { openRegState, REG_STATE_LIMIT, type RegState } from './regstore.ts';
+import { fileRecord, recentAfterOpen, recentListOf } from './recent.ts';
 import { stopAudioReport } from '../audio/worker-hook.ts'; // decision 0175: listens for { cmd: 'audio-init' } (the page sends it)
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -38,6 +39,8 @@ let fruity: FruityEngine | null = null;
 let driver: IdleDriver | null = null;
 /** Issue #1383: the saved HKCU tree of the virtual registry (regstore.ts); null when the browser keeps none */
 let regState: RegState | null = null;
+/** Issue #1502: FL's Recent list (the MRU values, newest first) as the journal holds it (recent.ts) */
+let recentList: string[] = [];
 const reports = new ReportThrottle();
 const trace = new IdleTrace();
 const checkpoints: { n: number; hash: number }[] = [];
@@ -84,10 +87,12 @@ async function handle(m: ToWorker): Promise<void> {
     case 'guest-text': guestText(m.markers, m.radius); break;
     case 'settings-redraw': if (fruity?.redrawTree(m.lid)) driver?.wake(); break;
     case 'window-api-trace': fruity?.windowApiTrace(m.on); break;
+    case 'hz': hzWanted = m.hz; ensureDriver()?.setHz(m.hz); break;   // Issue #1402: the engine is paced at the page's rate from its next idle
     case 'webview2-loaded': onWebView2Loaded(); break;
     case 'webview2-message': log('info', `the page posted a message to the engine's WebView2 (${m.json.length} characters): the engine has no WebMessageReceived model yet, so it is not delivered`); break;
     case 'clipboard-text': fruity?.answerClipRead(m.id, m.text); break;   // #1389: the engine waits for this answer (its JSPI import)
     case 'exit-request': onExitRequest(); break;
+    case 'clipboard-probe-answer': fruity?.answerClipProbe(m.id, m.has); break;   // #1406: the engine waits for this answer (a question about the formats)
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
 }
@@ -107,6 +112,7 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
   if (!m.assets.glue || !m.assets.dll || !m.assets.seed) throw new Error('the emscripten engine needs the glue, the seed pack and the DLL pack');
   regState = await openRegState(log);
   if (regState) mark('reg_state', { saved: regState.saved.length, bytes: regState.bytes });
+  recentList = regState ? recentListOf(regState.saved) : [];
   const host: FruityHost = {
     regSaved: () => regState?.saved ?? null,
     regPut: (record) => { regState?.put(record); },
@@ -128,6 +134,7 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
     fileDlgProgress: (id, done, total) => post({ t: 'filedlg-progress', id, done, total }),
     clipWrite: (text) => post({ t: 'clipboard-write', text }),   // #1389: the engine's Copy goes to the page
     clipRead: (id) => post({ t: 'clipboard-read', id }),        // #1389: the engine's Paste asks the page for the clipboard text
+    clipProbe: (id) => post({ t: 'clipboard-probe', id }),      // #1406: the engine's question about the formats asks the page whether there is text
     inputPoll,
     inputDone,
   };
@@ -170,6 +177,8 @@ function cancelDeadlineWait(h: DeadlineWait): void {
   Atomics.notify(deadlineWords, h.slot);
 }
 
+/** Issue #1402: the page's last rate of requestAnimationFrame (cmd 'hz'), kept until the driver exists to take it */
+let hzWanted: number | null = null;
 // the engine instance exists only once run() has instantiated the wasm, so the driver is made at the first idle or the first input
 function ensureDriver(): IdleDriver | null {
   if (driver || !fruity) return driver;
@@ -226,6 +235,7 @@ function ensureDriver(): IdleDriver | null {
       if (at - lastLagLog > 5000) { lastLagLog = at; log('warn', `the virtual clock fell ${(lagCutTicks / 10000).toFixed(0)} ms further behind the wall clock than the cap allows (S-clk-maxlag); it stays behind (no virtual time is skipped)`); lagCutTicks = 0; }
     },
   }, { maxLeadMs: 1, maxLagMs: 10 });
+  if (hzWanted !== null) driver.setHz(hzWanted);
   return driver;
 }
 
@@ -290,6 +300,7 @@ function clearMoveTimer(): void {
   if (moveFlushTimer !== null) { cancelDeadlineWait(moveFlushTimer); moveFlushTimer = null; }
 }
 function inputPoll(ptr: number, max: number): number {
+  deskPoll();   // Issue #1520: before the driver exists too (the start-up): the picture is shown at the scheduler's points
   const d = driver, mem = fruity?.memory;
   if (!ring || !d || !d.ready || !mem) return 0;
   if (d.awaitingCount > inlineSettledCount && inlineSince !== 0 && readSettled(ptr, max) === 1) {
@@ -392,12 +403,13 @@ function answerInline(): void {
 function reportIdle(n: number, nowTicks: number, nextTicks: number, busyMs: number | null, abs: number): void {
   if (!reports.idle(n, abs)) return;
   const caps = { input: driver !== null, appview: fruity?.hasAppView ?? false, display: fruity?.hasDisplay ?? false };
-  post({ t: 'idle', n, now: nowTicks, next: nextTicks, busyMs, abs, caps, stats: driver?.stats ?? { ...newDriverStats(), idleCount: n }, queued: driver?.queued ?? 0, ...(checkpoints.length ? { trace: checkpoints.splice(0) } : {}), memBytes: curMemory()?.buffer.byteLength, ...(fruity?.hostFileStats ? { hostFiles: fruity.hostFileStats } : {}) });
+  post({ t: 'idle', n, now: nowTicks, next: nextTicks, busyMs, abs, caps, stats: driver?.stats ?? { ...newDriverStats(), idleCount: n }, queued: driver?.queued ?? 0, ...(checkpoints.length ? { trace: checkpoints.splice(0) } : {}), memBytes: curMemory()?.buffer.byteLength, dwm: fruity?.dwmFlushes() ?? null, ...(fruity?.hostFileStats ? { hostFiles: fruity.hostFileStats } : {}) });
 }
 
 // the engine is waiting: then let the driver decide (give queued input, or wait for the engine's next deadline). The picture is not composed here (C-2): the render Worker asks for it (onRender 'want'), and its own frame loop
 // is not held back by the engine's business, which is what the idle used to do with a compose every 20 ms while nothing moved
 function onEngineIdle(n: number, nowTicks: number, nextTicks: number): void {
+  idleAt = performance.now();
   const ck = trace.push(n, nowTicks, nextTicks);
   if (ck) checkpoints.push(ck);
   flushLogs();
@@ -429,6 +441,23 @@ function onFileDlgAnswer(id: number, answer: FileDlgAnswer): void {
   const taken = fruity.answerFileDlg(id, answer);
   mark('filedlg_answer', { id, taken, ok: answer.ok });
   if (!taken) log('warn', `the page answered file dialog ${id}, which the engine is not waiting for`);
+  else if (answer.ok) keepOpened(answer.items);
+}
+
+/** Issue #1502: a project the person opened is kept for the next start: its content (the journal's user's file, op 5) and its place at the top of FL's Recent list (the MRU values).
+ * FL's own exit does not write the list here, so the page records the open; the records go to the journal as the engine's own changes do (regstore.ts). Nothing is kept when the journal is not. */
+function keepOpened(items: FileDlgItem[]): void {
+  const item = items.find((i) => i.role === 'R');
+  if (!regState || !item || !item.file || item.file.size === 0 || item.file.size > REG_STATE_LIMIT) return;
+  const state = regState;
+  const path = item.path;
+  void item.file.arrayBuffer().then((buf) => {
+    if (regState !== state) return;
+    state.put(fileRecord(path, new Uint8Array(buf)));
+    const next = recentAfterOpen(recentList, path);
+    recentList = next.list;
+    for (const r of next.records) state.put(r);
+  }).catch((e: unknown) => log('warn', `the project is not kept for the next start: ${String((e as Error)?.message ?? e).slice(0, 200)}`));
 }
 // at the engine's idle: a Save target whose file the engine has finished writing goes to the page as a copy (never to a server; the page offers it as a download)
 function pollSavedFiles(): void {
@@ -578,7 +607,7 @@ function onRender(m: RenderToEngine): void {
       else deskTick(true);
       break;
     case 'resync': compositor()?.resync(); break;
-    case 'scene-mode': { const api = compositor(); if (api && api.scene && api.sceneMode && !deskScene) { api.sceneMode(1); deskScene = true; } break; }
+    case 'scene-mode': sceneOn(); break;
     case 'pixels': { const d = pendingDump; pendingDump = null; if (d !== null) post({ t: 'desk-dump', width: m.width, height: m.height, data: m.data, windows: d }, [m.data]); break; }
     case 'pixels-error': pendingDump = null; post({ t: 'desk-dump-error', message: m.message }); break;
   }
@@ -671,6 +700,30 @@ function cursorPicSig(p: CursorPictureMsg): string {
     h2 = Math.imul(h2 ^ ((w << 13) | (w >>> 19)), 0x85ebca6b) >>> 0;
   }
   return `${p.width}x${p.height}:${p.hotX},${p.hotY}:${p.alpha ? 1 : 0}:${p.invert}:${p.transparent}:${p.opaque}:${h1.toString(16)}_${h2.toString(16)}`;
+}
+
+/** decision 0240: the scene mode is on, once (the render Worker's WebGL2 presenter reads the description, not the picture) */
+function sceneOn(): void {
+  const api = compositor();
+  if (api && api.scene && api.sceneMode && !deskScene) { api.sceneMode(1); deskScene = true; }
+}
+
+// Issue #1520: the picture is shown while the engine runs without an idle (a start-up, a long run). The render Worker's question is answered only at the engine's idle, so the scheduler's points
+// (inputPoll) bring the picture up to date too: at most every DESK_POLL_MS, and only when no idle came for that long (at an idle the render Worker's own question does it). A compose waits for a presenter
+// to exist (the shared block says which): the first one must show the whole picture, and nothing composed before it would be shown.
+const DESK_POLL_MS = 50;
+let deskPollAt = -Infinity;
+let idleAt = -Infinity;
+function deskPoll(): void {
+  const t = performance.now();
+  if (t - deskPollAt < DESK_POLL_MS || t - idleAt < DESK_POLL_MS) return;
+  deskPollAt = t;
+  if (!port || !gate || !fruity) return;
+  sendDeskReady();
+  const mode = gate.presenter;
+  if (!deskReady || mode === PRESENTER_NONE) return;
+  if (mode === PRESENTER_SCENE) sceneOn();
+  try { deskTick(false); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
 }
 
 /** #1392: the picture of a cursor the guest loaded from one of its modules or made with CreateIconIndirect, read now (before the osstate that names the handle, which is posted when the key changes: a handle number can be made again for another cursor, so it is not kept) */

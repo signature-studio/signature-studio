@@ -78,6 +78,10 @@
 uint32_t fle_display_hz(void) FLE_THREAD_REF;
 /* The refresh rate EnumDisplaySettingsW reports (see fle_thread.c): FLE_DISPLAYSETTINGS_FREQUENCY in the environment, else fle_display_hz(). */
 uint32_t fle_display_settings_hz(void) FLE_THREAD_REF;
+/* Issue #1402: the page's measured rate of requestAnimationFrame, put in at an idle (fle_g3_hz): 24..1000, else 0 and nothing changes. Once put, fle_display_hz() and fle_display_settings_hz() answer it. */
+int fle_display_hz_put(uint32_t hz) FLE_THREAD_REF;
+/* Issue #1402: the number of DwmFlush calls so far. */
+uint64_t fle_thread_dwm_flushes(void) FLE_THREAD_REF;
 
 /* ---- decision 0147 (PROVISIONAL): deterministic pseudo-preemption (an exception to decision 0122's "a thread is given up only inside one of the waiting or yielding APIs") ----
  * From the first CreateThread on, every FLE_PREEMPT_SLICE_DISPATCHES indirect calls of the guest (fle_progress_count of fle_dispatch.h; the count is the same for native, wasm, -O0 and -O2) end one slice: the virtual
@@ -167,6 +171,8 @@ unsigned fle_thread_current(void) FLE_THREAD_REF;
 void fle_thread_sleep(const char *api, uint32_t ms) FLE_THREAD_REF;
 /* Decision 0171: a new thread that runs the C function body(arg) (see fle_thread.c); returns its handle, 0 on failure. */
 uint64_t fle_thread_spawn(void (*body)(uint64_t), uint64_t arg) FLE_THREAD_REF;
+/* Issue #1499 (段 B): the running thread ends with `code`, as ExitThread ends it (a program's thread that calls ExitProcess). Does not return. The first thread is not ended here. */
+void fle_thread_end_running(uint32_t code) FLE_THREAD_REF;
 /* kernel32!SwitchToThread: 1 when another thread ran, 0 when there was none ready. */
 int fle_thread_switch(void) FLE_THREAD_REF;
 /* Waits for the objects (events: fle_event.c; threads). ms is the time-out in ms (0xFFFFFFFF = INFINITE). `msg` != 0 adds the input of the thread's queue (MsgWait...,
@@ -227,6 +233,10 @@ void fle_thread_preempt_stats(fle_preempt_stats *out) FLE_THREAD_REF;
 void fle_thread_report(FILE *f) FLE_THREAD_REF;
 /* A trace of every switch on stderr (write(2)), for diagnosis. */
 void fle_thread_set_trace(int on) FLE_THREAD_REF;
+int fle_thread_trace_on(void) FLE_THREAD_REF;   /* Issue #1502: the trace is on (the other modules' diagnostic lines follow it) */
+/* Issue #1502: one "fle-event:" line for an event call, and one line per thread of the table (the trace only) */
+void fle_thread_trace_event(const char *what, uint64_t h, uint32_t v) FLE_THREAD_REF;
+void fle_thread_trace_table(void) FLE_THREAD_REF;
 /* Decision 0234 (mt3, PROVISIONAL): 1 = the scheduler orders the ready threads by their scheduling priority (Learn "Scheduling Priorities": the levels SetThreadPriority kept), 0 (the default) = the rotation in creation order of decision 0122, the priorities are only kept. */
 void fle_thread_set_priorities(int on) FLE_THREAD_REF;
 

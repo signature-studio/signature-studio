@@ -1,0 +1,23 @@
+id	kind	name	source	how	nameSource
+topbar/part/twpcontrol	TWPControl	TWPControl #16	lid 16 parent lid 14 TWPControl	at 372,82 3468x2078 vis 1	index
+topbar/part/twpcontrol-2	TWPControl	TWPControl #49	lid 49 parent lid 14 TWPControl	at 0,82 364x2078 vis 1	index
+topbar/part/tquickcontrolbar	TQuickControlBar	TQuickControlBar #50	lid 50 parent lid 14 TQuickControlBar	at 0,0 3840x82 vis 1	index
+topbar/part/tquickedittoolbar	TQuickEditToolBar	TQuickEditToolBar #51	lid 51 parent lid 50 TQuickEditToolBar	at 0,0 3839x41 vis 1	index
+topbar/part/tquickedittoolbarpanel	TQuickEditToolbarPanel	TQuickEditToolbarPanel #52	lid 52 parent lid 51 TQuickEditToolbarPanel	at 861,0 172x41 vis 1	index
+topbar/part/tquickedittoolbar-2	TQuickEditToolBar	TQuickEditToolBar #71	lid 71 parent lid 50 TQuickEditToolBar	at 0,41 3839x41 vis 1	index
+topbar/part/tquickedittoolbarpanel-2	TQuickEditToolbarPanel	TQuickEditToolbarPanel #72	lid 72 parent lid 71 TQuickEditToolbarPanel	at 935,0 172x41 vis 1	index
+topbar/part/tquickedittoolbarpanel-3	TQuickEditToolbarPanel	TQuickEditToolbarPanel #73	lid 73 parent lid 71 TQuickEditToolbarPanel	at 532,0 92x41 vis 1	index
+topbar/part/tquickedittoolbarpanel-4	TQuickEditToolbarPanel	TQuickEditToolbarPanel #74	lid 74 parent lid 71 TQuickEditToolbarPanel	at 900,0 35x41 vis 1	index
+topbar/part/tquickedittoolbarpanel-5	TQuickEditToolbarPanel	TQuickEditToolbarPanel #75	lid 75 parent lid 71 TQuickEditToolbarPanel	at 1,0 300x41 vis 1	index
+topbar/part/tquickedittoolbarpanel-6	TQuickEditToolbarPanel	TQuickEditToolbarPanel #76	lid 76 parent lid 71 TQuickEditToolbarPanel	at 624,0 144x41 vis 1	index
+topbar/part/tquickedittoolbarpanel-7	TQuickEditToolbarPanel	TQuickEditToolbarPanel #77	lid 77 parent lid 51 TQuickEditToolbarPanel	at 1033,0 156x41 vis 1	index
+topbar/part/tquickedittoolbarpanel-8	TQuickEditToolbarPanel	TQuickEditToolbarPanel #78	lid 78 parent lid 51 TQuickEditToolbarPanel	at 301,0 196x41 vis 1	index
+topbar/part/tquickedittoolbarpanel-9	TQuickEditToolbarPanel	TQuickEditToolbarPanel #79	lid 79 parent lid 51 TQuickEditToolbarPanel	at 497,0 136x41 vis 1	index
+topbar/part/tquickedittoolbarpanel-10	TQuickEditToolbarPanel	TQuickEditToolbarPanel #80	lid 80 parent lid 51 TQuickEditToolbarPanel	at 1,0 300x41 vis 1	index
+topbar/part/tnewmenu	TNewMenu	TNewMenu #81	lid 81 parent lid 80 TNewMenu	at 3,4 293x33 vis 1	index
+topbar/part/tquickedittoolbarpanel-11	TQuickEditToolbarPanel	TQuickEditToolbarPanel #82	lid 82 parent lid 51 TQuickEditToolbarPanel	at 3771,0 68x41 vis 1	index
+topbar/part/tquickedittoolbarpanel-12	TQuickEditToolbarPanel	TQuickEditToolbarPanel #83	lid 83 parent lid 51 TQuickEditToolbarPanel	at 765,0 96x40 vis 1	index
+topbar/part/splitter-1	TQuickEditToolbarPanel	Splitter_1	lid 84 parent lid 51 TQuickEditToolbarPanel	at 1191,0 2580x41 vis 1	memory
+topbar/part/twpcontrol-3	TWPControl	TWPControl #92	lid 92 parent lid 53 TWPControl	at 167,28 112x41 vis 1	index
+topbar/part/tquickcontrolbar-2	TQuickControlBar	TQuickControlBar #103	lid 103 parent lid 14 TQuickControlBar	at 0,2160 3840x0 vis 1	index
+topbar/part/twpcontrol-4	TWPControl	TWPControl #109	lid 109 parent lid 14 TWPControl	at 3840,82 0x2078 vis 1	index

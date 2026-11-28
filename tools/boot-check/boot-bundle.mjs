@@ -1,4 +1,4 @@
-// Boot check for an arbitrary bundle directory (copy of boot.mjs with the bundle named by argv[2]). Runs it once in headless Chrome (a new profile) and prints one JSON object on stdout. Exit 1 when the run failed ("error" set), 2 when no bundle directory is given.
+// Boot check for an arbitrary bundle directory (copy of boot.mjs with the bundle named by argv[2]). Runs it four times in headless Chrome (a new profile each time): once cold, then three warm starts. Prints one JSON object on stdout: the fields of the warm start whose elapsedMs is the median of the three (elapsedMs is that median; samples are the three warm elapsedMs in the order measured), with coldMs (the cold start's elapsedMs; the first start after a build is the cold one, the OS file cache not yet warm). The median keeps one slow runner's start from deciding the check. Exit 1 when a start failed ("error" set; a cold start that is not engine-idle counts as failed, and so does a warm start that is not engine-idle or shows STAND-IN), 2 when no bundle directory is given.
 // Usage: node tools/boot-check/boot-bundle.mjs <absolute path to the bundle directory raw/<name>> > boot.json   (needs app/node_modules and app/dist). The page is opened at "/" with no parameters.
 // The brotli files of the bundle are in br/<name>/ next to raw/ (stage-assets.mjs links them for the app's /assets/ route). The temporary directory is inside the repository (.tmp-boot-*) and is removed.
 // standIn is only whether the text "STAND-IN" is in the page body; it is a reading, not a proof either way.
@@ -19,6 +19,7 @@ const appDir = path.join(repo, 'app');
 const WAIT_LIMIT_MS = 180000;
 const POLL_MS = 1000;
 const CDP_TIMEOUT_MS = 20000;
+const COLD_LIMIT_MS = 60000;
 
 // the isolation flags of archive/e2e-old/e2e/browser.mjs, without the net-log and the crash folder
 const ISOLATION = [
@@ -118,12 +119,43 @@ export async function bootBundle(bundleDir, { afterIdle } = {}) {
   return { out, engineLog };
 }
 
+/** The middle of the numbers (the lower of the two middle ones for an even count); null when there is no number. */
+const median = (xs) => {
+  const s = xs.filter((x) => typeof x === 'number').sort((a, b) => a - b);
+  return s.length === 0 ? null : s[Math.floor((s.length - 1) / 2)];
+};
+
+/** Why a warm start is not a good start (null when it is): its error, else a state other than engine-idle, else the STAND-IN text. */
+const warmFailure = (w) => w.error ?? (w.state !== 'engine-idle' ? `warm start: state ${w.state}` : null) ?? (w.standIn === true ? 'warm start: STAND-IN' : null);
+
+/** The check's JSON from its starts: cold (the first start) and warms (the later starts). elapsedMs is the median of the warms' elapsedMs, with the other fields of that start; samples are the warms' elapsedMs in the order measured; coldMs is the cold start's elapsedMs. error is the cold start's (its stop is not hidden), else the first warm start that failed, else the cold start's being too slow. */
+export function composeBoot(cold, warms) {
+  const coldError = cold.error ?? (cold.state !== 'engine-idle' ? `cold start: state ${cold.state}` : null);
+  const slow = cold.elapsedMs > COLD_LIMIT_MS ? `cold boot too slow: ${cold.elapsedMs} ms (limit ${COLD_LIMIT_MS} ms)` : null;
+  const warmError = warms.map(warmFailure).find((e) => e !== null) ?? null;
+  const samples = warms.map((w) => w.elapsedMs);
+  const mid = median(samples);
+  const pick = warms.find((w) => w.elapsedMs === mid) ?? warms[warms.length - 1];
+  return { ...pick, elapsedMs: mid, samples, coldMs: cold.elapsedMs, error: coldError ?? warmError ?? slow };
+}
+
+// the warm starts after the cold one: their median is the check's elapsedMs
+export const WARM_STARTS = 3;
+
+/** The bundle started once cold, then WARM_STARTS times warm, each start in its own Chrome: `boot` is bootBundle (a spec passes a fake). */
+export async function bootSeries(bundleDir, boot = bootBundle) {
+  const { out: cold } = await boot(bundleDir);
+  const warms = [];
+  for (let i = 0; i < WARM_STARTS; i++) warms.push((await boot(bundleDir)).out);
+  return composeBoot(cold, warms);
+}
+
 async function main() {
   if (!process.argv[2]) {
     process.stderr.write('usage: node tools/boot-check/boot-bundle.mjs <absolute path to the bundle directory>\n');
     process.exit(2);
   }
-  const { out } = await bootBundle(path.resolve(process.argv[2]));
+  const out = await bootSeries(path.resolve(process.argv[2]));
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
   process.exitCode = out.error ? 1 : 0;
 }

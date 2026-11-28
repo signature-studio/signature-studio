@@ -1,0 +1,3 @@
+# FL Studio Mobile Rack FX (Effects, 1 DLL). hook: none (inputs/plugin-hooks.tsv has no row for it). omit: - (the setjmp entries are found by fe-decode, run_list).
+key	guest	role	sha256	size	hook	args	omit
+effects.fl-studio-mobile-rack-fx.fl_studio_mobile_rack_fx_x64.dll	Plugins\Fruity\Effects\FL Studio Mobile Rack FX\FL Studio Mobile Rack FX_x64.dll	本体	8c43108b377cbcee5dc0abfc2c59b09903f108b1291459a12c64bfa8bcbe737e	8228864	none	--pdata	-

@@ -366,6 +366,7 @@ static void map_fake_image(void)
     size_t opt = 0x80 + 24;
     if (b != (uint8_t *)RM_BASE) { fprintf(stderr, "the fake image cannot be mapped at %#llx\n", U(RM_BASE)); exit(2); }
     w16(b, 0, 0x5a4d); w32(b, 0x3c, 0x80); w32(b, 0x80, 0x4550);
+    w16(b, 0x80 + 22, 0x2000);                              /* FileHeader.Characteristics: IMAGE_FILE_DLL (without it the image is a program, fle_realmod.c) */
     w16(b, opt, 0x20b);
     w32(b, opt + 16, (uint32_t)(DLLMAIN_VA - RM_BASE));   /* AddressOfEntryPoint */
     w32(b, opt + 112, 0x400); w32(b, opt + 116, 0x100);    /* export directory */
@@ -391,7 +392,7 @@ int main(int argc, char **argv)
         printf("handle32 %llx\n", U(fle_module_handle(32)));
         printf("handle33 %llx\n", U(fle_module_handle(33)));
         printf("deferred %d %d %d %d\n", fle_module_is_deferred(31), fle_module_is_deferred(32), fle_module_is_deferred(33), fle_module_is_deferred(34));
-        printf("past %p\n", (const void *)fle_module_name(42)); /* decision 0238: 41 modules (combase.dll after kernelbase.dll); 40 modules (decision 0122: 39; decision 0119: 38; old: 36) */
+        printf("past %p\n", (const void *)fle_module_name(43)); /* Issue #1370: 43 modules (imm32.dll is index 42); decision 0238: 41 modules (combase.dll after kernelbase.dll); 40 modules (decision 0122: 39; decision 0119: 38; old: 36) */
     } else if (!strcmp(s, "load")) {
         LLW("blend2d.dll"); LLW("Blend2D.dll"); LLW("BLEND2D"); LLW("blend2d.dll.");
         LLW("quickfontcache_x64.dll"); LLW("QuickFontCache_x64.dll"); LLW("QUICKFONTCACHE_X64"); LLW("quickfontcache_x64.dll.");
@@ -406,7 +407,7 @@ int main(int argc, char **argv)
         printf("count %u %u\n", fle_load_refcount(32), fle_load_refcount(33));
         free_lib(M(33)); free_lib(M(33)); free_lib(M(34));
         printf("count %u %u\n", fle_load_refcount(32), fle_load_refcount(33));
-        printf("past %u\n", fle_load_refcount(42)); /* decision 0238: 41 modules (combase.dll after kernelbase.dll); 40 modules (decision 0122: 39; decision 0119: 38; old: 36) */
+        printf("past %u\n", fle_load_refcount(43)); /* decision 0238: 41 modules (combase.dll after kernelbase.dll); 40 modules (decision 0122: 39; decision 0119: 38; old: 36) */
     } else if (!strcmp(s, "gmh")) {
         const char *const a[] = { "blend2d.dll", "Blend2D.dll", "BLEND2D", "blend2d", "blend2d.dll.", "blend2d.", "blend2d.dll.dll", "blend2d2.dll",
             "quickfontcache_x64.dll", "QuickFontCache_x64.dll", "QUICKFONTCACHE_X64", "quickfontcache_x64", "quickfontcache_x64.dll.",
@@ -447,8 +448,8 @@ int main(int argc, char **argv)
     } else if (!strcmp(s, "free-blend-count-one")) { free_lib(M(33));
     } else if (!strcmp(s, "free-qfc-count-one")) { free_lib(M(34));
     } else if (!strcmp(s, "free-blend-after-balanced")) { LLW("blend2d.dll"); free_lib(M(33)); free_lib(M(33));
-    } else if (!strcmp(s, "free-past-the-table")) { free_lib(M(43)); /* decision 0238: past the 41 modules (M(41) with 40: kernelbase.dll only); decision 0238 earlier: past the 40 modules (M(40) was the first handle past 39 after decision 0122); decision 0122: past the 39 modules (decision 0119: M(39) past 38; old: M(37), the first handle past 36 modules) */
-    } else if (!strcmp(s, "gpa-past-the-table")) { gpa(M(43), "AggCreateInstance"); /* decision 0238: past the 41 modules (M(41) with 40: kernelbase.dll only); decision 0238 earlier: past the 40 modules (M(40) after decision 0122); decision 0122: past the 39 modules (decision 0119: M(39); old: M(37)) */
+    } else if (!strcmp(s, "free-past-the-table")) { free_lib(M(44)); /* Issue #1370: M(n) is entry n - 1, so the first handle past the 43 modules is M(44); decision 0238: past the 41 modules (M(41) with 40: kernelbase.dll only); decision 0238 earlier: past the 40 modules (M(40) was the first handle past 39 after decision 0122); decision 0122: past the 39 modules (decision 0119: M(39) past 38; old: M(37), the first handle past 36 modules) */
+    } else if (!strcmp(s, "gpa-past-the-table")) { gpa(M(44), "AggCreateInstance"); /* Issue #1370: M(44) (see free-past-the-table); decision 0238: past the 41 modules (M(41) with 40: kernelbase.dll only); decision 0238 earlier: past the 40 modules (M(40) after decision 0122); decision 0122: past the 39 modules (decision 0119: M(39); old: M(37)) */
     } else if (!strcmp(s, "gpa-misaligned")) { gpa(M(33) + 1, "AggCreateInstance");
     } else if (!strcmp(s, "gpa-ordinal")) { prep(M(33), 1, 0); fle_imp_GetProcAddress(); out();
     } else if (!strcmp(s, "near-1")) { LLW("blend2d2.dll");
@@ -485,6 +486,7 @@ int main(int argc, char **argv)
         printf("two frees\n"); fflush(stdout);
         free_lib(RM_BASE);
     } else if (!strcmp(s, "real-free-before-load")) { free_lib(RM_BASE);
+    } else if (!strcmp(s, "real-gpa-before-load")) { gpa(RM_BASE, "AggCreateInstance");
     } else if (!strcmp(s, "real-stop-deferred-qfc")) {
         uint64_t va;
         LLW("blend2d.dll");
@@ -514,6 +516,8 @@ fn runtime_objs() -> &'static Vec<PathBuf> {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let mut v = Vec::new();
         for s in srcs {
             let o = dir.join(s.file_name().unwrap().to_string_lossy().replace(".c", ".o"));
@@ -618,7 +622,7 @@ fn the_table_has_the_two_deferred_modules_n33_and_n34_and_shcore_after_them() {
     // Decision 0099 appended shcore.dll (N = 35, index 34) after the two deferred modules; decision 0118 appended rpcrt4.dll (N = 36, index 35); decision 0119 appended
     // wtsapi32.dll (N = 37) and uxtheme.dll (N = 38): the count is 38 (old: 36).
     let got = lines("table");
-    assert_eq!(got[0], "count 42"); // decision 0238: kernelbase.dll and combase.dll appended (40 with kernelbase.dll only) (decision 0122: dwmapi.dll, 39; old: 38)
+    assert_eq!(got[0], "count 43"); // decision 0238: kernelbase.dll and combase.dll appended (40 with kernelbase.dll only) (decision 0122: dwmapi.dll, 39; old: 38)
     assert_eq!(got[1], "name32 blend2d.dll");
     assert_eq!(got[2], "name33 quickfontcache_x64.dll");
     assert_eq!(got[3], format!("handle32 {:x}", handle(N_BLEND2D)));
@@ -855,6 +859,21 @@ fn a_real_blend2d_follows_the_real_module_rules_of_free_library() {
     assert_eq!(o.stdout.lines().filter(|l| *l == "1 5").count(), 3);
     // FreeLibrary of the base before the load: the real-module stop
     aborts_with(d, "real-free-before-load", "FreeLibrary of a real module that is not loaded");
+}
+
+#[test]
+fn get_proc_address_of_a_real_module_that_is_not_loaded_returns_null_and_module_not_found() {
+    // Issue #1418 (family: GetProcAddress NULL). A handle that is not a live module gives NULL and ERROR_MOD_NOT_FOUND (126): Wine's
+    // kernel32 tests (dlls/kernel32/tests/module.c, testGetProcAddress_Wrong: GetProcAddress((HMODULE)0xdeadbeef, ...) gives
+    // ERROR_MOD_NOT_FOUND). The real module is not loaded here (its base is the handle the table gives). One warning line.
+    let d = real_driver();
+    let o = run_with(d, "real-gpa-before-load");
+    assert!(o.ok, "real-gpa-before-load: did not exit normally (signal {:?}): {}\n{}", o.signal, o.stderr, o.stdout);
+    assert_eq!(o.stdout.lines().collect::<Vec<_>>(), ["0 126"]);
+    assert_eq!(
+        o.stderr.lines().filter(|l| l.starts_with("fle: warn: GetProcAddress")).collect::<Vec<_>>(),
+        ["fle: warn: GetProcAddress: not modelled, returned 0 (caller 0xdead0000)"]
+    );
 }
 
 #[test]

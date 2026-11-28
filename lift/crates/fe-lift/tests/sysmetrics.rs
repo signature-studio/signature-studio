@@ -69,7 +69,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-sm"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for (name, ours) in [("fle_sysmetrics.c", true), ("fle_gdc.c", false), ("fle_imports.c", false), ("fle_env.c", false)] {
+        for (name, ours) in [("fle_sysmetrics.c", true), ("fle_gdc.c", false), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false)] {
             let base = if ours { src_dir() } else { runtime_dir() };
             let o = dir.join(name.replace(".c", ".o"));
             clang_c(&base.join(name), &o, ours);
@@ -599,7 +599,7 @@ fn the_dll_name_is_part_of_the_match() {
     assert!(!st.handled.contains_key("jmp_imp:GetSystemMetrics"));
     assert!(!c.contains("fle_imp_GetSystemMetrics"));
     let va = IB + 0x1040;
-    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")));
+    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"other.dll!GetSystemMetrics\"); }}")));
 }
 
 // ---- 6. The bytes of the real DLL that the investigation rests on ----

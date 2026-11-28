@@ -199,9 +199,9 @@ fn each_new_thunk_is_answered_under_its_own_dll_and_no_other_dll() {
         let (st, c) = gen(&[(dll, name), ("kernel32.dll", name), (dll, "SendMessageA"), ("kernel32.dll", "GetProcAddress")]);
         assert_eq!(st.handled[format!("jmp_imp:{name}").as_str()], 1, "{dll}!{name}");
         assert_eq!(c.matches(&format!("fle_imp_{name}(); return;")).count(), 1, "{dll}!{name}: only the thunk of its own dll is answered");
-        for k in [1u64, 2] {
+        for (k, want) in [(1u64, format!("kernel32.dll!{name}")), (2, format!("{dll}!SendMessageA"))] {
             let va = IB + 0x1040 + 0x10 * k;
-            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{name}: thunk {k} stays unsupported");
+            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{want}\"); }}")), "{dll}!{name}: thunk {k} stops by name");
         }
     }
 }
@@ -210,8 +210,8 @@ fn each_new_thunk_is_answered_under_its_own_dll_and_no_other_dll() {
 // 2. The driver: the real runtime files and a stub guest window procedure that logs every message
 // ---------------------------------------------------------------------------------------------
 
-const RT_FILES: [&str; 24] = [
-    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
+const RT_FILES: [&str; 25] = [
+    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_glob.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
     "fle_time.c", "fle_gdc.c", "fle_gdi.c", "fle_cursor.c", "fle_res.c", "fle_modules.c", "fle_realmod.c", "fle_raster.c", "fle_monitor.c", "fle_ole.c", "fle_reg.c",
 ];
 const RT_EXTRA: [&str; 4] = ["fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c"];
@@ -220,7 +220,7 @@ fn clang_c(src: &Path, obj: &Path, strict: bool) {
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-c"]);
     if strict {
-        cmd.arg("-Werror");
+        cmd.arg("-Werror").arg("-Wno-deprecated-declarations");
     }
     let cc = cmd.arg("-I").arg(src_dir()).arg("-I").arg(rt_dir()).arg(src).arg("-o").arg(obj).env("TMPDIR", work_dir().join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed for {}: {}", src.display(), String::from_utf8_lossy(&cc.stderr));
@@ -240,6 +240,9 @@ fn objs() -> &'static Vec<PathBuf> {
             clang_c(&base.join(name), &o, is_ours);
             v.push(o);
         }
+        let mo = dir.join("mutex_real_stub.o");
+        clang_c(&manifest().join("tests/support/mutex_real_stub.c"), &mo, true);
+        v.push(mo);
         v
     })
 }
@@ -819,7 +822,7 @@ fn cursor_objs() -> &'static Vec<PathBuf> {
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
         for (name, ours) in [
-            ("fle_cursor.c", true), ("fle_res.c", true), ("fle_loadimage.c", true), ("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", true), ("fle_imports.c", false), ("fle_env.c", false), ("fle_modules.c", false),
+            ("fle_cursor.c", true), ("fle_res.c", true), ("fle_loadimage.c", true), ("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", true), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false), ("fle_modules.c", false),
             ("fle_realmod.c", false), ("fle_thread.c", false), ("fle_win.c", false), ("fle_class.c", false), ("fle_sys.c", false), ("fle_event.c", false), ("fle_proc.c", false), ("fle_callback.c", false),
             ("fle_vfs.c", false), ("fle_vmap.c", false), ("fle_vol.c", false), ("fle_host.c", false), ("fle_time.c", false), ("fle_x87ctl.c", false), ("fle_mxcsr.c", false), ("fle_x87.c", false), ("fle_locale.c", false),
         ] {

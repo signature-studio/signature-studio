@@ -1,0 +1,41 @@
+{
+  "total": 765,
+  "perArea": {
+    "menus": 157,
+    "windows": 8,
+    "topbar": 22,
+    "settings": 97,
+    "plugins": 147,
+    "file": 91,
+    "page": 8,
+    "delivery": 235
+  },
+  "unnamed": {
+    "menus": 157,
+    "windows": 4,
+    "topbar": 21,
+    "settings": 35,
+    "plugins": 2,
+    "file": 10,
+    "page": 8
+  },
+  "fl": {
+    "ok": true,
+    "error": null,
+    "menus": 157,
+    "windows": 8,
+    "topbar": 22,
+    "settings": 77
+  },
+  "perFile": {
+    "menus": 157,
+    "windows": 8,
+    "topbar": 22,
+    "settings": 77,
+    "plugins": 147,
+    "file": 91,
+    "resources": 20,
+    "page": 8,
+    "delivery": 235
+  }
+}
