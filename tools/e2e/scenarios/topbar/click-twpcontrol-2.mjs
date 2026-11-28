@@ -5,7 +5,7 @@ import { partOperation } from '../../lib/topbar.mjs';
 export default defineScenario({
   id: 'topbar/click-twpcontrol-2',
   covers: ['topbar/click/twpcontrol-2', 'topbar/part/twpcontrol-2'],
-  expectFail: 'new', // a visible effect was not seen in the run of 2026-11-26 (a candidate for PM triage; not confirmed as a defect)
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return partOperation(guest, 'twpcontrol-2', 'click');
   },

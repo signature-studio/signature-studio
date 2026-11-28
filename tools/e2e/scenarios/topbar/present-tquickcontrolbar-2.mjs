@@ -5,6 +5,7 @@ import { presentPart } from '../../lib/topbar.mjs';
 export default defineScenario({
   id: 'topbar/present-tquickcontrolbar-2',
   covers: ['topbar/part/tquickcontrolbar-2'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return presentPart(guest, 'tquickcontrolbar-2');
   },

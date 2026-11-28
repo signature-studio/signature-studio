@@ -160,7 +160,8 @@ static void write_mbi(uint64_t out, uint64_t base, uint64_t alloc_base, uint32_t
 }
 
 /* ---- Decision 0123 (PROVISIONAL), wall 25: images and other registered ranges ---- */
-#define VQ_MAX_IMAGES 16u
+/* the FLEngine's image and one image per real module (RM_MAX 192 of fle_realmod.c, each mapped when the guest loads it): with 16, a session with more images stops at the next one (#1537) */
+#define VQ_MAX_IMAGES 193u
 #define VQ_MAX_RANGES 16u
 #define VQ_MAX_SECTIONS 24u
 #define MEM_FREE_  0x10000u

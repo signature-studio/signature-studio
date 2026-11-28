@@ -1,7 +1,7 @@
 // The measures of the perf area (Issue #1497): the start-up, the rAF windows (the least one-second window), the input-to-picture latency (the page's own latency records),
 // the engine's busy fraction (busyPct), the memory (the engine's wasm memory and the JS heap), and the audio output under the mouse (underrun, quanta).
 // A person's actions are real mouse and key events (lib/guest.mjs); the reads are the page's test aids (window.__app). The expectations are ratios against a baseline
-// (golden/perf/baseline.tsv, recorded on the runner by `record` below), never absolute values. Playwright is not imported: the browser comes from the page.
+// (the same run's reference measure, Issue #1509: the judge reads no golden table), never absolute values. Playwright is not imported: the browser comes from the page.
 // CLI (the baseline is made from a run's output, and only then): node tools/e2e/lib/perf.mjs record <run.jsonl>... [--out FILE]   (default FILE: golden/perf/baseline.tsv)
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,7 +15,6 @@ export { sleep } from './flow.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const GOLDEN_DIR = path.resolve(here, '..', 'golden', 'perf');
 export const BASELINE = path.join(GOLDEN_DIR, 'baseline.tsv');
-export const AB_BASE = path.join(GOLDEN_DIR, 'ab-base.tsv');
 // the coarse limits (the runner's own spread is not known to be smaller): a time or a busy share may be 1.5 x the baseline, a memory growth 1.3 x, a fall of the rAF rate 1/1.5
 export const LIMIT = { time: 1.5, fps: 1.5, busy: 1.5, memory: 1.3, latency: 1.5 };
 export const STARTUP_RUNS = 3;
@@ -62,7 +61,7 @@ export function ratioCheck(value, base, kind, limit) {
 }
 
 /**
- * The judge of one scenario: the measured items (each against its baseline row, or against the A/B base), and the results the scenario returns:
+ * The judge of one scenario: the measured items (each against its reference in the same run: a Map of item -> { value }), and the results the scenario returns:
  * `items` (item -> value, unit, base, ratio, limit, kind, pass, samples), `nproc`, `loadavg` (before and after the measure). notes: one line per item.
  */
 export class Judge {
@@ -309,20 +308,27 @@ export async function receivedHz(guest, before, ms) {
   return ms > 0 ? round(((await pointerCount(guest)) - before) / (ms / 1000), 1) : null;
 }
 
-/** the base of a judge: the baseline (BASELINE), or the A/B base the change is compared with (AB_BASE) */
-export const baseOf = (which) => readTable(which === 'ab' ? AB_BASE : BASELINE);
+/** the base of a ratio measured in the same run (Issue #1509): the reference is the same measure under the reference condition, taken in this run (no table is read) */
+export const sameRunBase = (item, value) => new Map([[item, { value }]]);
 const dprOf = (page) => page.evaluate(() => window.devicePixelRatio);
 
-/** the start-up medians of the scenario's display (its page's viewport and device pixel ratio): judged as the items startup.engineIdle.ms and startup.firstIdle.ms */
-export async function measureStartup(ctx, which) {
-  const j = new Judge(baseOf(which));
+/**
+ * The start-up medians of the scenario's display (its page's viewport and device pixel ratio). Two sets of start-ups in this run: the first set is the reference
+ * (the same operation on the same machine, the sets' medians), and the second set is judged against it as the items startup.engineIdle.ms and startup.firstIdle.ms
+ * (the ratio at most the limit). No golden table is read (Issue #1509).
+ */
+export async function measureStartup(ctx) {
   const viewport = ctx.page.viewportSize();
   const dpr = await dprOf(ctx.page);
-  const s = await startupRuns(ctx.page.context().browser(), ctx.origin, viewport, dpr);
+  const browser = ctx.page.context().browser();
+  const ref = await startupRuns(browser, ctx.origin, viewport, dpr);
+  const s = await startupRuns(browser, ctx.origin, viewport, dpr);
   const eng = median(s.engineIdle), first = median(s.firstIdle);
-  const ok1 = s.error === null && eng !== null && j.ratio('startup.engineIdle.ms', eng, { kind: 'upper', limit: LIMIT.time, unit: 'ms', samples: s.engineIdle });
-  const ok2 = s.error === null && first !== null && j.ratio('startup.firstIdle.ms', first, { kind: 'upper', limit: LIMIT.time, unit: 'ms', samples: s.firstIdle });
-  j.notes.push(`runs ${s.runs.length} at ${viewport.width}x${viewport.height} DPR ${dpr}: engine-idle ${s.engineIdle.join(', ')} ms; first idle ${s.firstIdle.join(', ')} ms${s.error ? `; error ${s.error}` : ''}`);
+  const j = new Judge(new Map([...sameRunBase('startup.engineIdle.ms', median(ref.engineIdle)), ...sameRunBase('startup.firstIdle.ms', median(ref.firstIdle))]));
+  const ok1 = s.error === null && ref.error === null && eng !== null && j.ratio('startup.engineIdle.ms', eng, { kind: 'upper', limit: LIMIT.time, unit: 'ms', samples: s.engineIdle });
+  const ok2 = s.error === null && ref.error === null && first !== null && j.ratio('startup.firstIdle.ms', first, { kind: 'upper', limit: LIMIT.time, unit: 'ms', samples: s.firstIdle });
+  j.notes.push(`reference: the same run's first ${ref.runs.length} starts: engine-idle ${ref.engineIdle.join(', ')} ms; first idle ${ref.firstIdle.join(', ')} ms`);
+  j.notes.push(`runs ${s.runs.length} at ${viewport.width}x${viewport.height} DPR ${dpr}: engine-idle ${s.engineIdle.join(', ')} ms; first idle ${s.firstIdle.join(', ')} ms${s.error ? `; error ${s.error}` : ''}${ref.error ? `; reference error ${ref.error}` : ''}`);
   return { ok: ok1 && ok2, results: j.results(), notes: j.notes, state: (await ctx.guest.state())?.state ?? null };
 }
 
@@ -330,16 +336,23 @@ export async function measureStartup(ctx, which) {
  * The rAF's least one-second window (and the mean) while `during` runs (a mouse for `ms`, the menus, New); with no `during`, the page is only watched for `ms`.
  * Judged as the item against the base (kind lower: the fall is at most the limit).
  */
-export async function measureFps(ctx, item, ms, during, which = 'base') {
-  const j = new Judge(baseOf(which));
+export async function measureFps(ctx, item, ms, during) {
+  const quiet = await rafSpan(ctx.page, 8000, null);
+  const j = new Judge(sameRunBase(item, quiet.least));
+  const span = await rafSpan(ctx.page, ms, during);
+  const { least, mean, samples } = span;
+  const ok = least !== null && quiet.least !== null && j.ratio(item, least, { kind: 'lower', limit: LIMIT.fps, unit: 'rAF/s (least 1 s window)', samples: [least] });
+  j.notes.push(`reference: the same run with no input, 8 s: least ${quiet.least === null ? 'none' : round(quiet.least, 2)} rAF/s; mean ${round(mean, 2)} rAF/s over ${round((samples[samples.length - 1].t - samples[0].t) / 1000, 1)} s; ${samples.length} samples`);
+  return { ok, results: j.results(), notes: j.notes, state: (await ctx.guest.state())?.state ?? null };
+}
+
+/** the rAF samples while `during` runs (or for `ms` with no input): the least one-second window, the mean and the samples */
+async function rafSpan(page, ms, during) {
   let done = false;
   const work = (during ? during() : sleep(ms)).finally(() => { done = true; });
-  const samples = await rafWhile(ctx.page, () => !done);
+  const samples = await rafWhile(page, () => !done);
   await work;
-  const least = minWindowRate(samples), mean = meanRate(samples);
-  const ok = least !== null && j.ratio(item, least, { kind: 'lower', limit: LIMIT.fps, unit: 'rAF/s (least 1 s window)', samples: [least] });
-  j.notes.push(`mean ${round(mean, 2)} rAF/s over ${round((samples[samples.length - 1].t - samples[0].t) / 1000, 1)} s; ${samples.length} samples`);
-  return { ok, results: j.results(), notes: j.notes, state: (await ctx.guest.state())?.state ?? null };
+  return { least: minWindowRate(samples), mean: meanRate(samples), samples };
 }
 
 /**
@@ -358,15 +371,16 @@ export async function measureLatency(guest, { n, act, close = true, prepare = nu
 }
 
 /** a click on a menu label, `n` times: the click's input-to-picture latency */
-export const menuLatency = (guest, label, n = 5) => measureLatency(guest, { n, act: () => clickLabel(guest, label) });
+export const menuLatency = (guest, label, n = 5, prepare = null) => measureLatency(guest, { n, act: () => clickLabel(guest, label), prepare });
 
 /** the key latency: the drop-down of File is open and ArrowDown is pressed `n` times (each press is one input) */
-export async function keyLatency(guest, n = 10) {
+export async function keyLatency(guest, n = 10, prepare = null) {
   const base = await openLids(guest);
   await clickLabel(guest, 'File');
   await sleep(800);
   const out = [];
   for (let i = 0; i < n; i++) {
+    if (prepare) await prepare();
     out.push(await inputLatency(guest, () => guest.key('ArrowDown', 'ArrowDown', 40)));
     await sleep(150);
   }

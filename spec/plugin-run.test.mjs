@@ -27,7 +27,7 @@ try {
   console.log(`FAIL 道具が読めない: ${e.message.split('\n')[0]}`);
   process.exit(1);
 }
-const { keyOf, effectRows, resolveNames, projectFor, wasmReadRe, isPlayFailure, playFailuresOf, candidatesFor, passes, sceneProjectFor } = m;
+const { keyOf, effectRows, resolveNames, projectFor, wasmReadRe, isPlayFailure, playFailuresOf, candidatesFor, passes, sceneProjectFor, engineStopOf } = m;
 const flp = await import(pathToFileURL(path.join(ROOT, 'tools/plugin-run/flp.mjs')).href);
 
 // 1) 存在しない名前は 1 で止まる(標準出力は空。バンドルの場所は読まれないので、在るディレクトリを渡す)
@@ -267,6 +267,48 @@ try {
   }
 } finally {
   fs.rmSync(tmpF, { recursive: true, force: true });
+}
+
+// (h) the order of scene (c)'s candidates (Issue #1537): within a root, the project that names fewer other effect plug-ins comes first (the smaller first on a tie)
+{
+  const tmpH = fs.mkdtempSync(path.join(ROOT, '.tmp-spec-plugin-run.'));
+  try {
+    const u16 = (s) => Buffer.from(s, 'utf16le');
+    const sep = Buffer.alloc(2);
+    const rh = path.join(tmpH, 'rh');
+    fs.mkdirSync(rh, { recursive: true });
+    fs.writeFileSync(path.join(rh, 'many.flp'), Buffer.concat([Buffer.alloc(10), u16('Fruity Delay'), sep, u16('Fruity Balance'), sep, u16('Fruity Filter'), sep, u16('Effector')]));
+    fs.writeFileSync(path.join(rh, 'few.flp'), Buffer.concat([Buffer.alloc(500), u16('Fruity Delay')]));
+    const got = (called(candidatesFor, 'Fruity Delay', [rh], 5) ?? []).map((f) => path.basename(f));
+    ok('candidatesFor: 同じ根では、他のプラグインを名指す数が少ない曲が先(大きくても)', JSON.stringify(got) === JSON.stringify(['few.flp', 'many.flp']), JSON.stringify(got));
+  } finally {
+    fs.rmSync(tmpH, { recursive: true, force: true });
+  }
+}
+
+// (g) the engine's stop of a run (Issue #1537): the stop that the engine printed before the play (before `from`) is in engineStop too, with the last 5 fle: lines of the whole log
+{
+  const before = [
+    '[err] fle: LoadLibraryW: the module is not in the table',
+    '[err] fruity: == stop: exit code 134',
+    '[err] fruity: runtime message: fle: indirect call to 0 is not a known function entry',
+    '[err] fle: indirect call to 0 is not a known function entry',
+  ];
+  const during = ['[err] fle thread 23 failed: SuspendError: x', 'ok line'];
+  const exit = { reason: 'exited', code: 134, message: '' };
+  const from = before.length;
+  const es = called(engineStopOf, [...before, ...during], exit);
+  ok('engineStopOf: 再生の前に出た停止も入る(stop の行と、終了の理由・終了コード)', es?.exit?.code === 134 && es?.stop !== null && es?.stop?.stopLine?.includes('exit code 134') === true, JSON.stringify(es?.stop));
+  ok('engineStopOf: 最後の fle: の行は再生の前の物を含む', Array.isArray(es?.lastFle) && es.lastFle.includes('fle: indirect call to 0 is not a known function entry'), JSON.stringify(es?.lastFle));
+  ok('engineStopOf: 再生の後の行(from より後)は fle: として入らない', Array.isArray(es?.lastFle) && !es.lastFle.some((l) => l.includes('SuspendError')) && from === 4, JSON.stringify(es?.lastFle));
+  const many = Array.from({ length: 7 }, (_, i) => `[err] fle: line ${i}`);
+  const cut = called(engineStopOf, [...many, '[err] fruity: == stop: exit code 1'], { reason: 'exited', code: 1, message: '' });
+  ok('engineStopOf: fle: の行は最後の 5 本', Array.isArray(cut?.lastFle) && cut.lastFle.length === 5 && cut.lastFle[0] === 'fle: line 2' && cut.lastFle[4] === 'fle: line 6', JSON.stringify(cut?.lastFle));
+  ok('engineStopOf: 停止が無ければ null(終了の情報も停止の行も無い)', called(engineStopOf, ['[err] fle: x'], null) === null);
+  const returned = called(engineStopOf, ['[err] fruity: == stop: returned from entry'], null);
+  ok('engineStopOf: 終了の情報が無ければ、正常な戻りの停止の行が在っても null', returned === null, JSON.stringify(returned));
+  const noFle = called(engineStopOf, ['[err] fle: x'], { reason: 'stopped', code: 2, message: '' });
+  ok('engineStopOf: 終了の情報が在れば、fle: の行が無くても記録される', noFle !== null && JSON.stringify(noFle?.lastFle) === JSON.stringify(['fle: x']), JSON.stringify(noFle));
 }
 
 console.log(failed === 0 ? 'ok   spec/plugin-run.test.mjs: 全部通った' : `FAIL spec/plugin-run.test.mjs: ${failed} 件`);

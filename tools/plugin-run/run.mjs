@@ -6,7 +6,7 @@
 //   2. the scene asks the guest for the plug-in:
 //      scene (c): a project that names it. The candidates are the .flp files whose text holds the plug-in's name at a name boundary, as UTF-16LE or as ASCII (the internal name, the event 201 of a project):
 //      the characters before and after the name are not ASCII letters or digits, and a space after the name is not a boundary when a letter or digit follows it: "Fruity Delay Bank" and "Fruity Delay 2" are not "Fruity Delay".
-//      They are ordered by root (host-extra/resources first, then host/resources) and by size (the smaller first), and at most 5 are tried, one launch each; the first that asks for the plug-in is kept.
+//      They are ordered by root (host-extra/resources first, then host/resources), then by the number of other effect plug-ins they name (fewer first, Issue #1537), then by size (the smaller first), and at most 5 are tried, one launch each; the first that asks for the plug-in is kept.
 //      scene (d): a project made from a template (Data/Templates under the roots): the template's first mixer insert plug-in is renamed to the plug-in and its state (212) is zeroed (tools/plugin-run/flp.mjs),
 //      and the project is opened as scene (c) opens one. The templates are taken in root order and path order; one with exactly one mixer insert plug-in is preferred. The project is written under the run's temporary directory.
 //      --scene c: scene (c) only; --scene d: scene (d) only; --scene auto (the default): scene (c) over the candidates, then scene (d) when no candidate asks for the plug-in (or there is none).
@@ -14,7 +14,9 @@
 //   4. processed: Space starts the play and PLAY_MS pass. True when all of these hold: quantaWhilePlaying rises in that time (audio.detail()); no engine line written in that time is a failure
 //      (fle thread <n> failed, SuspendError, stopped here: they are listed in playFailures); the page's state is engine-idle after it.
 //      outputRms and nonSilentQuanta are recorded only: the samples of a project may be missing (the demo projects often play silence), so they are not part of processed.
-// stdout: one JSON line per main DLL: {"plugin":"Fruity Balance","instantiated":true,"processed":false,"error":null,"elapsedMs":1234.5,"playFailures":["..."],"outputRms":0,"nonSilentQuanta":0,"quantaWhilePlaying":400,"sceneKind":"c","sceneFile":"...","candidatesTried":1}
+// stdout: one JSON line per main DLL: {"plugin":"Fruity Balance","instantiated":true,"processed":false,"error":null,"elapsedMs":1234.5,"playFailures":["..."],"outputRms":0,"nonSilentQuanta":0,"quantaWhilePlaying":400,"engineStop":null,"sceneKind":"c","sceneFile":"...","candidatesTried":1}
+//   engineStop (Issue #1537): null when the engine did not stop; else the stop report's facts (tools/e2e/lib/stop.mjs stopOf: exit {reason, code}, message, stop, evidence, returnAddress, registers, report)
+//   and lastFle, the last 5 "fle: " lines of the whole engine log, the ones printed before the play too (a stop during the scene is not in playFailures, which read the play's window only).
 //   quantaWhilePlaying and nonSilentQuanta are the rises during the play; outputRms is audio.detail().rms after it. error is set only when the scene failed or the guest did not ask for the plug-in (a failure of the play is in playFailures).
 //   sceneKind is "c" or "d" for the scene that asked for the plug-in (null when none did); sceneFile is the project of scene (c) relative to the repository (null for scene (d) and when none asked); candidatesTried is the number of scene (c)'s projects tried (0 to 5).
 // stderr: the scene's steps, the play's numbers, and on a scene error the last engine lines. A failed scene leaves its screen in .tmp-plugin-run-fail-<name>.png (the name in lower case, spaces as hyphens).
@@ -27,6 +29,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.mjs';
 import { stageAssets } from '../boot-check/stage-assets.mjs';
 import { encodeFlp, insertPluginsOf, parseFlp, renamePlugin } from './flp.mjs';
+import { stopOf } from '../e2e/lib/stop.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
@@ -58,6 +61,7 @@ const SNAPSHOT = `(() => { const a = window.__app ?? null; return {
   timeline: a ? a.timeline : {},
   error: a && a.error ? a.error : null,
   imageReads: a ? a.imageReads : [],
+  exit: a && a.exit ? { reason: a.exit.reason, code: a.exit.code, message: String(a.exit.message ?? '') } : null,
 }; })()`;
 
 const AUDIO_DETAIL = `(() => { const a = window.__app.audio; if (!a) return null; const d = a.detail(); return { deviceState: d.deviceState, status: d.status, ctxState: d.ctxState, quantaWhilePlaying: d.quantaWhilePlaying, nonSilentQuanta: d.nonSilentQuanta, rms: d.rms }; })()`;
@@ -132,23 +136,30 @@ export function atBoundary(buf, at, len, unit = 2) {
   return !isAsciiAlnum(after);
 }
 
-/** the candidate projects of scene (c) (Issue #1524): the .flp files whose text holds the name at a boundary, as UTF-16LE or as ASCII (the internal name), in root order, then the smaller first (path order on a tie);
+/** whether the bytes name `name` at a boundary, as UTF-16LE or as ASCII (the internal name) */
+function namedIn(buf, name) {
+  return [[Buffer.from(name, 'utf16le'), 2], [Buffer.from(name, 'latin1'), 1]].some(([needle, unit]) => {
+    for (let at = buf.indexOf(needle); at >= 0; at = buf.indexOf(needle, at + 1)) if (atBoundary(buf, at, needle.length, unit)) return true;
+    return false;
+  });
+}
+
+/** the candidate projects of scene (c) (Issue #1524): the .flp files whose text holds the name at a boundary, as UTF-16LE or as ASCII (the internal name), in root order, then the ones that name fewer
+ *  other effect plug-ins first (Issue #1537: a project with many plug-ins stops in one of them, not in the one asked for), then the smaller first (path order on a tie);
  *  a file that another root gives under the same relative path is listed once (the first root's); at most `max` */
-export function candidatesFor(name, roots, max = Infinity) {
-  const needles = [[Buffer.from(name, 'utf16le'), 2], [Buffer.from(name, 'latin1'), 1]];
+export function candidatesFor(name, roots, max = Infinity, pluginNames = effectRows().map((r) => r.name)) {
   const out = [];
   const seen = new Set();
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
-    const hits = flpFiles(root).filter((f) => {
+    const hits = flpFiles(root).flatMap((f) => {
       const buf = fs.readFileSync(f);
-      return needles.some(([needle, unit]) => {
-        for (let at = buf.indexOf(needle); at >= 0; at = buf.indexOf(needle, at + 1)) if (atBoundary(buf, at, needle.length, unit)) return true;
-        return false;
-      });
-    }).filter((f) => !seen.has(path.relative(root, f)));
-    for (const f of hits) seen.add(path.relative(root, f));
-    out.push(...hits.sort((a, b) => fs.statSync(a).size - fs.statSync(b).size));
+      if (!namedIn(buf, name)) return [];
+      const others = pluginNames.filter((n) => keyOf(n) !== keyOf(name) && namedIn(buf, n)).length;
+      return [{ f, size: buf.length, others }];
+    }).filter((h) => !seen.has(path.relative(root, h.f)));
+    for (const h of hits) seen.add(path.relative(root, h.f));
+    out.push(...hits.sort((a, b) => a.others - b.others || a.size - b.size).map((h) => h.f));
   }
   return out.slice(0, max);
 }
@@ -212,8 +223,17 @@ function parseWindows(text) {
   });
 }
 
+/** the engine's stop of a run (Issue #1537): null when the page recorded no exit of the engine (a "== stop: returned from entry" line is a normal return, not a stop); else the stop report's facts (tools/e2e/lib/stop.mjs stopOf: exit, message, stop, registers, report)
+ *  and the last 5 "fle: " lines of the WHOLE log, the ones printed before the play too (a stop during the scene is not in the play's window) */
+export function engineStopOf(lines, exit) {
+  const strip = (l) => l.replace(/^\[err\] ?/, '').replace(/^fruity: /, '');
+  if (exit === null) return null;
+  const lastFle = lines.map(strip).filter((l) => l.startsWith('fle: ')).slice(-5).map((l) => l.slice(0, 400));
+  return { ...stopOf(lines, exit), lastFle };
+}
+
 /** a result line with nothing measured (the fields of the JSON line, in their order) */
-const blankRow = (plugin, error) => ({ plugin, instantiated: false, processed: false, error, elapsedMs: null, playFailures: [], outputRms: null, nonSilentQuanta: null, quantaWhilePlaying: null });
+const blankRow = (plugin, error) => ({ plugin, instantiated: false, processed: false, error, elapsedMs: null, playFailures: [], outputRms: null, nonSilentQuanta: null, quantaWhilePlaying: null, engineStop: null });
 
 const timed = (p, ms, what) => {
   let t;
@@ -430,6 +450,18 @@ async function runScene({ S, ev, scene, name, wasmRe }) {
   return out;
 }
 
+/** the engine's stop as the log holds it now (engineStopOf). A stopped engine's report reaches the log late (tools/e2e/lib/resilience.mjs stopReport): the "exit code" line is awaited (6 s at most), then 1 s for the engine's stderr line */
+async function engineStopNow(ev) {
+  const snap = await ev(SNAPSHOT).catch(() => null);
+  const lines = () => ev('window.__app.engineLog()').catch(() => []);
+  if (snap && (snap.state === 'error' || snap.state === 'exited')) {
+    const t0 = Date.now();
+    while (!(await lines()).some((l) => /exit code \d+/.test(l)) && Date.now() - t0 < 6000) await sleep(250);
+    await sleep(1000);
+  }
+  return engineStopOf(await lines(), snap?.exit ?? null);
+}
+
 /** one launch: the plug-in's DLL named by `target`, in the scene given ({kind:'c' or 'd', projectPath}), from the navigation to the end of the scene; returns the JSON line's object */
 async function measureOnce(port, target, scene, shotDir) {
   const out = blankRow(target.name, null);
@@ -477,6 +509,8 @@ async function measureOnce(port, target, scene, shotDir) {
       out.error = sc.error ?? (out.instantiated ? null : `the guest did not ask for ${target.name} in scene (${scene.kind}) (no ${wasmRe} read with requested=1); state ${sc.state}`);
       process.stderr.write(`scene (${scene.kind}): ${sc.steps.join('; ')}${sc.error ? ` ERROR ${sc.error}` : ''}\n`);
     }
+    out.engineStop = await engineStopNow(ev);
+    if (out.engineStop) process.stderr.write(`engine stop: exit ${JSON.stringify(out.engineStop.exit)}, lastFle ${JSON.stringify(out.engineStop.lastFle)}\n`);
     if (out.error !== null) {
       const s = await S('Page.captureScreenshot', { format: 'png' }).catch(() => null);
       if (s) fs.writeFileSync(path.join(shotDir, `.tmp-plugin-run-fail-${target.folder.toLowerCase().replace(/\s+/g, '-')}.png`), Buffer.from(s.data, 'base64'));

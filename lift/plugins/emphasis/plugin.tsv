@@ -1,0 +1,3 @@
+# Emphasis (Effects, Issue #1435). 本体 Emphasis_x64.dll; no 補助. hook: the three Delphi hook points of the RVAs (inputs/plugin-hooks.tsv). omit: - (the setjmp entries come from fe-decode, #1370).
+key	guest	role	sha256	size	hook	args	omit
+effects.emphasis.emphasis_x64.dll	Plugins\Fruity\Effects\Emphasis\Emphasis_x64.dll	本体	dc48d5710b5c2cf75bfd109d108311ac773322ca5799c53fc3a0910db60d2063	4142080	rva:0x191e0,0x33860,0x33880	--pdata	-
