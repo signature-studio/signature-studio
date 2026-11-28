@@ -320,6 +320,75 @@ static size_t record_append(char *b, size_t cap, size_t used, int ended)
     return used;
 }
 
+/* The message of an Exception object: its FMessage, a UnicodeString at +8 (the characters at the pointer, their count at the pointer - 4). ASCII only; the other characters are '?'.
+ * Returns 1 when it was read, 0 when the object, the string or one of its characters is not readable. */
+static int msg_of(uint64_t obj, char *dst, size_t dn)
+{
+    uint64_t p;
+    uint32_t n, k;
+    size_t used = 0;
+
+    dst[0] = 0;
+    if (obj == 0 || !readable8(obj + 8)) return 0;
+    p = ld64(obj + 8);
+    if (p == 0 || !readable8(p - 8)) return 0;
+    n = ld32(p - 4);
+    if (n > 4096u) return 0;
+    for (k = 0; k < n && used + 1 < dn; k++) {
+        uint16_t c;
+
+        if (!readable8(p + 2ull * k)) return 0;
+        c = ld16(p + 2ull * k);
+        dst[used++] = (c >= 0x20 && c < 0x7f) ? (char)c : '?';
+    }
+    dst[used] = 0;
+    return 1;
+}
+
+/* The last exception that a landing took (fle_seh_unwind_ex, at the landing; the stop of a search that no frame takes names it first). The exception that a landing's except body
+ * raises again is the one the search cannot take, and the landed one is where it came from. It is the last landing, not the first: a landing that came earlier, with no stop after it,
+ * is not known to be the cause, so the count of the landings says how many there were. */
+#define LANDED_TRAIL 4u
+static struct {
+    unsigned count;                 /* the landings so far (0: none) */
+    uint32_t code, flags;
+    uint64_t land_ip;
+    unsigned frames;                /* the frames of its unwind (pass 2), from the raise to the landing */
+    trail_ent trail[LANDED_TRAIL];  /* the first of them */
+    int has_cls, has_msg;
+    char cls[120], msg[96];         /* the class of argument 1 (class_of) and the message of the Exception (msg_of) */
+} landed;
+
+static void landed_record(uint32_t code, uint32_t flags, uint64_t land_ip)
+{
+    uint64_t obj = trail_nargs >= 2 ? ld64(trail_args + 8) : 0;
+    unsigned i;
+
+    landed.count++;
+    landed.code = code;
+    landed.flags = flags;
+    landed.land_ip = land_ip;
+    landed.frames = trail_n;
+    for (i = 0; i < LANDED_TRAIL && i < trail_n && i < TRAIL_HEAD; i++) landed.trail[i] = trail_head[i];
+    landed.has_cls = obj != 0 && class_of(obj, landed.cls, sizeof landed.cls);
+    landed.has_msg = obj != 0 && msg_of(obj, landed.msg, sizeof landed.msg);
+}
+
+/* Appends the landed exception to b (used bytes long). It comes before the frames of the stop, which are the long part of the line (400 bytes are kept). */
+static size_t landed_append(char *b, size_t cap, size_t used)
+{
+    unsigned i;
+
+    if (landed.count == 0) return used;
+    used = rec_put(b, cap, used, "; last landed exception (landing %u): code %#x, flags %#x", landed.count, (unsigned)landed.code, (unsigned)landed.flags);
+    if (landed.has_cls) used = rec_put(b, cap, used, ", arg1 class %s", landed.cls);
+    if (landed.has_msg) used = rec_put(b, cap, used, ", message \"%s\"", landed.msg);
+    else used = rec_put(b, cap, used, ", message unreadable");
+    used = rec_put(b, cap, used, ", landing at %#llx after %u frame(s) [", (unsigned long long)landed.land_ip, landed.frames);
+    for (i = 0; i < landed.frames && i < LANDED_TRAIL; i++) used = trail_put(b, cap, used, &landed.trail[i], i > 0);
+    return rec_put(b, cap, used, "%s]", landed.frames > LANDED_TRAIL ? " ..." : "");
+}
+
 /* ---- the virtual unwind of one frame (Learn: x64 exception handling, "Unwind procedure" and "UNWIND_CODE") ---- */
 static uint32_t ia2_last_code;      /* decision 0191 (diagnostics only): the code and the argument pointer of the RaiseException being dispatched, to name a delay-load failure in the stop below */
 static uint64_t ia2_last_args;
@@ -640,6 +709,7 @@ void fle_seh_raise(void)
         delay_names(args, dll, sizeof dll, proc, sizeof proc);
         used = rec_put(why, sizeof why, used, " [delay-load: dll %.60s proc %.90s]", dll, proc);
     }
+    used = landed_append(why, sizeof why, used);
     record_append(why, sizeof why, used, 1);
     fle_stop(api, why);
     abort();
@@ -724,6 +794,7 @@ void fle_seh_unwind_ex(void)
             pend.c = c;
             pend.rax = retval;
             reg->land_ip = target_ip;
+            landed_record(d->code, d->flags, target_ip);
             fle_seh_top = reg;
             fle_landing_top = reg->landing;
             fle_callback_depth_set(reg->cbdepth);
