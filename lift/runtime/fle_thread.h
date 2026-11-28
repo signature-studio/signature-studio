@@ -232,8 +232,8 @@ void fle_thread_report(FILE *f) FLE_THREAD_REF;
 /* A trace of every switch on stderr (write(2)), for diagnosis. */
 void fle_thread_set_trace(int on) FLE_THREAD_REF;
 int fle_thread_trace_on(void) FLE_THREAD_REF;   /* Issue #1502: the trace is on (the other modules' diagnostic lines follow it) */
-/* Issue #1502: the stack words of the running call (" rsp <rsp> stack <8 words>"), and one line per thread of the table (the trace only) */
-void fle_thread_trace_words(char *buf, size_t n) FLE_THREAD_REF;
+/* Issue #1502: one "fle-event:" line for an event call, and one line per thread of the table (the trace only) */
+void fle_thread_trace_event(const char *what, uint64_t h, uint32_t v) FLE_THREAD_REF;
 void fle_thread_trace_table(void) FLE_THREAD_REF;
 /* Decision 0234 (mt3, PROVISIONAL): 1 = the scheduler orders the ready threads by their scheduling priority (Learn "Scheduling Priorities": the levels SetThreadPriority kept), 0 (the default) = the rotation in creation order of decision 0122, the priorities are only kept. */
 void fle_thread_set_priorities(int on) FLE_THREAD_REF;

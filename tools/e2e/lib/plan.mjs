@@ -1,7 +1,7 @@
 // The plan of a run (Issue #1485, #1506): the arguments, the displays and their rows, the budget of a row, the shard, the result of a scenario and the acceptance
 // of a scenario and of a row. Pure (no browser), so the tests can use it.
 // The display names: 4k-dpr1, 4k-dpr2, 4k-random (as before) and dpr:<number> (e.g. dpr:1.25): the CSS size is 3840 / DPR by 2160 / DPR.
-import { areaOf, shardOf, sortById } from './scenario.mjs';
+import { areaOf, runOrder, shardOf, sortById } from './scenario.mjs';
 
 export const DISPLAY = { width: 3840, height: 2160, refreshHzTarget: 120 };
 export const FAIL_LOG_LINES = 200;
@@ -184,7 +184,7 @@ export function planScenarios(all, { only = null, shard = null, repeat = 1 } = {
     }
     list = all.filter((s) => only.includes(s.id) || only.includes(s.name));
   }
-  list = shard === null ? sortById(list) : shardOf(list, shard.i, shard.n);
+  list = runOrder(shard === null ? sortById(list) : shardOf(list, shard.i, shard.n));
   const out = [];
   for (let r = 1; r <= repeat; r++) for (const sc of list) out.push({ sc, repeat: r });
   return out;

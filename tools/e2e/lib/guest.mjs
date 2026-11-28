@@ -144,7 +144,6 @@ export class Guest {
     }
   }
   async shot(file) {
-    if (!this.shots) return;
     const s = await this.send('Page.captureScreenshot', { format: 'png' });
     const fs = await import('node:fs');
     fs.writeFileSync(file, Buffer.from(s.data, 'base64'));

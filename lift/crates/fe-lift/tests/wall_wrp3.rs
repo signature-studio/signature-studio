@@ -293,6 +293,7 @@ const SETUP: &str = r#"
     unsigned i;
     if (img == MAP_FAILED) { printf("mmap failed\n"); return 1; }
     img[0] = 'M'; img[1] = 'Z'; *(uint32_t *)(img + 0x3c) = 0x80; *(uint32_t *)(img + 0x80) = 0x4550;
+    *(uint16_t *)(img + 0x80 + 22) = 0x2000; /* FileHeader.Characteristics: IMAGE_FILE_DLL (without it the image is a program, fle_realmod.c) */
     *(uint16_t *)(img + 0x80 + 24) = 0x20b; *(uint32_t *)(img + 0x80 + 24 + 16) = 0x1000;
     *(uint32_t *)(img + 0x80 + 24 + 112 + 9 * 8) = 0x200; *(uint32_t *)(img + 0x80 + 24 + 112 + 9 * 8 + 4) = 0x28;
     *(uint64_t *)(img + 0x200) = BASE + 0x300; *(uint64_t *)(img + 0x208) = BASE + 0x308; *(uint64_t *)(img + 0x210) = BASE + 0x340;

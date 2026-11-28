@@ -230,8 +230,13 @@ fn the_scheduler_trace_on_stderr_is_the_same_in_two_runs_and_counts_one_switch_p
     let b = run(&["ping_pong"]);
     assert_eq!(trace(&a), trace(&b));
     let sw = trace(&a).iter().filter(|l| l.starts_with("switch ")).count();
-    // 2000 rounds, two transfers per round (main -> thread when main waits, thread -> main when it waits), plus the first start and the end: 4003 stderr lines = create + switches + start + exit
-    assert_eq!(a.err.len(), 4003, "{}", a.err.len());
+    // 2000 rounds, two transfers per round (main -> thread when main waits, thread -> main when it waits), plus the first start and the end. Issue #1502 added the event lines
+    // (2 creates, 4000 SetEvent, 4000 waits and 1 wait that is signaled at once) and the wait-objects lines (one per call site of a wait): the count is itemized here, no line is left out
+    let tt = a.err.iter().filter(|l| l.starts_with("fle-thread: ")).count();
+    let ev = a.err.iter().filter(|l| l.starts_with("fle-event: ")).count();
+    assert_eq!(tt, 4005, "create + switches + start + exit + wait-objects");
+    assert_eq!(ev, 8003, "create + set + wait + done-signaled");
+    assert_eq!(a.err.len(), tt + ev, "{}", a.err.len());
     assert!(sw >= 4000 && sw <= 4001, "{sw}");
 }
 

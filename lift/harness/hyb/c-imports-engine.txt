@@ -244,6 +244,7 @@ GetPaletteEntries
 GetParent
 GetPhysicalCursorPos
 GetPixel
+GetPrivateProfileIntA
 GetProcAddress
 GetProcessAffinityMask
 GetProcessDpiAwareness
@@ -387,6 +388,7 @@ MapVirtualKeyW
 MapWindowPoints
 MaskBlt
 MessageBeep
+MessageBoxA
 midiInGetDevCapsW
 midiInGetNumDevs
 midiOutGetDevCapsW
@@ -408,6 +410,7 @@ OffsetRgn
 OleInitialize
 OleUninitialize
 OpenProcessToken
+OutputDebugStringA
 OutputDebugStringW
 PatBlt
 PeekMessageW

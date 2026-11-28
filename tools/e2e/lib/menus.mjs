@@ -3,21 +3,39 @@
 // A scenario starts with ensureEngine: when the engine has stopped (exited or error), the page is loaded again, so that one item's stop does not fail the next scenarios of the shard.
 import { clickElement, sleep, waitStable } from './flow.mjs';
 import { clearMissingPlugins } from './file.mjs';
-import { windowTable, closeNew, menuPath, openMenu, menuBarRect, pixelHashRegion, readMenuRows, startProject, guestText, POPUP, MENU_BAR } from './common.mjs';
+import { windowTable, newWindows, menuPath, openMenu, menuBarRect, pixelHashRegion, readMenuRows, startProject, guestText, POPUP, MENU_BAR } from './common.mjs';
 import { rootOf } from './dump.mjs';
 
 const ESC = { code: 'Escape', key: 'Escape', vk: 27 };
 
-/** the menus can be used now: the File drop-down opens from its label, and Escape closes it (no drop-down is left) */
+/**
+ * the windows new since `base` are closed by Escape, as common.mjs's closeNew does (the focus on the desktop first); the ones still open are returned.
+ * A window that Escape does not close (a dialog that stays) costs `rounds` x `ms` here, not 8 x 5 s as in closeNew, so a scenario with one stays in its budget.
+ */
+async function closeNewWindows(guest, base, { rounds = 3, ms = 1500 } = {}) {
+  let cur = await newWindows(guest, base);
+  if (cur.pops.length + cur.others.length === 0) return [];
+  await guest.focusDesktop();
+  for (let i = 0; i < rounds; i++) {
+    const n = cur.pops.length + cur.others.length;
+    await guest.escape();
+    const t0 = Date.now();
+    for (;;) {
+      cur = await newWindows(guest, base);
+      if (cur.pops.length + cur.others.length < n || Date.now() - t0 >= ms) break;
+      await sleep(150);
+    }
+    if (cur.pops.length + cur.others.length === 0) return [];
+  }
+  return [...cur.pops, ...cur.others];
+}
+
+/**
+ * the menus can be used now: the menu bar is in the window table. (A window table read costs about 2 s: the File drop-down is not opened here for each scenario,
+ * so that 51 scenarios fit a shard's 35-minute budget; a drop-down the last scenario left is closed by resetProject.)
+ */
 async function menusUsable(guest) {
-  const t = await windowTable(guest);
-  if (!menuBarRect(t)) return false;
-  const base = new Set(t.top.map((w) => w.lid));
-  await openMenu(guest, 'File');
-  await sleep(600);
-  const open = (await windowTable(guest)).top.some((w) => w.cls === POPUP && !base.has(w.lid));
-  await closeNew(guest, base);
-  return open;
+  return menuBarRect(await windowTable(guest)) !== null;
 }
 
 /**
@@ -137,7 +155,8 @@ export async function chooseItem(ctx, names) {
   const after = await snapshot(guest);
   const obs = observe(before, after, quiet);
   const sub = popSizes(obs.popups);
-  const left = await closeNew(guest, before.lids);
+  // the table after the choice shows no new window: nothing to close (a read of the table costs about 2 s)
+  const left = [...after.lids].some((l) => !before.lids.has(l)) ? await closeNewWindows(guest, before.lids) : [];
   const notes = [`${names.join(' > ')} is ${id}`, describe(obs)];
   if (sub !== null) notes.push(`drop-downs open: ${sub.join(', ')}`);
   if (left.length) notes.push(`still open after Escape: ${left.map(winName).join(', ')}`);
@@ -146,7 +165,7 @@ export async function chooseItem(ctx, names) {
     // a toggle (a panel shown or hidden): the same choice again puts it back, so the next scenario starts from the same window table
     await menuPath(guest, names);
     await sleep(700);
-    await closeNew(guest, before.lids);
+    await closeNewWindows(guest, before.lids);
     notes.push('the change was a toggle: the same item was chosen again to put it back');
   }
   const state = await engineState(guest);
@@ -174,20 +193,22 @@ export async function dialogAnswer(ctx, names, how) {
   if (pre.restarted) notes.push('the engine had stopped: the page was loaded again first');
   const dlg = obs.dialogs.find((w) => w.cls !== 'TNewCaption') ?? obs.dialogs[0] ?? null;
   if (!dlg) {
-    await closeNew(guest, before.lids);
+    await closeNewWindows(guest, before.lids);
     return { ok: false, engineState: await engineState(guest), notes: [...notes, describe(obs), 'no window opened: no dialog to answer'], results: { id, dialogs: [], answer: how } };
   }
-  if (how === 'ok') await guest.key('Enter', 'Enter', 13);
-  else if (how === 'cancel') await guest.key(ESC.code, ESC.key, ESC.vk);
+  // the answer goes to the desktop's focus (closeNew does the same before its Escape): an answer that is sent to another focus does not reach the dialog
+  if (how === 'ok') { await guest.focusDesktop(); await guest.key('Enter', 'Enter', 13); }
+  else if (how === 'cancel') { await guest.focusDesktop(); await guest.key(ESC.code, ESC.key, ESC.vk); }
   else {
     await guest.click(dlg.x + dlg.w / 2, dlg.y + 8);
     await sleep(300);
+    await guest.focusDesktop();
     await guest.key(ESC.code, ESC.key, ESC.vk);
   }
   await sleep(900);
   const after = await snapshot(guest);
   const gone = obs.dialogs.every((w) => !after.table.top.some((t) => t.lid === w.lid));
-  const left = await closeNew(guest, before.lids);
+  const left = await closeNewWindows(guest, before.lids);
   const state = await engineState(guest);
   notes.push(`dialog ${winName(dlg)} ${gone ? 'is gone' : 'is still there'} after ${how}`);
   if (left.length) notes.push(`still open after the answer: ${left.map(winName).join(', ')}`);
@@ -203,13 +224,13 @@ export async function chooseTwice(ctx, names) {
   const id = await menuPath(guest, names);
   await sleep(700);
   const o1 = observe(b1, await snapshot(guest), quiet);
-  const left1 = await closeNew(guest, b1.lids);
+  const left1 = await closeNewWindows(guest, b1.lids);
   await sleep(500);
   const b2 = await snapshot(guest);
   await menuPath(guest, names);
   await sleep(700);
   const o2 = observe(b2, await snapshot(guest), quiet);
-  const left2 = await closeNew(guest, b2.lids);
+  const left2 = await closeNewWindows(guest, b2.lids);
   const state = await engineState(guest);
   // the same kind: the same window classes (a title can differ: a new pattern is named with its number), and a change in both or in neither
   const same = o1.dialogs.map((w) => w.cls).join('|') === o2.dialogs.map((w) => w.cls).join('|') && o1.changed.length > 0 === o2.changed.length > 0;
@@ -247,7 +268,7 @@ export async function keyAndMenu(ctx, label, press, names) {
     await press(guest);
     await sleep(700);
   }
-  const left1 = await closeNew(guest, b1.lids);
+  const left1 = await closeNewWindows(guest, b1.lids);
   await sleep(500);
   const b2 = await snapshot(guest);
   const id = await menuPath(guest, names);
@@ -257,7 +278,7 @@ export async function keyAndMenu(ctx, label, press, names) {
     await menuPath(guest, names);
     await sleep(700);
   }
-  const left2 = await closeNew(guest, b2.lids);
+  const left2 = await closeNewWindows(guest, b2.lids);
   const state = await engineState(guest);
   const e1 = effectOf(o1), e2 = effectOf(o2);
   const notes = [`shortcut ${label} and ${names.join(' > ')} (${id})`, `shortcut: ${describe(o1)}`, `menu: ${describe(o2)}`, `same effect: ${e1 === e2 ? 'yes' : 'no'} (${e1} | ${e2})`];
@@ -282,7 +303,7 @@ export async function shortcut(ctx, label, press, restore = null) {
   const obs = observe(before, await snapshot(guest), quiet);
   const sub = popSizes(obs.popups);
   if (restore) await restore(guest);
-  const left = await closeNew(guest, before.lids);
+  const left = await closeNewWindows(guest, before.lids);
   const state = await engineState(guest);
   const notes = [`shortcut ${label}`, describe(obs)];
   if (sub !== null) notes.push(`drop-downs open: ${sub.join(', ')}`);
@@ -299,7 +320,7 @@ export async function labelOpens(ctx, label) {
   await openMenu(guest, label);
   await sleep(900);
   const obs = observe(before, await snapshot(guest));
-  const left = await closeNew(guest, before.lids);
+  const left = await closeNewWindows(guest, before.lids);
   const state = await engineState(guest);
   const p = obs.popups[0];
   const notes = [`${label} drop-down: ${p ? `${p.w}x${p.h}` : 'none'}`, `items in the E0 list: ${e0Count(label)}`];
@@ -319,7 +340,7 @@ export async function labelEscape(ctx, label) {
   await guest.key(ESC.code, ESC.key, ESC.vk);
   await sleep(700);
   const closed = observe(before, await snapshot(guest)).popups.length;
-  const left = await closeNew(guest, before.lids);
+  const left = await closeNewWindows(guest, before.lids);
   const state = await engineState(guest);
   const notes = [`${label}: drop-downs open ${opened}, after Escape ${closed}`];
   if (left.length) notes.push(`still open: ${left.map(winName).join(', ')}`);
@@ -341,7 +362,7 @@ export async function labelSwitch(ctx, from, to) {
   await openMenu(guest, to);
   await sleep(900);
   const second = observe(before, await snapshot(guest)).popups;
-  const left = await closeNew(guest, before.lids);
+  const left = await closeNewWindows(guest, before.lids);
   const state = await engineState(guest);
   const right = first.length === 1 && second.length === 1 && second[0].x > first[0].x;
   const notes = [`${from} open, then ${to}: drop-downs ${afterClick.length} after the click on ${to}, ${second.length} after a second click on ${to}`];
@@ -364,7 +385,7 @@ export async function arrowOpens(ctx, names) {
   }
   const obs = observe(before, await snapshot(guest));
   const n = popSizes(obs.popups);
-  const left = await closeNew(guest, before.lids);
+  const left = await closeNewWindows(guest, before.lids);
   const state = await engineState(guest);
   const notes = [`${names.join(' > ')} by ArrowRight: submenus open ${obs.popups.length}`, `drop-downs open: ${n ? n.join(', ') : 'none'}`];
   if (left.length) notes.push(`still open: ${left.map(winName).join(', ')}`);
@@ -383,7 +404,7 @@ export async function submenuEscape(ctx, names) {
   await guest.key(ESC.code, ESC.key, ESC.vk);
   await sleep(700);
   const after = observe(before, await snapshot(guest)).popups.length;
-  const left = await closeNew(guest, before.lids);
+  const left = await closeNewWindows(guest, before.lids);
   const state = await engineState(guest);
   const notes = [`${names.join(' > ')}: drop-downs open ${opened}, after Escape ${after}`];
   if (left.length) notes.push(`still open: ${left.map(winName).join(', ')}`);
