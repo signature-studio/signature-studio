@@ -1312,7 +1312,7 @@ mod tests {
         let state = format!("{root}/state");
         copy_dir(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")), Path::new(&state));
         write_wave_folders(&table, &state);
-        assert_eq!(read_rows_from(&state).unwrap().len(), 166, "the copy of lift/plugins (Balance, Filter, Sytrus, Reverb, the Plugin Manager's .exe, LAMEenc and ildsp) and the wave's 159 rows");
+        assert_eq!(read_rows_from(&state).unwrap().len(), 165, "the copy of lift/plugins (Balance, Filter, Sytrus, Reverb, the Plugin Manager's .exe and LAMEenc) and the wave's 159 rows");
         let stale = format!("{root}/stale");
         fs::create_dir_all(format!("{stale}/old")).unwrap();
         fs::write(format!("{stale}/old/plugin.tsv"), format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\neffects.old.old_x64.dll\tPlugins\\Fruity\\Effects\\Old\\Old_x64.dll\t本体\t{}\t10\tnone\t\t-\n", "a".repeat(64))).unwrap();
@@ -1324,12 +1324,12 @@ mod tests {
         };
         for plugins in [state.as_str(), concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")] {
             let dlls = second_wave_dlls(plugins, &wave).unwrap();
-            assert_eq!(dlls.len(), 166);
+            assert_eq!(dlls.len(), 165);
             let sizes: Vec<u64> = dlls.iter().map(image_of).collect();
             let bases = assign_bases(0xC1CF000, &sizes).expect("the images fit below GLOBAL_BASE");
             assert_eq!(bases[0], 0xC1D0000);
             let wave_total: u64 = dlls.iter().filter(|d| d.plugin != "fruity-balance" && d.plugin != "fruity-filter" && !d.is_exe()).map(|d| align_up(image_of(d), ALIGN)).sum();
-            assert_eq!(wave_total, 748_158_976 + 524_288 + 720_896 + 4_521_984, "the wave's 748,158,976 B, Reverb's 516,096 B (aligned: 524,288), LAMEenc's 671,744 B (aligned: 720,896) and ildsp's 4,485,120 B (aligned: 4,521,984) of SizeOfImage");
+            assert_eq!(wave_total, 748_158_976 + 524_288 + 720_896, "the wave's 748,158,976 B, Reverb's 516,096 B (aligned: 524,288) and LAMEenc's 671,744 B (aligned: 720,896) of SizeOfImage");
             for pair in bases.windows(2).zip(sizes.iter()) {
                 assert!(pair.0[1] >= pair.0[0] + align_up(*pair.1, ALIGN), "the images at {:#x} and {:#x} overlap", pair.0[0], pair.0[1]);
             }
@@ -1357,9 +1357,9 @@ mod tests {
 
     /// The first wave's folders (tools/plugin-layout/wave2-plugins.mjs, FIRST_WAVE): their DLLs are in lift/plugins, and not in the table.
     /// Reverb_x64.dll (Issue #1429, a helper of Sytrus in Shared) is in lift/plugins too, and not in the table. The Plugin Manager's .exe (Issue #1499)
-    /// is in lift/plugins too, and not in the table. LAMEenc_x64.dll (Issue #1512, the MP3 encoder) is too. ildsp_x64.dll (Issue #1539, the DSP DLL) is too.
+    /// is in lift/plugins too, and not in the table. LAMEenc_x64.dll (Issue #1512, the MP3 encoder) is too.
     fn first_wave_folder(guest: &str) -> bool {
-        const FIRST_WAVE: [&str; 8] = [r"Plugins\Fruity\Effects\Fruity Balance", r"Plugins\Fruity\Effects\Fruity Filter", r"Plugins\Fruity\Effects\Fruity Delay 2", r"Plugins\Fruity\Generators\Sytrus", r"Shared\Reverb_x64.dll", r"System\Tools\Plugin Manager\PluginManager.exe", r"Shared\LAMEenc_x64.dll", r"Shared\ildsp_x64.dll"];
+        const FIRST_WAVE: [&str; 7] = [r"Plugins\Fruity\Effects\Fruity Balance", r"Plugins\Fruity\Effects\Fruity Filter", r"Plugins\Fruity\Effects\Fruity Delay 2", r"Plugins\Fruity\Generators\Sytrus", r"Shared\Reverb_x64.dll", r"System\Tools\Plugin Manager\PluginManager.exe", r"Shared\LAMEenc_x64.dll"];
         let folder = guest.split('\\').take(4).collect::<Vec<&str>>().join("\\");
         FIRST_WAVE.iter().any(|f| f.eq_ignore_ascii_case(&folder))
     }
