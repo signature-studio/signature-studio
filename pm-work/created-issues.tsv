@@ -235,3 +235,4 @@
 254	#1540	`cargo test -p fe-build` が main で 2 件落ちる: `the_second_wave_is_160_dlls_and_fits_the_image_area`(`File exists`)と `the_second_wave_with_its_data_fits_the_limits`(`fruity-delay-bank` の guest path が一意でない)	Task
 255	#1541	DPR を実行中に 1.8 から 1.75 へ変えると、engine が終了コード 5 で止まる: 再現して、一度目の停止の原因を特定して直す	Task
 256	#1542	起動の最中(最初の idle の前)に入力を送ると、Delphi の例外 0xEEDFADE を処理する frame が見つからず、engine が SIGABRT で止まる(間欠。乱数の DPR 2.29 の `context-menu-none`)	Task
+257	#1543	共有の DLL 4: Elastique_x64.dll を実モジュールにして、既定の曲を開いた時の『Problems loading the project』の箱を消す	Task
