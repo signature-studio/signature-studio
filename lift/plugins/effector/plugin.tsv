@@ -1,0 +1,4 @@
+# Effector (Effects, Issue #1435). 本体 Effector_x64.dll; 補助 engine_x64.dll (the engine the 本体 names: no Delphi hook points). hook: the three Delphi hook points of the RVAs (inputs/plugin-hooks.tsv). omit: - (the setjmp entries come from fe-decode, #1370).
+key	guest	role	sha256	size	hook	args	omit
+effects.effector.effector_x64.dll	Plugins\Fruity\Effects\Effector\Effector_x64.dll	本体	8d437239007f9532dc9eeddac960d8555004cb14e5c75b700f4774601f3a18bc	3726336	rva:0x17980,0x31a10,0x31a30	--pdata	-
+effects.effector.engine_x64.dll	Plugins\Fruity\Effects\Effector\engine_x64.dll	補助	6b0c7c25e4eeb91a91b9e93b6113e909031d390711e7045faace68565357172c	498176	none	--pdata	-

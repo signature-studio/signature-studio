@@ -73,7 +73,8 @@ typedef struct {
     uint64_t base, size, pdata;
     uint32_t npdata;
 } img_t;
-#define IMG_MAX 12
+/* the exe and the real modules of fle_realmod.c (RM_MAX 192): every image that can be mapped at once (#1537: 12 dropped the 13th image without a word) */
+#define IMG_MAX 193
 static img_t imgs[IMG_MAX];
 static int nimgs = -1;
 
@@ -96,43 +97,67 @@ static int read_img(uint64_t base, img_t *im)
     return 1;
 }
 
+/* A full table stops by name; it never drops an image (the unwinder would then miss the frames of that image). */
+static void add_img(const img_t *im)
+{
+    if (nimgs >= IMG_MAX) fle_stop("RaiseException", "the image table of the unwinder is full (IMG_MAX): more images than it holds");
+    imgs[nimgs++] = *im;
+}
+
 static void load_images(void)
 {
     img_t im;
 
     nimgs = 0;
-    if (read_img(FLE_EXE_HANDLE, &im)) imgs[nimgs++] = im;
-    if (fle_realmod_total && fle_realmod_base_of) {
+    if (read_img(FLE_EXE_HANDLE, &im)) add_img(&im);
+    if (fle_realmod_total && fle_realmod_base_of && fle_realmod_image_mapped) {
         uint64_t n = fle_realmod_total(), k;
 
-        for (k = 0; k < n && nimgs < IMG_MAX; k++) {
-            uint64_t b = fle_realmod_base_of((int)k);
+        for (k = 0; k < n; k++) {
+            uint64_t b;
 
-            if (b && read_img(b, &im)) imgs[nimgs++] = im;
+            if (!fle_realmod_image_mapped((int)k)) continue;
+            b = fle_realmod_base_of((int)k);
+            if (b && read_img(b, &im)) add_img(&im);
         }
     }
 }
 
 /* For tests that map an image of their own: replaces the list (bases of mapped PE images). */
+static int images_from_test;
 void fle_seh_set_images(const uint64_t *bases, unsigned n);
 void fle_seh_set_images(const uint64_t *bases, unsigned n)
 {
     unsigned i;
     img_t im;
 
+    images_from_test = 1;
     nimgs = 0;
-    for (i = 0; i < n && nimgs < IMG_MAX; i++)
-        if (read_img(bases[i], &im)) imgs[nimgs++] = im;
+    for (i = 0; i < n; i++)
+        if (read_img(bases[i], &im)) add_img(&im);
+}
+
+static const img_t *find_img(uint64_t pc)
+{
+    int i;
+
+    for (i = 0; i < nimgs; i++)
+        if (pc >= imgs[i].base && pc - imgs[i].base < imgs[i].size) return &imgs[i];
+    return NULL;
 }
 
 static const img_t *img_of(uint64_t pc)
 {
-    int i;
+    const img_t *im;
 
     if (nimgs < 0) load_images();
-    for (i = 0; i < nimgs; i++)
-        if (pc >= imgs[i].base && pc - imgs[i].base < imgs[i].size) return &imgs[i];
-    return NULL;
+    im = find_img(pc);
+    /* a real module the guest loaded after the list was read is not in it yet: the list is read again (#1537) */
+    if (!im && !images_from_test) {
+        load_images();
+        im = find_img(pc);
+    }
+    return im;
 }
 
 /* The RUNTIME_FUNCTION that holds the RVA (binary search of the sorted table), or 0. */
