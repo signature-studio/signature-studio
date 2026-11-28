@@ -749,8 +749,10 @@ fn seed_copies(tree: &str, dlls: &[Dll]) -> Result<(), String> {
 }
 
 /// The tables of the build, from the plugin rows and the fixed rows. `with_base` is false in the extraction (no host yet): the
-/// extraction table and the seed table do not depend on the bases, and the lists are left alone. With the bases, lists/ gets the
-/// fixed lists again (the lists stage then writes the plugins' lists, so no list of a removed plugin is left behind).
+/// extraction table and the seed table do not depend on the bases, and the lists are left alone. The bundle's seed table
+/// (vfs-seed-idle1.tsv) has the Plugin database rows, whose SHA-256 is read from the host tree (the extraction puts those files
+/// there), so it is made with the bases. With the bases, lists/ gets the fixed lists again (the lists stage then writes the
+/// plugins' lists, so no list of a removed plugin is left behind).
 pub fn generate(with_base: bool) -> Result<(), String> {
     let mut dlls = read_plugins()?;
     let data = read_data(&dlls)?;
@@ -766,15 +768,15 @@ pub fn generate(with_base: bool) -> Result<(), String> {
     write(&format!("{OUT_DIR}/extract-dlls.tsv"), &extract)?;
     let seed = seed_table(&read_text(FIXED_SEED)?, &dlls, &data);
     write(&format!("{OUT_DIR}/vfs-seed-extract.tsv"), &seed)?;
+    write(&format!("{OUT_DIR}/seed.args"), &seed_args)?;
+    if !with_base {
+        return Ok(());
+    }
     let mut idle1 = seed;
     for row in plugin_db_rows(&plugin_db_names(&dlls)?, &plugin_db_categories(&dlls))? {
         idle1.push_str(&format!("{row}\n"));
     }
     write(&format!("{OUT_DIR}/vfs-seed-idle1.tsv"), &idle1)?;
-    write(&format!("{OUT_DIR}/seed.args"), &seed_args)?;
-    if !with_base {
-        return Ok(());
-    }
     seed_copies(HOST_DIR, &dlls)?;
     let lists = format!("{OUT_DIR}/lists");
     let _ = fs::remove_dir_all(&lists);
