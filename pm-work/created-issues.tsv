@@ -232,3 +232,4 @@
 251	#1537	プラグインを足すと、既存のプラグインが `indirect call to 0` で止まる: 溢れている上限を特定して直す	Task
 252	#1538	第 2 波の DLL が使う import のうち runtime に無い物を、全件、表にして実装する: 実装しない物は名前つきの停止にする	Task
 253	#1539	共有の DLL の行を足す: `ildsp_x64.dll` を実モジュールにし、`Shared\module\` の DLL の出所を確かめる(出所が無ければ行は足さない)	Task
+254	#1540	`cargo test -p fe-build` が main で 2 件落ちる: `the_second_wave_is_160_dlls_and_fits_the_image_area`(`File exists`)と `the_second_wave_with_its_data_fits_the_limits`(`fruity-delay-bank` の guest path が一意でない)	Task
