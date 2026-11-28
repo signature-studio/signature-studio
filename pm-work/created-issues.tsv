@@ -241,3 +241,6 @@
 260	#1546	プラグインの再生・描画で、間接呼び出しの呼び先が画素・文字の形になって engine が止まる: 書いた場所を特定して直す	Task
 261	#1547	第 2 波で停止の型により束から外した plugin を、(B) の後に入れ直す: 追跡の表と受け入れ	Task
 262	#1548	起動の間のスプラッシュの提示が約 2 fps しか出ない: 毎秒の提示の数を測り、60 fps 以上に上げる	Task
+263	#1549	製品: 起動の時に OPFS の hkcu.log の getSize が失敗すると、engine が error のまま戻らず、同じ page の後続の本が連鎖して落ちる(e2e-full の最新の run で 33 本)	Task
+264	#1550	製品: メニューや F8 から開いた箱(TSpeechForm・TPlugListForm・TWAVRenderForm・TTapTempoForm・TPythonForm)が、Esc・OK・Cancel で閉じない(e2e-full の最新の run で 17 本)	Task
+265	#1551	E2E の plugins: 一覧(Installed)の読みが本の開始位置から始まり、共有の page では一覧が見えないため、282 本が一覧の段で止まる(印の受理の後ろに隠れている)	Task
