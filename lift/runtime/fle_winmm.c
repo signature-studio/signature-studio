@@ -14,6 +14,10 @@
 void fle_imp_midiInGetNumDevs(void) { R[0] = FLE_WINMM_MIDI_IN_DEVS; }
 void fle_imp_midiOutGetNumDevs(void) { R[0] = FLE_WINMM_MIDI_OUT_DEVS; }
 
+/* MSDN joyGetNumDevs: "the number of joystick devices supported by the driver"; no joystick is attached to the virtual machine, so the count
+ * is zero, as for the MIDI devices above (joyGetPosEx and joyGetDevCaps are not answered: they stop by name). */
+void fle_imp_joyGetNumDevs(void) { R[0] = 0; }
+
 /* MSDN midiInGetDevCapsW: the identifier "varies from zero to one less than the number of devices present";
  * MMSYSERR_BADDEVICEID is "The specified device identifier is out of range"; "If cbmic is zero, nothing is copied,
  * and the function returns MMSYSERR_NOERROR"; MMSYSERR_INVALPARAM is "The specified pointer or structure is

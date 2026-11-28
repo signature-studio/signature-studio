@@ -199,7 +199,7 @@ fn the_thunk_is_answered_under_user32_and_under_no_other_dll() {
     let va = IB + 0x1040;
     assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ {{ void fle_imp_PostThreadMessageW(void); fle_imp_PostThreadMessageW(); return; }}}}")), "thunk 0 is answered");
     let va = IB + 0x1050;
-    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "the same name under kernel32 stays unsupported");
+    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"kernel32.dll!PostThreadMessageW\"); }}")), "the same name under kernel32 stops by name");
 }
 
 // ---------------------------------------------------------------------------------------------

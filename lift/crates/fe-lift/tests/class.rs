@@ -242,7 +242,8 @@ fn the_two_rows_are_in_the_table_and_declared_and_the_neighbours_are_not_answere
     // decision 0123 (old: "UnregisterClassW" and "GetClassNameW" were in this list): runtime/fle_class.c answers UnregisterClassW and runtime/fle_win.c GetClassNameW (tests/wall_fr9.rs).
     for n in [
         "RegisterClassExW", "GetClassInfoExW", "RegisterClassA", "RegisterClassExA", "GetClassInfoA",
-        "GetClassInfoExA", "UnregisterClassA", "GetClassLongPtrW",
+        "GetClassInfoExA", "UnregisterClassA",
+        // "GetClassLongPtrW" was in this list until Issue #1538 (GCLP_HICON only, runtime/fle_win.c; tests/second_wave_imports.rs)
         // "SetClassLongPtrW" was in this list until decision 0119 (wall 9/15: runtime/fle_win.c answers it, tests/wall_fr6.rs); old: asserted absent
     ] {
         assert!(!table.contains(&format!("\"{n}\"")), "{n} must not be answered by this decision");

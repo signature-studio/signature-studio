@@ -29,8 +29,8 @@ const DIALOG = [
 /** the items with a submenu, and its number of items (the crash-hunt) */
 const SUBMENU = { 'file-2': 5, 'file-8': 1, 'file-9': 13, 'file-9-9': 2, 'file-9-10': 2, 'add-5': 5, 'view-11': 18, 'view-19': 7 };
 
-/** the stops, with the Issue of the defect (crash-hunt: #1415, #1416, #1411), or 'new' for a stop seen in a run with no Issue yet (tools-4: the riff machine window; #1429 is the same window with another address, so not the same defect as far as the run shows). add-14 has a DPR 1.7 choice without the mark */
-const STOP = { 'file-9-11': '#1415', 'view-11-1': '#1416', 'add-14': '#1411', 'tools-4': 'new' };
+/** the stops, marked 'new' (a stop seen in a run with no open Issue yet: tools-4, the riff machine window; #1429 is the same window with another address, so not the same defect as far as the run shows). The crash-hunt's stops of add-14, file-9-11 and view-11-1 carry no mark: their Issues are closed, so a stop of them shows as a failure of its scenario. add-14 has a DPR 1.7 choice without the mark */
+const STOP = { 'tools-4': 'new' };
 
 /** the items whose effect is seen at DPR 1.7 only (the crash-hunt saw none at DPR 1): their scenarios run on the random display */
 const randomOnly = (slug) => ['view-12', 'view-13', 'view-14'].includes(slug) || slug.startsWith('view-19');

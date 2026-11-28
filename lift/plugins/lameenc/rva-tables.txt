@@ -1,0 +1,6 @@
+# LAMEenc_x64.dll (Issue #1512): the MSVC jump table whose targets are leaf functions without .pdata. Row: RVA COUNT (hex RVA, decimal count).
+# The table at RVA 0x5b08 has 9 RVAs (the index bound cmp $8, ja): the switch of the state machine at RVA 0x5950 (jmp *%rdx at RVA 0x5976).
+# Entry 2 is RVA 0x5a4d, the "indirect call to 0xcf65a4d is not a known function entry" stop. Entry 8 (0x5978) falls through into entry 7 (0x597f): its root stays undecodable.
+# The other MSVC tables of the DLL (0x15cc, 0x1ca8, 0xa9ac, 0x1274c, 0x1276c, 0x16f50, 0x312c7, 0x3175c) hold targets inside their own functions (.pdata):
+# they are not listed here, because a row makes each target a function entry, and the labels inside a function then break the function that holds them.
+0x5b08 9

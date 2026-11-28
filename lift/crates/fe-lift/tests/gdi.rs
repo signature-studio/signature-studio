@@ -1876,7 +1876,7 @@ fn the_createfontindirectw_thunk_calls_the_runtime_and_the_names_are_part_of_the
         assert!(!st.handled.contains_key("jmp_imp:CreateFontIndirectW"), "{dll}!{api}");
         assert!(!c.contains("fle_imp_CreateFontIndirectW"), "{dll}!{api}");
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
     }
 }
 
@@ -1898,7 +1898,7 @@ fn the_getobjectw_thunk_calls_the_runtime_and_the_names_are_part_of_the_match() 
         assert!(!st.handled.contains_key("jmp_imp:GetObjectW"), "{dll}!{api}");
         assert!(!c.contains("fle_imp_GetObjectW"), "{dll}!{api}");
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
     }
 }
 
@@ -1914,8 +1914,8 @@ fn the_dll_name_is_part_of_the_match() {
         assert!(!st.handled.contains_key(format!("jmp_imp:{name}").as_str()), "{name}");
         assert!(!c.contains(&format!("fle_imp_{name}")), "{name}");
     }
-    for va in [IB + 0x1050, IB + 0x1060, IB + 0x1070] {
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{va:#x}");
+    for (va, name) in [(IB + 0x1050, "CreatePalette"), (IB + 0x1060, "DeleteObject"), (IB + 0x1070, "GetStockObject")] {
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"other.dll!{name}\"); }}")), "{va:#x}");
     }
 }
 
@@ -3424,7 +3424,7 @@ fn the_thunks_of_the_nineteen_apis_call_the_runtime_and_the_dll_name_is_part_of_
             let c = String::from_utf8(out).unwrap();
             assert!(!st.handled.contains_key(format!("jmp_imp:{api}").as_str()), "{wrong}!{api}");
             assert!(!c.contains(&format!("fle_imp_{api}")), "{wrong}!{api}");
-            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{wrong}!{api}");
+            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{wrong}!{api}\"); }}")), "{wrong}!{api}");
         }
     }
 }
@@ -3440,7 +3440,7 @@ fn the_neighbours_that_decision_0108_does_not_answer_stay_unsupported_thunks() {
         let c = String::from_utf8(out).unwrap();
         assert!(!c.contains(&format!("fle_imp_{api}")), "{dll}!{api}");
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
         assert_eq!(st.handled.keys().filter(|k| k.starts_with("jmp_imp:")).count(), 0, "{dll}!{api}");
     }
 }

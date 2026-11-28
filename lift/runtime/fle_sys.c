@@ -367,6 +367,27 @@ void fle_imp_EnterCriticalSection(void)
     s->recursion++;
 }
 
+/* kernel32!TryEnterCriticalSection: BOOL f(LPCRITICAL_SECTION rcx). Learn: "If the critical section is successfully entered or the current
+ * thread already owns the critical section, the return value is nonzero. If another thread already owns the critical section, the return
+ * value is zero." The call never waits. A section that is not initialized (or was deleted) stops, as in EnterCriticalSection. */
+void fle_imp_TryEnterCriticalSection(void)
+{
+    uint64_t a = fle_cs_arg("TryEnterCriticalSection");
+    fle_cs_slot *s = fle_cs_find(a);
+    unsigned me;
+
+    if (!s) STOP("TryEnterCriticalSection on a section %#llx that is not initialized (or was deleted)\n", (unsigned long long)a);
+    if (s->recursion == UINT32_MAX) STOP("TryEnterCriticalSection recursion overflow\n");
+    me = fle_thread_current ? fle_thread_current() : 0;
+    if (s->recursion > 0 && s->owner != me) {
+        R[0] = 0;
+        return;
+    }
+    s->owner = me;
+    s->recursion++;
+    R[0] = 1;
+}
+
 /* Decision 0122: called by the scheduler for a thread that waits for the section at `addr`: when the section is free it is taken for `thread` and 1 is returned. */
 int fle_sys_cs_try_take(uint64_t addr, unsigned thread)
 {

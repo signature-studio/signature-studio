@@ -264,6 +264,20 @@ void fle_class_set_hicon(const char *api, uint16_t atom, uint64_t value, uint64_
     fle_stop(api, "the class of the window is not in the class table");
 }
 
+/* Issue #1538: the read side of fle_class_set_hicon (GetClassLongPtrW, GCLP_HICON): *out = the hIcon the class `atom` has now. */
+void fle_class_get_hicon(const char *api, uint16_t atom, uint64_t *out)
+{
+    uint64_t i;
+
+    fle_class_check_thread(api);
+    for (i = 0; i < tab_n; i++) {
+        if (tab[i].atom != atom) continue;
+        memcpy(out, tab[i].wc + FLE_CLASS_WC_OFF_HICON, 8);
+        return;
+    }
+    fle_stop(api, "the class of the window is not in the class table");
+}
+
 /* Decision 0123: see fle_class.h. */
 int fle_class_name_of(uint16_t atom, uint16_t *out, uint16_t *len)
 {

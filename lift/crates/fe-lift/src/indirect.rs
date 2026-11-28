@@ -166,7 +166,7 @@ mod tests {
         assert_eq!(st.handled["jmp_ind:rip_table"], 1);
         assert!(c.contains(&format!("f_{:x}(); R[4] += 8;", IB + 0x1040)));
         assert!(c.contains(&format!("goto L_{:x};", IB + 0x1030)));
-        assert!(c.contains(&format!("fle_unsupported(UINT64_C({:#x}));", IB + 0x1006)));
+        assert!(c.contains(&format!("fle_import_stop(\"k.dll!Fn\"); }}")) && c.contains(&format!("/* {:#x} Call */", IB + 0x1006)));
         assert_eq!(st.unsupported["Call: indirect through IAT slot (not lifted)"], 1);
         assert!(!st.unsupported.contains_key("Call: indirect target unresolved"));
     }

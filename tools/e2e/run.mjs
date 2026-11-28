@@ -252,7 +252,8 @@ async function runShared(sc, repeat, d, env, sh, index, budget) {
   let mark = { n: 0, t: null };
   try {
     mark = await logMark(sh.guest);
-    const reset = await resetProject(sh.guest, { newProject: sc.area === 'file' });
+    // the menus' scenarios (about 50 in a shard's 35 minutes) wait less for a late box (500 ms of quiet, not 2 s): each wait is about 5 s of the shard's budget
+    const reset = await resetProject(sh.guest, { newProject: sc.area === 'file', settleMs: sc.area === 'menus' ? 500 : 2000 });
     if (reset.left.length) out.notes.push(`after File > New, open: ${JSON.stringify(reset.left)}`);
     // a page made again (Issue #1528): File > New must make a new project (its form is shown, the engine is idle) before the scenario runs; until it does, each scenario checks it
     if (sh.recreated) {

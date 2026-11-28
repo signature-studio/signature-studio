@@ -210,6 +210,56 @@ void fle_imp_GetPrivateProfileStringW(void)
     free(app); free(key); free(def); free(file); free(buf);
 }
 
+/* ---- kernel32!GetPrivateProfileIntA (Issue #1512: LAMEenc_x64.dll's beInitStream reads Debug / WriteLogFile of lame_enc.ini, a file that the volume does not have) ----
+ * UINT f(LPCSTR lpAppName rcx, LPCSTR lpKeyName rdx, INT nDefault r8d, LPCSTR lpFileName r9). Learn (winbase.h, "GetPrivateProfileIntA function"): "Retrieves an integer associated with a key in the specified section of an initialization file";
+ * the return value is "the integer equivalent of the string following the specified key name in the specified initialization file. If the key is not found, the return value is the specified default value"; lpFileName: "If this parameter does not contain a full path to the file, the system searches for the file in the Windows directory".
+ * Choices without a source (S-ia2-profile-int): the file, the lookup and the error code are GetPrivateProfileStringW's (the same code runs), and the default text of the call is nDefault in decimal, so a key that is not found answers nDefault as the page says;
+ * the text found is read as a decimal integer (blanks, an optional sign, then digits; no digit gives 0, as atoi does; the value wraps to 32 bits). The names are ANSI: a byte of 0x80 or above stops by name (the code page conversion is not modelled). */
+static uint16_t *ansi_name(const char *api, uint64_t p)
+{
+    size_t m = 0, k;
+    uint16_t *d;
+
+    if (p == 0) fle_stop(api, "a name is NULL: the page gives no behaviour");
+    for (;;) {
+        uint8_t c = (uint8_t)fle_ld(p + m, 1);
+        if (c == 0) break;
+        if (c >= 0x80) fle_stop(api, "a name holds a byte of 0x80 or above: the code page conversion is not modelled");
+        if (++m > 600u) fle_stop(api, "a name longer than 600 characters is not modelled");
+    }
+    d = malloc((m + 1) * 2);
+    for (k = 0; k <= m; k++) d[k] = (uint16_t)fle_ld(p + k, 1);
+    return d;
+}
+
+void fle_imp_GetPrivateProfileIntA(void)
+{
+    static const char api[] = "GetPrivateProfileIntA";
+    uint16_t *app = ansi_name(api, R[1]), *key = ansi_name(api, R[2]), *file = ansi_name(api, R[9]);
+    uint16_t dtext[16], out[32] = { 0 };
+    uint64_t saved[16], st[8] = { 0 };
+    char dbuf[16];
+    size_t k = 0, cap = sizeof out / sizeof out[0];
+    uint32_t v = 0;
+    int neg = 0;
+
+    snprintf(dbuf, sizeof dbuf, "%d", (int)(int32_t)R[8]);
+    for (k = 0; dbuf[k]; k++) dtext[k] = (uint16_t)dbuf[k];
+    dtext[k] = 0;
+    st[5] = cap;
+    st[6] = va_of(file);
+    memcpy(saved, R, sizeof saved);
+    R[1] = va_of(app); R[2] = va_of(key); R[8] = va_of(dtext); R[9] = va_of(out); R[4] = va_of(st);
+    fle_imp_GetPrivateProfileStringW();
+    memcpy(R, saved, sizeof saved);
+    k = 0;
+    while (k + 1 < cap && (out[k] == ' ' || out[k] == '\t')) k++;
+    if (k + 1 < cap && (out[k] == '+' || out[k] == '-')) neg = out[k++] == '-';
+    while (k + 1 < cap && out[k] >= '0' && out[k] <= '9') v = v * 10u + (uint32_t)(out[k++] - '0');
+    R[0] = neg ? 0u - v : v;
+    free(app); free(key); free(file);
+}
+
 /* ---- kernel32!WritePrivateProfileStringW (wall ia2-W30: the Help "Internet links" write after they read) ----
  * BOOL f(LPCWSTR lpAppName rcx, LPCWSTR lpKeyName rdx, LPCWSTR lpString r8, LPCWSTR lpFileName r9). Learn (winbase.h, "WritePrivateProfileStringW function"): "Copies a string into the specified section of an initialization file";
  * lpAppName "the name of the section to which the string will be copied. If the section does not exist, it is created"; lpKeyName "the name of the key to be associated with a string. If the key does not exist in the specified
