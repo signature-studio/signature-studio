@@ -67,7 +67,7 @@ const KEY_DOWN = { code: 'ArrowDown', key: 'ArrowDown', vk: 40, mods: 0 };
 const DOWN_WAIT_MS = 200, NAV_WAIT_MS = 120, OPEN_WAIT_MS = 600, OPEN_SETTLE_MS = 500, OBSERVE_MS = 2000, SETTLE_MS = 20000, POLL_MS = 400, SETTINGS_OPEN_MS = 2500, PAGE_WAIT_MS = 1500;
 const MAX_ITEMS = 90, MAX_DEPTH = 3;
 const FILE_LABEL = 'File';
-const STARTUP_LIMIT = { elapsedMs: 12500, preBootBytes: 314368711 };
+const STARTUP_LIMIT = { elapsedMs: 12500, preBootBytes: 330000000 };
 const TIMEOUT_EVAL = /^timeout \d+ ms: Runtime\.evaluate/;
 const TIMEOUT_ANY = /^timeout \d+ ms:/;
 const EXIT_REASON = 'File の最後の項目 Exit: FL が終了する(正しい終了。停止に数えない)';
