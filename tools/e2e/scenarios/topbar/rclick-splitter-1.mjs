@@ -5,6 +5,7 @@ import { partOperation } from '../../lib/topbar.mjs';
 export default defineScenario({
   id: 'topbar/rclick-splitter-1',
   covers: ['topbar/rclick/splitter-1', 'topbar/part/splitter-1'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return partOperation(guest, 'splitter-1', 'rclick');
   },

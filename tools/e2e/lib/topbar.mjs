@@ -5,8 +5,9 @@
 // A part whose picture moves by itself (a meter) has before !== control; its effect is still the change from the control. A right click's menu is a new TQuickPopupMenuWindow that holds the click point.
 // The memory label ("<n> MB") is read from the guest's memory (guestText); its value is the MiB floor of the last K32GetProcessMemoryInfo answer in the engine log (#1391).
 import { absoluteRect } from './dump.mjs';
-import { closeNew, guestText, newWindows, openLids, pixelHashRegion, windowTable } from './common.mjs';
+import { closeNew, guestText, newWindows, openLids, picture, pixelHashRegion, windowTable } from './common.mjs';
 import { sleep } from './flow.mjs';
+import { regionColours } from './picture.mjs';
 
 const CLASS_OF = { twpcontrol: 'TWPControl', tquickcontrolbar: 'TQuickControlBar', tquickedittoolbar: 'TQuickEditToolBar', tquickedittoolbarpanel: 'TQuickEditToolbarPanel', tnewmenu: 'TNewMenu' };
 const OPS = ['click', 'rclick', 'wheel', 'drag'];
@@ -14,6 +15,9 @@ const MIB = 1048576;
 const MEMORY_TOLERANCE_MIB = 4;
 const MEMORY_WAIT_MS = 15000;
 const MB_RUN = /^(\d+) MB$/;
+// one wheel notch is 120 (WHEEL_DELTA). The page turns a DOM deltaY of 100 into one notch (app/src/input/tracker.ts), and at DPR 2 the browser gives a CDP delta of 120 as a DOM deltaY of
+// 60 (measured: DOM = CDP / DPR, e.g. DPR 1.37: 120 -> 87.6; DPR 2.6: 120 -> 46.2), so the notch is sent as 120 x DPR, which the page reads as 120 at any DPR.
+const WHEEL_NOTCH = 120;
 const K32_CALLS = 'window.__app.engineLog().filter(function (l) { return /memory-usage: K32GetProcessMemoryInfo/.test(l); }).map(function (l) { return Number(/WorkingSetSize (\\d+)/.exec(l)[1]); })';
 
 /** the class and the ordinal of a part from its slug (`twpcontrol-2`: the 2nd TWPControl; `splitter-1`: the 13th TQuickEditToolbarPanel) */
@@ -69,12 +73,14 @@ export async function partOperation(guest, slug, op) {
   const r = at.rect;
   const c = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
   const base = await openLids(guest);
+  const dpr = await guest.ev('window.devicePixelRatio');
   const before = await pixelHashRegion(guest, r);
   await sleep(1000);
   const control = await pixelHashRegion(guest, r);
+  const under = await elementAt(guest, c);
   if (op === 'click') await guest.click(c.x, c.y);
   else if (op === 'rclick') await guest.rightClick(c.x, c.y);
-  else if (op === 'wheel') await guest.wheel(c.x, c.y, 3, 120);
+  else if (op === 'wheel') await guest.wheel(c.x, c.y, 3, WHEEL_NOTCH * dpr);
   else {
     const horizontal = r.w >= r.h;
     const a = horizontal ? { x: r.x + r.w * 0.25, y: c.y } : { x: c.x, y: r.y + r.h * 0.25 };
@@ -91,13 +97,36 @@ export async function partOperation(guest, slug, op) {
   const animating = control !== before;
   const inert = op === 'click' && slug === 'splitter-1';
   const ok = op === 'rclick' ? fresh.pops.length > 0 : op === 'click' ? (inert ? !changed && opened.length === 0 : changed || opened.length > 0) : changed;
+  const colours = regionColours(await picture(guest), r);
   const row = {
     part: slug, op, cls: spec.cls, n: spec.n, lid: at.lid, rect: r, before, control, after, animating, changed,
-    opened, menu: menu ? { cls: menu.cls, x: menu.x, y: menu.y, w: menu.w, h: menu.h } : null,
+    opened, menu: menu ? { cls: menu.cls, x: menu.x, y: menu.y, w: menu.w, h: menu.h } : null, colours, under,
   };
+  // a drag moves its part (the splitter): it is dragged back by the same distance, so the parts that the scenarios after it read are where they were (one page is shared)
+  const back = op === 'drag' ? await dragBack(guest, at.lid, r) : null;
   const verdict = inert ? (ok ? 'inert: a click does not move it' : 'moved by a click') : (ok ? 'effect' : 'no effect');
-  const note = `${slug} ${op}: ${verdict} (picture ${changed ? 'changed' : 'unchanged'}${animating ? ', moves by itself' : ''}; opened ${opened.join(',') || 'none'}; menu ${fresh.pops.length ? `${fresh.pops[0].w}x${fresh.pops[0].h}${menu ? ' at the point' : ' not at the point'}` : 'none'})`;
-  return { ok, engineState: (await guest.state())?.state ?? engineState, notes: [note], results: [row] };
+  const note = `${slug} ${op}: ${verdict} (picture ${changed ? 'changed' : 'unchanged'}${animating ? ', moves by itself' : ''}; opened ${opened.join(',') || 'none'}; menu ${fresh.pops.length ? `${fresh.pops[0].w}x${fresh.pops[0].h}${menu ? ' at the point' : ' not at the point'}` : 'none'}; rect ${r.x},${r.y} ${r.w}x${r.h} colours ${colours}; under the centre ${under ?? 'none'})`;
+  if (back) row.draggedBack = back;
+  const notes = back ? [note, `${slug}: dragged back by ${back.dx},${back.dy} guest px`] : [note];
+  return { ok, engineState: (await guest.state())?.state ?? engineState, notes, results: [row] };
+}
+
+/** the element under a guest px point (the page's element at the CSS point: its tag, id and the Browser face's webview mark); a diagnosis only, the verdict does not use it */
+async function elementAt(guest, c) {
+  const p = await guest.pointAt(c.x, c.y);
+  return guest.ev(`(() => { const e = document.elementFromPoint(${p.x}, ${p.y}); if (!e) return null; return [e.tagName, e.id || null, e.hasAttribute('data-fl-webview2') ? 'webview2' : null].filter(Boolean).join(' '); })()`);
+}
+
+/** a part that a drag moved (its place now differs from `before`, its rectangle): dragged back from its centre by the distance; the new distance { dx, dy }, or null when it did not move */
+async function dragBack(guest, lid, before) {
+  const now = absoluteRect(await windowTable(guest), lid);
+  if (!now) return null;
+  const dx = before.x - now.x, dy = before.y - now.y;
+  if (dx === 0 && dy === 0) return null;
+  const from = { x: now.x + now.w / 2, y: now.y + now.h / 2 };
+  await guest.drag(from, { x: from.x + dx, y: from.y + dy }, 10);
+  await sleep(300);
+  return { dx, dy };
 }
 
 /** the "<n> MB" runs of a guestText answer (the memory label): { mb, run } */

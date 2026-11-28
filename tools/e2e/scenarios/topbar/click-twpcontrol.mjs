@@ -5,6 +5,7 @@ import { partOperation } from '../../lib/topbar.mjs';
 export default defineScenario({
   id: 'topbar/click-twpcontrol',
   covers: ['topbar/click/twpcontrol', 'topbar/part/twpcontrol'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return partOperation(guest, 'twpcontrol', 'click');
   },

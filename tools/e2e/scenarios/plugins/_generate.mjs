@@ -17,8 +17,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FEATURE_KINDS, builtinSource, positionSource, kindOf, batchIssuesNaming, pluginRows } from '../../lib/plugins.mjs';
 
-/** the closed Issues (#1508): their numbers are never a mark. Listed here, in the generator (update it when an Issue is closed). */
-export const CLOSED_ISSUES = ['#1315', '#1319', '#1336', '#1337', '#1338', '#1400', '#1484'];
+/** the closed Issues (#1508): their numbers are never a mark. Listed here as numbers, in the generator (update it when an Issue is closed). */
+const CLOSED_NUMBERS = [1315, 1319, 1336, 1337, 1338, 1400, 1484];
+export const CLOSED_ISSUES = CLOSED_NUMBERS.map((n) => `#${n}`);
 /** the mark of a plugin whose Plugin database entry is not drawn, with no open batch Issue that lists it (#1508): the classification data (#1535) */
 export const INSERT_MARK = '#1535';
 /** the mark of the external plugins (Serum 2, OTT, Vital): the open Feature #1324 names the three (#1508) */
