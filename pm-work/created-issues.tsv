@@ -237,3 +237,6 @@
 256	#1542	起動の最中(最初の idle の前)に入力を送ると、Delphi の例外 0xEEDFADE を処理する frame が見つからず、engine が SIGABRT で止まる(間欠。乱数の DPR 2.29 の `context-menu-none`)	Task
 257	#1543	共有の DLL 4: Elastique_x64.dll を実モジュールにして、既定の曲を開いた時の『Problems loading the project』の箱を消す	Task
 258	#1544	内蔵インストゥルメント 16: FLEX を、1 プラグイン 1 wasm で入れる	Task
+259	#1545	プラグインを足すと `preBootBytes` が増える: プラグインの DLL・wasm・seed を、起動の前に取らないようにする	Task
+260	#1546	プラグインの再生・描画で、間接呼び出しの呼び先が画素・文字の形になって engine が止まる: 書いた場所を特定して直す	Task
+261	#1547	第 2 波で停止の型により束から外した plugin を、(B) の後に入れ直す: 追跡の表と受け入れ	Task
