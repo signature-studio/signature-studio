@@ -248,3 +248,4 @@
 267	#1553	tools/plugin-run が、インストゥルメント(generators.*)を名前で解決できる	Task
 268	#1554	opengl32 を WebGL2 へ橋渡しする: FLEX の engine から始める	Task
 269	#1556	パフォーマンス最適化の PR #1555 を、判定を通して取り込む: P3 の A/B(音声の途切れ)で main と比べ、悪化が無い部分から入れる	Task
+270	#1557	PR #1555 の全体を、P3・P2 の A/B と smoke で測る(測定のみ。main には何も入れず、報告だけ commit する)	Task
