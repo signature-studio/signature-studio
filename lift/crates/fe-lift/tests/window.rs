@@ -1454,7 +1454,8 @@ fn the_dll_name_and_the_api_name_are_part_of_the_match() {
             assert!(!st.handled.contains_key(format!("jmp_imp:{n}").as_str()) && !c.contains(&format!("fle_imp_{n}")), "{dll}!{api}");
         }
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        // Issue #1538: a thunk that no row answers stops by name
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
     }
 }
 

@@ -225,7 +225,7 @@ fn the_four_imported_flengine_thunks_are_answered_under_their_own_dll() {
     }
     assert_eq!(c.matches("fle_imp_GetComputerNameExW(); return;").count(), 1, "the user32 thunk is not answered");
     let va = IB + 0x1040 + 0x10 * 4;
-    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "the thunk of user32!GetComputerNameExW stays unsupported");
+    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"user32.dll!GetComputerNameExW\"); }}")), "the thunk of user32!GetComputerNameExW stops by name");
     // the two rows that no module imports are handled when a module does import them, and not under another DLL
     let (st, _) = gen(&[("advapi32.dll", "GetUserNameW"), ("kernel32.dll", "GetComputerNameExA"), ("kernel32.dll", "GetUserNameW"), ("advapi32.dll", "GetComputerNameExA")]);
     assert_eq!(st.handled["jmp_imp:GetUserNameW"], 1);

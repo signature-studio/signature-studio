@@ -578,3 +578,48 @@ void fle_imp_lstrlenW(void)
         while (fle_ld(p + 2u * n, 2) != 0) n++;
     R[0] = (uint32_t)n;
 }
+
+/* kernel32!lstrcpyA: LPSTR f(LPSTR rcx, LPCSTR rdx). Learn: copies the string, its terminating NUL included, and returns the buffer.
+ * A NULL pointer is not defined by the page and stops. The buffers must not overlap (the page: the behaviour is undefined). */
+void fle_imp_lstrcpyA(void)
+{
+    uint64_t d = R[1], s = R[2], n = 0, k;
+
+    if (d == 0 || s == 0) fle_stop("lstrcpyA", "a NULL pointer: the page does not define it");
+    while (fle_ld(s + n, 1) != 0) n++;
+    for (k = 0; k <= n; k++) fle_st(d + k, 1, fle_ld(s + k, 1));
+    R[0] = d;
+}
+
+/* kernel32!lstrcatW: LPWSTR f(LPWSTR rcx, LPCWSTR rdx). Learn: appends the string, its NUL included, to the end of the buffer and returns the
+ * buffer. A NULL pointer is not defined and stops. */
+void fle_imp_lstrcatW(void)
+{
+    uint64_t d = R[1], s = R[2], dl = 0, n = 0, k;
+
+    if (d == 0 || s == 0) fle_stop("lstrcatW", "a NULL pointer: the page does not define it");
+    while (fle_ld(d + 2u * dl, 2) != 0) dl++;
+    while (fle_ld(s + 2u * n, 2) != 0) n++;
+    for (k = 0; k <= n; k++) fle_st(d + 2u * (dl + k), 2, fle_ld(s + 2u * k, 2));
+    R[0] = d;
+}
+
+/* kernel32!lstrcpynW: LPWSTR f(LPWSTR rcx, LPCWSTR rdx, int iMaxLength r8d). Learn: copies at most iMaxLength - 1 characters and always
+ * terminates the buffer with a NUL when iMaxLength is positive; returns the buffer. A count that is not positive is not defined by the page
+ * here and stops, as does a NULL pointer. */
+void fle_imp_lstrcpynW(void)
+{
+    uint64_t d = R[1], s = R[2], k = 0;
+    int32_t m = (int32_t)(uint32_t)R[8];
+
+    if (d == 0 || s == 0) fle_stop("lstrcpynW", "a NULL pointer: the page does not define it");
+    if (m <= 0) fle_stop("lstrcpynW", "iMaxLength is not positive: the copy is not defined here");
+    while (k + 1 < (uint64_t)m) {
+        uint64_t c = fle_ld(s + 2u * k, 2);
+        if (c == 0) break;
+        fle_st(d + 2u * k, 2, c);
+        k++;
+    }
+    fle_st(d + 2u * k, 2, 0);
+    R[0] = d;
+}

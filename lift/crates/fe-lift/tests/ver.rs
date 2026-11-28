@@ -129,8 +129,9 @@ fn table_thunk_calls_runtime_and_others_stay_unsupported() {
     assert!(!st.handled.contains_key("jmp_imp:VerifyVersionInfoW"));
     assert!(c.contains("fle_imp_VerSetConditionMask(); return;"));
     assert!(!c.contains(&format!("L_{vsc:x}: {{ /* {vsc:#x} Jmp */ fle_unsupported")));
-    assert!(c.contains(&format!("L_{vvi:x}: {{ /* {vvi:#x} Jmp */ fle_unsupported(UINT64_C({vvi:#x})); }}")));
-    assert!(c.contains(&format!("L_{fn_thunk:x}: {{ /* {fn_thunk:#x} Jmp */ fle_unsupported(UINT64_C({fn_thunk:#x})); }}")));
+    // Issue #1538: the thunk stops by the name the import table gives (the fixture's name of 0x2430 is cut at the next string: "VerifyVersionI")
+    assert!(c.contains(&format!("L_{vvi:x}: {{ /* {vvi:#x} Jmp */ fle_import_stop(\"kernel32.dll!VerifyVersionI\"); }}")));
+    assert!(c.contains(&format!("L_{fn_thunk:x}: {{ /* {fn_thunk:#x} Jmp */ fle_import_stop(\"k.dll!Fn\"); }}")));
     assert_eq!(st.unsupported["Jmp: indirect through IAT slot (not lifted)"], 2);
 }
 

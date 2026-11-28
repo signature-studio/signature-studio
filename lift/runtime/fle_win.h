@@ -130,6 +130,7 @@ void fle_imp_DefWindowProcW(void);
  * of WM_SETICON, say nothing about a NULL or invalid hWnd; System Error Codes lists 1400 "Invalid window handle." without naming an API). */
 #define FLE_ERROR_INVALID_WINDOW_HANDLE 1400u
 #define FLE_GCLP_HICON (-14)   /* Learn SetClassLongPtrW: GCLP_HICON -14 "Replaces a handle to the icon associated with the class" */
+void fle_imp_GetClassLongPtrW(void);   /* Issue #1538: GCLP_HICON only (fle_win.c) */
 void fle_imp_SendMessageW(void);
 void fle_imp_SendMessageA(void);
 void fle_imp_SetClassLongPtrW(void);

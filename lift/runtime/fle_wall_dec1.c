@@ -54,6 +54,12 @@ void fle_imp_GetUserDefaultLCID(void)
     R[0] = FLE_EMULATED_LCID;
 }
 
+/* kernel32!GetUserDefaultLangID: LANGID f(void). Learn: the language identifier of the user default locale, the low word of its LCID (en-US: 0x0409). */
+void fle_imp_GetUserDefaultLangID(void)
+{
+    R[0] = FLE_EMULATED_LCID & 0xFFFFu;
+}
+
 /* The locale-name entry points (Vista and later) take a name where the older ones take an LCID. The only locale the environment emulates is en-US (decision 0044), so NULL (LOCALE_NAME_USER_DEFAULT,
  * 'the user default locale') and "en-US" mean 0x0409 and every other name stops by name. The Ex functions then run the LCID versions with the same remaining arguments (the arguments 2..6 sit in the same places). */
 static void ex_locale(const char *api, uint64_t name)

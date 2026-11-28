@@ -1073,6 +1073,32 @@ void fle_imp_SetClassLongPtrW(void)
     R[0] = prev;
 }
 
+/* user32!GetClassLongPtrW: ULONG_PTR f(HWND hWnd rcx, int nIndex rdx). Learn: "If the function fails, the return value is zero"; the requested
+ * value on success. The same window rule as SetClassLongPtrW above (a choice without a source: an hWnd that is not a live window of this table
+ * answers 0 and ERROR_INVALID_WINDOW_HANDLE 1400). A live window: nIndex GCLP_HICON (-14) answers the hIcon of its class (fle_class.c); every other
+ * index stops by name (Issue #1538, the read side of decision 0119). */
+void fle_imp_GetClassLongPtrW(void)
+{
+    static const char api[] = "GetClassLongPtrW";
+    uint64_t h = R[1], hicon = 0;
+    int32_t index = (int32_t)(uint32_t)R[2];
+    int64_t i;
+    char why[160];
+
+    fle_win_check_thread(api);
+    i = live_index(h);
+    if (i < 0) {
+        invalid_window();
+        return;
+    }
+    if (index != FLE_GCLP_HICON) {
+        snprintf(why, sizeof why, "nIndex %d is not GCLP_HICON (-14): the other class values are not modelled (Issue #1538)", (int)index);
+        fle_stop(api, why);
+    }
+    fle_class_get_hicon(api, tab[i].atom, &hicon);
+    R[0] = hicon;
+}
+
 /* The six items of a fresh window menu, in the order of the bits of win.menu_items (decision 0119, wall 16). */
 static const uint32_t menu_cmds[6] = { FLE_SC_SIZE, FLE_SC_MOVE, FLE_SC_MINIMIZE, FLE_SC_MAXIMIZE, FLE_SC_CLOSE, FLE_SC_RESTORE };
 #define MENU_ALL ((1u << 6) - 1u)

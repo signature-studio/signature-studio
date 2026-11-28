@@ -190,6 +190,20 @@ fn is_near(i: &Instruction) -> bool {
     matches!(i.op_kind(0), OpKind::NearBranch16 | OpKind::NearBranch32 | OpKind::NearBranch64)
 }
 
+/// Issue #1538: `dll!name` (the DLL in lower case) of a call or jump through an IAT slot that no row of the import table answers. Its lift
+/// stops at that instruction, and the stop names the import (fle_import_stop) instead of "unsupported instruction". None for any other.
+fn unmodelled_import(i: &Instruction, va: u64, resolved: &BTreeMap<u64, Resolved>) -> Option<String> {
+    if !matches!(i.mnemonic(), Mnemonic::Call | Mnemonic::Jmp) || is_near(i) {
+        return None;
+    }
+    let Some(Resolved::Import { name }) = resolved.get(&va) else { return None };
+    let (dll, api) = name.rsplit_once('!')?;
+    if imports_table::lookup(name).is_some() {
+        return None;
+    }
+    Some(format!("{}!{}", dll.to_ascii_lowercase(), api))
+}
+
 fn is_imm(k: OpKind) -> bool {
     matches!(
         k,
@@ -1354,7 +1368,10 @@ pub fn generate_full<W: Write>(
                             }
                             st.unsupported_total += 1;
                             *st.unsupported.entry(format!("{m}: {reason}")).or_insert(0) += 1;
-                            format!("L_{va:x}: {{ {pre}/* {va:#x} {m} */ fle_unsupported(UINT64_C({va:#x})); }}\n")
+                            match unmodelled_import(i, va, &a.resolved) {
+                                Some(name) => format!("L_{va:x}: {{ {pre}/* {va:#x} {m} */ fle_import_stop(\"{name}\"); }}\n"),
+                                None => format!("L_{va:x}: {{ {pre}/* {va:#x} {m} */ fle_unsupported(UINT64_C({va:#x})); }}\n"),
+                            }
                         }
                     }
                 }
