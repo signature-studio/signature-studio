@@ -244,3 +244,4 @@
 263	#1549	製品: 起動の時に OPFS の hkcu.log の getSize が失敗すると、engine が error のまま戻らず、同じ page の後続の本が連鎖して落ちる(e2e-full の最新の run で 33 本)	Task
 264	#1550	製品: メニューや F8 から開いた箱(TSpeechForm・TPlugListForm・TWAVRenderForm・TTapTempoForm・TPythonForm)が、Esc・OK・Cancel で閉じない(e2e-full の最新の run で 17 本)	Task
 265	#1551	E2E の plugins: 一覧(Installed)の読みが本の開始位置から始まり、共有の page では一覧が見えないため、282 本が一覧の段で止まる(印の受理の後ろに隠れている)	Task
+266	#1552	ildsp_x64.dll を実モジュールにし直す: ポインタ経由の入口を全て入口にし、デモの曲を開いても止まらない	Task
