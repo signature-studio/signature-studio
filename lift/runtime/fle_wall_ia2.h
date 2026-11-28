@@ -18,12 +18,16 @@ int fle_ia2_path_absent(const uint16_t *u, size_t n);
  * and returns the count it gives. */
 size_t fle_ia2_ini_get(const uint8_t *data, size_t n, const uint16_t *app, const uint16_t *key, const uint16_t *def, uint16_t *out, uint32_t nsize);
 void fle_imp_GetPrivateProfileStringW(void);
+/* kernel32!GetPrivateProfileIntA (Issue #1512, the ANSI integer reader of the same file; see fle_wall_ia2v.c) */
+void fle_imp_GetPrivateProfileIntA(void);
 /* kernel32!WritePrivateProfileStringW (wall ia2-W30): the text editing alone (out gets the new file; returns its size) and the API; see fle_wall_ia2v.c */
 size_t fle_ia2_ini_put(const uint8_t *in, size_t n, const uint16_t *app, const uint16_t *key, const uint16_t *str, uint8_t *out, size_t cap);
 void fle_imp_WritePrivateProfileStringW(void);
 
 /* user32!MessageBoxW (wall ia2-W28): the default button is answered, no window is shown (S-ia2-msgbox-default); see fle_wall_ia2.c */
 void fle_imp_MessageBoxW(void);
+/* user32!MessageBoxA (Issue #1512, the ANSI form of the same answer) */
+void fle_imp_MessageBoxA(void);
 /* kernel32!GetTimeZoneInformationForYear (wall ia2-W21), fle_wall_ia2t.c */
 void fle_imp_GetTimeZoneInformationForYear(void);
 /* shell32!ShellExecuteW (walls ia2-W16/W29): answers SE_ERR_NOASSOC, nothing is started (S-ia2-shellexecute-noassoc) */

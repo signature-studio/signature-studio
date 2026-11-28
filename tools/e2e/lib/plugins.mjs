@@ -5,7 +5,7 @@
 // The insertion is not reachable in this build (#1508, measured at 4k-dpr1): the Installed folder lists names (the engine's enum-dir line) but draws no row, and the
 // picker's More plugins... list (Select effect plugin) shows 0 effects. insertFromDatabase reads the rows from the picture and stops there (no row, no entry).
 // Pure parts (the row and the source of a generated scenario) come first; the runtime parts use the page's reads (window table, engine log, picture) and real mouse and key events.
-import { windowTable, openLids, newWindows, pixelHashRegion } from './common.mjs';
+import { windowTable, openLids, newWindows, pixelHashRegion, guestText } from './common.mjs';
 import { absoluteRect } from './dump.mjs';
 import { sleep } from './flow.mjs';
 import { ensureMixer } from './input.mjs';
@@ -108,6 +108,13 @@ export function installedCount(lines) {
   return counts.length ? Math.max(...counts) : null;
 }
 
+/** the number of names the Installed folder's category folder (Effects or Generators) listed: its enum-dir line (the largest count); null when there is no listing (Issue #1535) */
+export function categoryCount(lines, category) {
+  const re = new RegExp(`enum-dir: (\\d+) ".*Plugin database\\\\Installed\\\\${category}\\\\\\*\\.\\*"`, 'i');
+  const counts = lines.map((l) => re.exec(l)).filter(Boolean).map((m) => Number(m[1]));
+  return counts.length ? Math.max(...counts) : null;
+}
+
 /** the plugin's entry in the Plugin database: the engine's lines name it (its folder or its file under Installed). The engine's lines have no names (#1508): a false here says nothing */
 export function databaseHas(lines, name) {
   return lines.some((l) => l.includes(name) && DB_TEXT.test(l));
@@ -122,6 +129,19 @@ export async function installedRowsShown(guest) {
   await sleep(1200);
   const after = await pixelHashRegion(guest, INSTALLED_LIST);
   return before !== after;
+}
+
+/** opens the Installed folder (its row: a click, then Right) in the Browser's Plugin database, and waits for its listing (Issue #1535) */
+export async function openInstalled(guest) {
+  await guest.click(INSTALLED.x, INSTALLED.y);
+  await sleep(400);
+  await guest.key('ArrowRight', 'ArrowRight', 39);
+  await sleep(1500);
+}
+
+/** whether "Directory is empty!" is in the guest's memory (guestText). The engine's text table holds it whether or not the hint line shows it: a true here says nothing (Issue #1535) */
+export async function hintSaysEmpty(guest) {
+  return (await guestText(guest, ['Directory is empty!'])).best !== null;
 }
 
 /**
