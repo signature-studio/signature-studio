@@ -43,7 +43,7 @@
 - commit の名義を変えない(環境の git の設定のまま)。commit・タグ・PR に Claude の行を付けない。
 - 必要の無いブランチを作らない。
 - 他のプロジェクトのセッション、portal の道具、依頼者の設定と資格情報に触れない。
-- リポジトリの外に、ファイル・ユニット・設定を作らない。一時ファイルはリポジトリの中の `.tmp-*` に置き、終わったら消す。
+- リポジトリの外に、ファイル・ユニット・設定を作らない。一時ファイルはリポジトリの中の `.tmp-*` に置き、終わったら消す。唯一の例外: 依頼者の指示(台帳 L-088)で作った、`~/.config/systemd/user/signature-studio-boot-notify.service`(インスタンスの起動を、監査・受付のセッションへ通知する)。通知(`kind="boot"` の `<agent-message>`)を受けたら、状態を取り直して(`git pull`・`gh run list`・`gh issue list` の failed・running・`opencode api session.active`)、`.tmp-watch.sh` が動いていなければ、background で起動し直す。
 - 製品の作業は Actions で行う。このマシンでは行わない。
 - GitHub Actions の実行は、依頼者が承認した(台帳 L-027)。作業ジョブの起動は Issues のイベント(`.github/workflows/agent.yml`)だけが行い、`gh workflow run` を手で打たない。`schedule` と `workflow_dispatch` は置かない。`app/`・`lift/`・`ci/` に触れる push は main の `deploy.yml` を動かすので、報告に書く。
 

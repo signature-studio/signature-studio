@@ -66,7 +66,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-seh"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for name in ["fle_seh.c", "fle_callback.c", "fle_proc.c", "fle_time.c", "fle_sys.c", "fle_imports.c", "fle_env.c"] {
+        for name in ["fle_seh.c", "fle_callback.c", "fle_proc.c", "fle_time.c", "fle_sys.c", "fle_imports.c", "fle_env.c", "fle_glob.c"] {
             let o = dir.join(name.replace(".c", ".o"));
             clang_c(&runtime_dir().join(name), &o, true);
             v.push(o);
@@ -172,6 +172,8 @@ static int g_variant;       /* scenario switches, see main */
 static uint64_t g_obj;      /* the exception object that the next raise passes */
 static uint64_t g_est5df610, g_est63ade0, g_est5df570, g_landed;
 static uint64_t objbuf[2][4];
+/* a UnicodeString as Delphi lays it out: the length in characters at the pointer - 4, the characters after it */
+static struct { int32_t len; uint16_t s[8]; } msg1 = { 4, { 'b', 'o', 'o', 'm', 0, 0, 0, 0 } };
 
 void f_411d20(void); void f_411e80(void); void f_5df540(void); void f_5df570(void); void f_5df610(void); void fb_5df610(void);
 void f_63ade0(void); void fb_63ade0(void); void f_5df673(void); void f_63ae4e(void); void f_5df720(void); void f_5df730(void); void f_4112c0(void);
@@ -429,6 +431,11 @@ int main(int argc, char **argv)
         R[4] -= 8; fle_st(R[4], 8, 0);                 /* the bottom of the stack: return address 0 */
         R[4] -= 8; fle_st(R[4], 8, 0x42daaf);          /* the raise is called from 0x42daaf, which no RUNTIME_FUNCTION covers (the byte after 0x42daa0's end): a leaf by Learn */
         raise_stub();
+    } else if (!strcmp(sc, "landed")) {
+        fle_teb_set_stack((uint64_t)(uintptr_t)stk, (uint64_t)(uintptr_t)stk + sizeof stk);
+        objbuf[0][1] = (uint64_t)(uintptr_t)msg1.s;   /* FMessage of the first object (+8): the UnicodeString "boom" */
+        R[4] -= 8; fle_st(R[4], 8, 0);                 /* the bottom of the stack: return address 0 */
+        f_5df610();                                    /* the first raise is caught here; its landing raises again, and no frame takes the second */
     } else if (!strcmp(sc, "nodispatch")) {
         R[1] = 0x1000; R[2] = 0x2000; R[8] = 0; R[9] = 0;
         fle_seh_unwind_ex();
@@ -543,6 +550,21 @@ fn the_stop_line_of_a_deep_chain_keeps_the_end_of_the_chain_within_the_400_bytes
     let msg = o.stderr.lines().find(|l| l.starts_with("fle: ")).unwrap_or_else(|| panic!("no fle: message: {}", o.stderr));
     let kept: String = msg.chars().take(400).collect();
     for w in ["ended at return address 0 (read at", "264 bytes below the stack base", "last frames 16-18 [", "arg1 class EOleSysError"] {
+        assert!(kept.contains(w), "{w:?} is past the 400 bytes kept: {msg}");
+    }
+}
+
+#[test]
+fn a_stop_after_a_landing_names_the_exception_that_the_landing_took_before_the_frames() {
+    // the first raise is caught by `on EOleSysError` in f_5df610 (landing 0x5df673); its except body raises again and no frame takes that one. The record names the landed
+    // exception (code, class, message, landing, its unwind frames) right after the fingerprint, so that it is within the 400 bytes that engine.exit.stop.lastFle keeps.
+    let Some(o) = run("landed", 0) else { return };
+    assert!(!o.ok, "did not stop: {}", o.stdout);
+    assert_eq!(o.signal, Some(6), "not SIGABRT: {}", o.stderr);
+    let msg = o.stderr.lines().find(|l| l.starts_with("fle: ")).unwrap_or_else(|| panic!("no fle: message: {}", o.stderr));
+    assert!(msg.starts_with("fle: RaiseException: exception code 0xeedfade, flags 0x1, 8 argument(s) raised; no frame-based handler took it"), "the fingerprint changed: {msg}");
+    let kept: String = msg.chars().take(400).collect();
+    for w in ["last landed exception (landing 1): code 0xeedfade", "arg1 class EOleSysError < EOleError < Exception", "message \"boom\"", "landing at 0x5df673"] {
         assert!(kept.contains(w), "{w:?} is past the 400 bytes kept: {msg}");
     }
 }
