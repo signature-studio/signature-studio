@@ -229,3 +229,6 @@
 248	#1534	E2E の印: 閉じた Issue を指す残りの印(#1499・#1419・#1429・基準の一覧の閉じた番号)を、開いている Issue か new に直し、閉じた番号の印を検査する試験を足す	Task
 249	#1535	Plugin database の Installed に、プラグインの行が出ない: 分類データ(Data\Patches\Plugin database の .nfo)を VFS に入れ、E2E の『行がある』判定を画素の読みに直す	Task
 250	#1536	`fe-lift` の全体の試験が main で 2 件落ちる: `fle_event.c` の `<unistd.h>`(#1502)と `wall_fr9t` の trace の `rsp` の揺れ	Task
+251	#1537	プラグインを足すと、既存のプラグインが `indirect call to 0` で止まる: 溢れている上限を特定して直す	Task
+252	#1538	第 2 波の DLL が使う import のうち runtime に無い物を、全件、表にして実装する: 実装しない物は名前つきの停止にする	Task
+253	#1539	共有の DLL の行を足す: `ildsp_x64.dll` を実モジュールにし、`Shared\module\` の DLL の出所を確かめる(出所が無ければ行は足さない)	Task
