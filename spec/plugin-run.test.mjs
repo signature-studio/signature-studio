@@ -269,6 +269,23 @@ try {
   fs.rmSync(tmpF, { recursive: true, force: true });
 }
 
+// (h) the order of scene (c)'s candidates (Issue #1537): within a root, the project that names fewer other effect plug-ins comes first (the smaller first on a tie)
+{
+  const tmpH = fs.mkdtempSync(path.join(ROOT, '.tmp-spec-plugin-run.'));
+  try {
+    const u16 = (s) => Buffer.from(s, 'utf16le');
+    const sep = Buffer.alloc(2);
+    const rh = path.join(tmpH, 'rh');
+    fs.mkdirSync(rh, { recursive: true });
+    fs.writeFileSync(path.join(rh, 'many.flp'), Buffer.concat([Buffer.alloc(10), u16('Fruity Delay'), sep, u16('Fruity Balance'), sep, u16('Fruity Filter'), sep, u16('Effector')]));
+    fs.writeFileSync(path.join(rh, 'few.flp'), Buffer.concat([Buffer.alloc(500), u16('Fruity Delay')]));
+    const got = (called(candidatesFor, 'Fruity Delay', [rh], 5) ?? []).map((f) => path.basename(f));
+    ok('candidatesFor: 同じ根では、他のプラグインを名指す数が少ない曲が先(大きくても)', JSON.stringify(got) === JSON.stringify(['few.flp', 'many.flp']), JSON.stringify(got));
+  } finally {
+    fs.rmSync(tmpH, { recursive: true, force: true });
+  }
+}
+
 // (g) the engine's stop of a run (Issue #1537): the stop that the engine printed before the play (before `from`) is in engineStop too, with the last 5 fle: lines of the whole log
 {
   const before = [

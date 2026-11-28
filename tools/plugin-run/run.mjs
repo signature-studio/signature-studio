@@ -6,7 +6,7 @@
 //   2. the scene asks the guest for the plug-in:
 //      scene (c): a project that names it. The candidates are the .flp files whose text holds the plug-in's name at a name boundary, as UTF-16LE or as ASCII (the internal name, the event 201 of a project):
 //      the characters before and after the name are not ASCII letters or digits, and a space after the name is not a boundary when a letter or digit follows it: "Fruity Delay Bank" and "Fruity Delay 2" are not "Fruity Delay".
-//      They are ordered by root (host-extra/resources first, then host/resources) and by size (the smaller first), and at most 5 are tried, one launch each; the first that asks for the plug-in is kept.
+//      They are ordered by root (host-extra/resources first, then host/resources), then by the number of other effect plug-ins they name (fewer first, Issue #1537), then by size (the smaller first), and at most 5 are tried, one launch each; the first that asks for the plug-in is kept.
 //      scene (d): a project made from a template (Data/Templates under the roots): the template's first mixer insert plug-in is renamed to the plug-in and its state (212) is zeroed (tools/plugin-run/flp.mjs),
 //      and the project is opened as scene (c) opens one. The templates are taken in root order and path order; one with exactly one mixer insert plug-in is preferred. The project is written under the run's temporary directory.
 //      --scene c: scene (c) only; --scene d: scene (d) only; --scene auto (the default): scene (c) over the candidates, then scene (d) when no candidate asks for the plug-in (or there is none).
@@ -136,23 +136,30 @@ export function atBoundary(buf, at, len, unit = 2) {
   return !isAsciiAlnum(after);
 }
 
-/** the candidate projects of scene (c) (Issue #1524): the .flp files whose text holds the name at a boundary, as UTF-16LE or as ASCII (the internal name), in root order, then the smaller first (path order on a tie);
+/** whether the bytes name `name` at a boundary, as UTF-16LE or as ASCII (the internal name) */
+function namedIn(buf, name) {
+  return [[Buffer.from(name, 'utf16le'), 2], [Buffer.from(name, 'latin1'), 1]].some(([needle, unit]) => {
+    for (let at = buf.indexOf(needle); at >= 0; at = buf.indexOf(needle, at + 1)) if (atBoundary(buf, at, needle.length, unit)) return true;
+    return false;
+  });
+}
+
+/** the candidate projects of scene (c) (Issue #1524): the .flp files whose text holds the name at a boundary, as UTF-16LE or as ASCII (the internal name), in root order, then the ones that name fewer
+ *  other effect plug-ins first (Issue #1537: a project with many plug-ins stops in one of them, not in the one asked for), then the smaller first (path order on a tie);
  *  a file that another root gives under the same relative path is listed once (the first root's); at most `max` */
-export function candidatesFor(name, roots, max = Infinity) {
-  const needles = [[Buffer.from(name, 'utf16le'), 2], [Buffer.from(name, 'latin1'), 1]];
+export function candidatesFor(name, roots, max = Infinity, pluginNames = effectRows().map((r) => r.name)) {
   const out = [];
   const seen = new Set();
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
-    const hits = flpFiles(root).filter((f) => {
+    const hits = flpFiles(root).flatMap((f) => {
       const buf = fs.readFileSync(f);
-      return needles.some(([needle, unit]) => {
-        for (let at = buf.indexOf(needle); at >= 0; at = buf.indexOf(needle, at + 1)) if (atBoundary(buf, at, needle.length, unit)) return true;
-        return false;
-      });
-    }).filter((f) => !seen.has(path.relative(root, f)));
-    for (const f of hits) seen.add(path.relative(root, f));
-    out.push(...hits.sort((a, b) => fs.statSync(a).size - fs.statSync(b).size));
+      if (!namedIn(buf, name)) return [];
+      const others = pluginNames.filter((n) => keyOf(n) !== keyOf(name) && namedIn(buf, n)).length;
+      return [{ f, size: buf.length, others }];
+    }).filter((h) => !seen.has(path.relative(root, h.f)));
+    for (const h of hits) seen.add(path.relative(root, h.f));
+    out.push(...hits.sort((a, b) => a.others - b.others || a.size - b.size).map((h) => h.f));
   }
   return out.slice(0, max);
 }
