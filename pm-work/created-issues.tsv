@@ -233,3 +233,4 @@
 252	#1538	第 2 波の DLL が使う import のうち runtime に無い物を、全件、表にして実装する: 実装しない物は名前つきの停止にする	Task
 253	#1539	共有の DLL の行を足す: `ildsp_x64.dll` を実モジュールにし、`Shared\module\` の DLL の出所を確かめる(出所が無ければ行は足さない)	Task
 254	#1540	`cargo test -p fe-build` が main で 2 件落ちる: `the_second_wave_is_160_dlls_and_fits_the_image_area`(`File exists`)と `the_second_wave_with_its_data_fits_the_limits`(`fruity-delay-bank` の guest path が一意でない)	Task
+255	#1541	DPR を実行中に 1.8 から 1.75 へ変えると、engine が終了コード 5 で止まる: 再現して、一度目の停止の原因を特定して直す	Task
