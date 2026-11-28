@@ -7,7 +7,8 @@ import path from 'node:path';
 import { closeWelcome, dismissProblems, noThanks, WELCOME, waitProjectOpen, waitStable } from '../../lib/flow.mjs';
 
 // the engine writes its stderr lines with a "[err] " prefix (the page's engine log keeps it)
-const LISTING = /^(?:\[err\] )?enum-dir: (\d+) "[^"]*Plugin database\\Installed\\[^"\\]*"$/;
+// (Issue #1535: the entries are in the category folders, Installed\Effects and Installed\Generators; each entry is a .nfo and a .fst)
+const LISTING = /^(?:\[err\] )?enum-dir: (\d+) "[^"]*Plugin database\\Installed\\(Effects|Generators)\\[^"\\]*"$/;
 
 /** the 本体 rows of a plugin.tsv: the rows after the header (a blank line and a # line are no row), as parse_plugin reads them */
 export function mainRows(text) {
@@ -56,9 +57,10 @@ export default {
     const plugins = builtinPlugins(repo);
     const lines = await guest.ev('window.__app.engineLog()');
     const listings = lines.map((l) => LISTING.exec(l)).filter(Boolean);
-    const count = listings.reduce((m, x) => Math.max(m, Number(x[1])), 0);
+    const largest = (category) => listings.filter((x) => x[2] === category).reduce((m, x) => Math.max(m, Number(x[1])), 0);
+    const count = (largest('Effects') + largest('Generators')) / 2;
     notes.push(`lift/plugins/ has ${plugins.length} plugin(s) with a 本体 row: ${plugins.map((p) => p.name).join(', ')}`);
-    notes.push(`the engine's listing of Plugin database\\Installed\\: ${listings.length} line(s), the count ${count}`);
+    notes.push(`the engine's listings of Plugin database\\Installed\\Effects and \\Generators: ${listings.length} line(s), the entries ${count}`);
     notes.push(...lines.filter((l) => /Plugin database\\Installed/.test(l)).slice(0, 12).map((l) => `engine: ${l}`));
     const ok = plugins.length > 0 && count >= plugins.length;
     log(`plugin database: ${count} entries listed (${plugins.length} built-in plugins)`);

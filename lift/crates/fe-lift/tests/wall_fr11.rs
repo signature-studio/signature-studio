@@ -233,7 +233,7 @@ fn each_of_the_33_thunks_is_answered_under_its_own_dll_and_no_other_dll() {
         assert_eq!(c.matches(&format!("fle_imp_{name}(); return;")).count(), own, "{dll}!{name}: answered only under the dll of its row");
         if dll != "kernel32.dll" {
             let va = IB + 0x1040 + 0x10;
-            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{name}: the thunk of kernel32!{name} stays unsupported");
+            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"kernel32.dll!{name}\"); }}")), "{dll}!{name}: the thunk of kernel32!{name} stops by name");
         }
     }
 }

@@ -205,9 +205,9 @@ fn each_new_thunk_is_answered_under_its_own_dll_and_no_other_dll() {
         let (st, c) = gen(&[(dll, name), (other, name), (dll, "SendMessageA"), ("kernel32.dll", "GetProcAddress")]);
         assert_eq!(st.handled[format!("jmp_imp:{name}").as_str()], 1, "{dll}!{name}");
         assert_eq!(c.matches(&format!("fle_imp_{name}(); return;")).count(), 1, "{dll}!{name}: only the thunk of its own dll is answered");
-        for k in [1u64, 2] {
+        for (k, want) in [(1u64, format!("{other}!{name}")), (2, format!("{dll}!SendMessageA"))] {
             let va = IB + 0x1040 + 0x10 * k;
-            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{name}: thunk {k} stays unsupported");
+            assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{want}\"); }}")), "{dll}!{name}: thunk {k} stops by name");
         }
     }
 }
@@ -1308,7 +1308,8 @@ fn the_last_error_1400_is_set_in_one_place_and_the_window_table_reads_no_host_st
     let h = std::fs::read_to_string(src_dir().join("fle_win.h")).unwrap();
     assert!(h.contains("#define FLE_ERROR_INVALID_WINDOW_HANDLE 1400u"));
     // decision 0122: PostMessageW and GetMessageW (an hWnd that is not a window of the thread) call it too: 7 (old: 5)
-    assert_eq!(code.matches("invalid_window();").count(), 7, "SendMessageW, SetClassLongPtrW, GetWindowLongPtrW, SetWindowTextW, SetWindowLongPtrW, PostMessageW and GetMessageW");
+    // Issue #1538: GetClassLongPtrW (the window rule of SetClassLongPtrW) calls it too: 8 (old: 7)
+    assert_eq!(code.matches("invalid_window();").count(), 8, "SendMessageW, SetClassLongPtrW, GetWindowLongPtrW, SetWindowTextW, SetWindowLongPtrW, PostMessageW, GetMessageW and GetClassLongPtrW");
     for bad in [
         "getpid", "getenv", "environ", "fopen", "open(", "/proc", "/etc", "/home", "/dev", "/tmp", "clock_gettime", "gettimeofday", "time(", "nanosleep", "usleep", "sleep(", "select(", "<time.h>", "<sys/time.h>",
         "pthread", "<sys/", "<unistd.h>", "<signal.h>", "fork(", "syscall", "futex", "__asm__", "abort(", "X11", "DISPLAY", "wayland", "ioctl", "dlopen", "LoadLibrary", "setjmp", "longjmp", "(void (*)",

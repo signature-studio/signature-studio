@@ -630,5 +630,5 @@ fn the_dll_name_is_part_of_the_match() {
     assert!(!st.handled.contains_key("jmp_imp:GetDeviceCaps"));
     assert!(!c.contains("fle_imp_GetDeviceCaps"));
     let va = IB + 0x1060;
-    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")));
+    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"other.dll!GetDeviceCaps\"); }}")));
 }

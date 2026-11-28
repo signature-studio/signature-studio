@@ -1841,7 +1841,7 @@ fn the_thunks_of_the_new_rows_call_the_runtime_and_the_names_are_part_of_the_mat
         let c = String::from_utf8(out).unwrap();
         assert!(!c.contains(&format!("fle_imp_{api}")), "{dll}!{api}");
         assert_eq!(st.handled.keys().filter(|k| k.starts_with("jmp_imp:")).count(), 0, "{dll}!{api}");
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
     }
 }
 

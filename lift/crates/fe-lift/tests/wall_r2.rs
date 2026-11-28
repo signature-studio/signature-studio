@@ -193,7 +193,7 @@ fn both_sh_get_folder_path_w_thunks_of_flengine_are_answered_under_their_own_dll
     assert_eq!(st.handled["jmp_imp:SHGetFolderPathW"], 1);
     assert_eq!(c.matches("fle_imp_SHGetFolderPathW(); return;").count(), 2, "the user32 thunk is not answered");
     let va = IB + 0x1040 + 0x10 * 3;
-    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "the thunk of user32!SHGetFolderPathW stays unsupported");
+    assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"user32.dll!SHGetFolderPathW\"); }}")), "the thunk of user32!SHGetFolderPathW stops by name");
     // the ANSI export of shfolder.dll has no row
     let (st, _) = gen(&[("kernel32.dll", "GetProcAddress"), ("SHFolder.dll", "SHGetFolderPathA")]);
     assert!(!st.handled.keys().any(|k| k.contains("SHGetFolderPathA")), "{:?}", st.handled);

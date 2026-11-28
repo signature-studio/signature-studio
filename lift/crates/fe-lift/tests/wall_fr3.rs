@@ -203,9 +203,9 @@ fn both_thunks_are_answered_under_shell32_and_no_other_dll() {
     assert_eq!(st.handled["jmp_imp:SHGetPathFromIDListW"], 1);
     assert_eq!(c.matches("fle_imp_SHGetSpecialFolderLocation(); return;").count(), 1, "only the shell32 thunk is answered");
     assert_eq!(c.matches("fle_imp_SHGetPathFromIDListW(); return;").count(), 1);
-    for k in [2u64, 3] {
+    for (k, name) in [(2u64, "user32.dll!SHGetSpecialFolderLocation"), (3, "shell32.dll!SHGetPathFromIDListA")] {
         let va = IB + 0x1040 + 0x10 * k;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "thunk {k} (user32! / the ANSI form) stays unsupported");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{name}\"); }}")), "thunk {k} (user32! / the ANSI form) stops by name");
     }
 }
 
@@ -217,9 +217,9 @@ fn the_other_wintrust_and_crypt32_functions_are_still_not_answered() {
     assert!(!st.handled.keys().any(|k| k.contains("WinVerifyTrustEx") || k.contains("CertOpenStore") || k.contains("CryptQueryObjectX")), "{:?}", st.handled);
     let rows = resp_rows(&c);
     assert!(!rows.iter().any(|(_, n, _)| n == "WinVerifyTrustEx" || n == "CertOpenStore"), "no row for them");
-    for k in 0..3u64 {
+    for (k, name) in [(0u64, "wintrust.dll!WinVerifyTrustEx"), (1, "crypt32.dll!CertOpenStore"), (2, "crypt32.dll!CryptQueryObjectX")] {
         let va = IB + 0x1040 + 0x10 * k;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "thunk {k}");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{name}\"); }}")), "thunk {k}");
     }
 }
 

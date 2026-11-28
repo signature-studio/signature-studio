@@ -641,7 +641,7 @@ ok "抽出の表(r7): ci/extract-dlls.tsv に ILSvg_x64.dll の行が 1 つ在�
 RVI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\Reverb_x64.dll" {print $2"\t"$3}' "$INST")
 ok "抽出の表(r8): ci/extract-dlls.tsv に Reverb_x64.dll の行は無い(plugin.tsv の行が取り出す)" "$(grep -c '^Reverb_x64' "$top/ci/extract-dlls.tsv")" 0
 ok "plugin の行(r8): lift/plugins/reverb/plugin.tsv に、鍵 reverb_x64.dll・補助の行が 1 つ在り、大きさと SHA-256 は一覧の値と一致する" "$(awk -F'\t' -v I="$RVI" 'BEGIN{split(I, a, "\t")} $1 == "reverb_x64.dll" && $2 == "Shared\\Reverb_x64.dll" && $3 == "補助" && $4 == a[2] && $5 == a[1] {n++} END{print n+0}' "$top/lift/plugins/reverb/plugin.tsv")" 1
-# (r9) #1512・#1513・#1514 の DLL(Shared\LAMEenc_x64.dll・Shared\wavpackdll_x64.dll・Shared\EasyFLAC_x64.dll)は、plugin.tsv が main に入るまで、抽出の表の 1 行で作業ツリーに取り出す(抽出先は plugin の行が作る形 lift/out-plugins/<key>。key は plugin.tsv の key 名)。大きさと SHA-256 は一覧の値。同じ DLL(名前と SHA-256 が同じ)の行は、表に 2 つ在ってはならない
+# (r9) #1512・#1513・#1514 の DLL(Shared\LAMEenc_x64.dll・Shared\wavpackdll_x64.dll・Shared\EasyFLAC_x64.dll)は、plugin.tsv が main に入るまで、抽出の表の 1 行で作業ツリーに取り出す(抽出先は plugin の行が作る形 lift/out-plugins/<key>。key は plugin.tsv の key 名)。大きさと SHA-256 は一覧の値。名前・SHA-256・抽出先が同じ行は、表に 2 つ在ってはならない(抽出先が違う 2 行は正当: b2d2 用の lift/out-sampledec と plugin 用の lift/out-plugins へ、同じ DLL を 2 か所に抽出する)
 # (r9-lameenc) #1512: LAMEenc は lift/plugins/lameenc/plugin.tsv が取り出す(r8 の Reverb と同じ。表には無い)
 LMI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\LAMEenc_x64.dll" {print $2"\t"$3}' "$INST")
 ok "抽出の表(r9): ci/extract-dlls.tsv に LAMEenc_x64.dll の行は無い(plugin.tsv の行が取り出す)" "$(grep -c '^LAMEenc_x64' "$top/ci/extract-dlls.tsv")" 0
@@ -650,11 +650,23 @@ WVI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\wavpackdll_x64.dll" {print $2"\t"$3}' "
 ok "抽出の表(r9): ci/extract-dlls.tsv に wavpackdll_x64.dll の行が 1 つ在り、抽出先は lift/out-plugins/wavpackdll_x64.dll(plugin.tsv の key 名)、大きさと SHA-256 は一覧の値と一致する" "$(awk -F'\t' -v I="$WVI" 'BEGIN{split(I, a, "\t")} $1 == "wavpackdll_x64.dll" {n++; if ($2 == "lift/out-plugins/wavpackdll_x64.dll" && $3 == a[2] && a[1] == "271672") ok++} END{print n+0"/"ok+0}' "$top/ci/extract-dlls.tsv")" "1/1"
 EFI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\EasyFLAC_x64.dll" {print $2"\t"$3}' "$INST")
 ok "抽出の表(r9): ci/extract-dlls.tsv に EasyFLAC_x64.dll の行が 1 つ在り、抽出先は lift/out-plugins/easyflac_x64.dll(plugin.tsv の key 名)、大きさと SHA-256 は一覧の値と一致する" "$(awk -F'\t' -v I="$EFI" 'BEGIN{split(I, a, "\t")} $1 == "EasyFLAC_x64.dll" {n++; if ($2 == "lift/out-plugins/easyflac_x64.dll" && $3 == a[2] && a[1] == "394240") ok++} END{print n+0"/"ok+0}' "$top/ci/extract-dlls.tsv")" "1/1"
-ok "抽出の表(r9): ci/extract-dlls.tsv に、名前と SHA-256 が同じ行の組は無い(同じ DLL の二重の抽出を避ける)" "$(awk -F'\t' '!/^#/ && NF>=3 {print tolower($1)"|"$3}' "$top/ci/extract-dlls.tsv" | sort | uniq -d | wc -l | tr -d ' ')" 0
+R9V() { [ -z "$(awk -F'\t' '!/^#/ && NF>=3 {print tolower($1)"|"$3"|"tolower($2)}' "$1" | sort | uniq -d)" ] && echo ok || echo FAIL; }
+S9=$(awk -F'\t' '$1 == "oggio_x64.dll" {print $3; exit}' "$top/ci/extract-dlls.tsv")
+printf 'oggio_x64.dll\tlift/out-sampledec/oggio_x64.dll\t%s\noggio_x64.dll\tlift/out-sampledec/oggio_x64.dll\t%s\n' "$S9" "$S9" > "$T/r9-same.tsv"
+printf 'oggio_x64.dll\tlift/out-sampledec/oggio_x64.dll\t%s\noggio_x64.dll\tlift/out-plugins/oggio_x64.dll\t%s\n' "$S9" "$S9" > "$T/r9-split.tsv"
+ok "抽出の表(r9): ci/extract-dlls.tsv に、名前・SHA-256・抽出先が同じ行の組は無い(同じ DLL の二重の抽出を避ける)" "$(R9V "$top/ci/extract-dlls.tsv")" ok
+ok "抽出の表(r9)の検査: 名前・SHA-256・抽出先が同じ 2 行の複写は FAIL" "$(R9V "$T/r9-same.tsv")" FAIL
+ok "抽出の表(r9)の検査: 抽出先が違う 2 行の複写は通る" "$(R9V "$T/r9-split.tsv")" ok
 # (r10) #1539 の DLL(Shared\ildsp_x64.dll)は、plugin.tsv が main に入るまで、抽出の表の 1 行で作業ツリーに取り出す(抽出先は plugin の行が作る形 lift/out-plugins/<key>。key は plugin.tsv の key 名)。名前は一覧の完全なパスの末尾と一致し、一覧の中で末尾が一致する物は 1 つだけ。大きさと SHA-256 は一覧の値
 IDI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\ildsp_x64.dll" {print $2"\t"$3}' "$INST")
 ok "抽出の表(r10): ci/extract-dlls.tsv に ildsp_x64.dll の行が 1 つ在り、抽出先は lift/out-plugins/ildsp_x64.dll(plugin.tsv の key 名)、大きさと SHA-256 は一覧の値と一致する" "$(awk -F'\t' -v I="$IDI" 'BEGIN{split(I, a, "\t")} $1 == "ildsp_x64.dll" {n++; if ($2 == "lift/out-plugins/ildsp_x64.dll" && $3 == a[2] && a[1] == "4197376") ok++} END{print n+0"/"ok+0}' "$top/ci/extract-dlls.tsv")" "1/1"
 ok "抽出の表(r10): インストーラの一覧で、末尾が ildsp_x64.dll に一致する物は 1 つだけ" "$(awk -F'\t' 'NR>2 && tolower($1) ~ /ildsp_x64[.]dll$/ {n++} END{print n+0}' "$INST")" 1
+# (r11) #1513(oggio_x64.dll)と共有の DLL 4(elastique_x64.dll)は、表に 2 つの行を持つ。1 つ目は b2d2 用(lift/out-sampledec/)、2 つ目は plugin 用(lift/out-plugins/<小文字の bare 名>)。NSIS の名前と SHA-256 は同じ。大きさは一覧の値
+OGI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\oggio_x64.dll" {print $2"\t"$3}' "$INST")
+ELI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\elastique_x64.dll" {print $2"\t"$3}' "$INST")
+ok "抽出の表(r11): ci/extract-dlls.tsv に oggio_x64.dll の行が 2 つ在り、1 つは lift/out-sampledec/oggio_x64.dll、もう 1 つは lift/out-plugins/oggio_x64.dll(plugin.tsv の key 名)、SHA-256 と大きさは一覧の値と一致する" "$(awk -F'\t' -v I="$OGI" 'BEGIN{split(I, a, "\t")} $1 == "oggio_x64.dll" && $3 == a[2] && a[1] == "1872384" {n++; if ($2 == "lift/out-sampledec/oggio_x64.dll") s++; if ($2 == "lift/out-plugins/oggio_x64.dll") p++} END{print n+0"/"s+0"/"p+0}' "$top/ci/extract-dlls.tsv")" "2/1/1"
+ok "抽出の表(r11): ci/extract-dlls.tsv に elastique_x64.dll の行が 2 つ在り、1 つは lift/out-sampledec/elastique_x64.dll、もう 1 つは lift/out-plugins/elastique_x64.dll(plugin.tsv の key 名)、SHA-256 と大きさは一覧の値と一致する" "$(awk -F'\t' -v I="$ELI" 'BEGIN{split(I, a, "\t")} $1 == "elastique_x64.dll" && $3 == a[2] && a[1] == "4997632" {n++; if ($2 == "lift/out-sampledec/elastique_x64.dll") s++; if ($2 == "lift/out-plugins/elastique_x64.dll") p++} END{print n+0"/"s+0"/"p+0}' "$top/ci/extract-dlls.tsv")" "2/1/1"
+ok "抽出の表(r11): インストーラの一覧で、末尾が oggio_x64.dll・elastique_x64.dll に一致する物は、それぞれ 1 つだけ" "$(awk -F'\t' 'NR>2 && tolower($1) ~ /(oggio|elastique)_x64[.]dll$/ {n++} END{print n+0}' "$INST")" 2
 EORD='["外部プラグインのインストーラをキャッシュに保存する(取ったときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)","インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトをキャッシュに保存する(取ったときだけ)","内蔵のプラグインのキャッシュ(R2)","内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)","内蔵のプラグインをキャッシュに保存する(取ったときだけ)"]'
 WORD='["抽出物を lift/out-app/host に置く","言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(全ての作業)","取った物を lift/out-app/host-extra/resources と lift/out-app/host/resources に置く(全ての作業。commit はしない)","内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)","取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)","タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す"]'
 ok "抽出物の追加: extract の段の順は、外部の保存の後に、言語等、内蔵のプラグイン" "$(jq -r --argjson o "$EORD" '[.jobs.extract.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true

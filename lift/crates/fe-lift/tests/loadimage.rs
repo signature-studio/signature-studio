@@ -853,7 +853,7 @@ fn the_dll_name_and_the_api_name_are_part_of_the_match() {
         assert!(!st.handled.contains_key("jmp_imp:LoadImageW"), "{dll}!{api}");
         assert!(!c.contains("fle_imp_LoadImageW"), "{dll}!{api}");
         let va = IB + 0x1040;
-        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_unsupported(UINT64_C({va:#x})); }}")), "{dll}!{api}");
+        assert!(c.contains(&format!("L_{va:x}: {{ /* {va:#x} Jmp */ fle_import_stop(\"{dll}!{api}\"); }}")), "{dll}!{api}");
     }
 }
 

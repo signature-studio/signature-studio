@@ -794,6 +794,23 @@ const TABLE: &[(&str, &str, &str, &str)] = &[
     ("imm32.dll", "ImmGetConversionStatus", "fle_imp_ImmGetConversionStatus", "jmp_imp:ImmGetConversionStatus"),
     ("imm32.dll", "ImmSetConversionStatus", "fle_imp_ImmSetConversionStatus", "jmp_imp:ImmSetConversionStatus"),
     ("imm32.dll", "ImmSetOpenStatus", "fle_imp_ImmSetOpenStatus", "jmp_imp:ImmSetOpenStatus"),
+    // Issue #1538 (appended: decision 0015, append only; the second wave, pm-work/findings/second-wave-imports.md). Answered by the runtime, no window or host file:
+    // TryEnterCriticalSection (runtime/fle_sys.c), GetUserDefaultLangID (fle_wall_dec1.c), lstrcpyA, lstrcatW, lstrcpynW (fle_glob.c), CreateMutexW and
+    // ReleaseMutex (fle_event.c), OpenFileMappingW (fle_vmap.c: every name is not found), GetClassLongPtrW (fle_win.c: GCLP_HICON only), joyGetNumDevs
+    // (fle_winmm.c: 0 devices), StringFromGUID2 (fle_ole.c), memset of the two CRT DLLs that the plugins import (fle_env.c).
+    ("kernel32.dll", "TryEnterCriticalSection", "fle_imp_TryEnterCriticalSection", "jmp_imp:TryEnterCriticalSection"),
+    ("kernel32.dll", "GetUserDefaultLangID", "fle_imp_GetUserDefaultLangID", "jmp_imp:GetUserDefaultLangID"),
+    ("kernel32.dll", "lstrcpyA", "fle_imp_lstrcpyA", "jmp_imp:lstrcpyA"),
+    ("kernel32.dll", "lstrcatW", "fle_imp_lstrcatW", "jmp_imp:lstrcatW"),
+    ("kernel32.dll", "lstrcpynW", "fle_imp_lstrcpynW", "jmp_imp:lstrcpynW"),
+    ("kernel32.dll", "CreateMutexW", "fle_imp_CreateMutexW", "jmp_imp:CreateMutexW"),
+    ("kernel32.dll", "ReleaseMutex", "fle_imp_ReleaseMutex", "jmp_imp:ReleaseMutex"),
+    ("kernel32.dll", "OpenFileMappingW", "fle_imp_OpenFileMappingW", "jmp_imp:OpenFileMappingW"),
+    ("user32.dll", "GetClassLongPtrW", "fle_imp_GetClassLongPtrW", "jmp_imp:GetClassLongPtrW"),
+    ("winmm.dll", "joyGetNumDevs", "fle_imp_joyGetNumDevs", "jmp_imp:joyGetNumDevs"),
+    ("ole32.dll", "StringFromGUID2", "fle_imp_StringFromGUID2", "jmp_imp:StringFromGUID2"),
+    ("vcruntime140.dll", "memset", "fle_imp_memset", "jmp_imp:memset"),
+    ("api-ms-win-crt-string-l1-1-0.dll", "memset", "fle_imp_memset", "jmp_imp:memset"),
 ];
 
 /// First pseudo-VA handed out by GetProcAddress (docs/decisions/0015-virtual-modules.md). Row `k` of
