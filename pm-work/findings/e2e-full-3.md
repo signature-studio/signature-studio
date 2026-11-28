@@ -14,7 +14,7 @@
 4. **結果は 2,227 件**(1,829 ID。宣言外 40 本)。未印で ok 1,537・印つき ok 42・印つきの失敗(受理)399・印つきの失敗(拒否)2・未印の失敗 228(うち error 35)・予算切れ(skip)19。前回(1,824 件)とは、shard の数・表示の行の数が違うので、件数は直接比べない(§9)。
 5. **前回からの主な変化**: 予算切れが 268 → **19**(menus の 8 shard で、予算の中に全本が入った。#1527 の予算の部分は直った)。audio の未印の失敗が 35 → **4**(#1526 の書き出しの連鎖は直った)。visual の描画の停止(error 34)は 1 に減った(#1528)。一方、menus の未印の失敗は 73 → **125**(項目の効果が無い群は 61 → 94。#1527 の項目の部分は直っていない)。file は 52 → **62**。
 6. **起動(page started → project open)**: shard の最初の値の中央値 **40.7 s**(57 件。範囲 27.2〜47.2 s)。全 76 組(表示ごと)の中央値 41.3 s。e2e の出力に `elapsedMs` は無いので、job のログの時刻差から求めた(推定。確認できない: 前回は未計測)。起動の待ちは、読み込み・Welcome・project 開き・待ちを含む(P1 の 10 秒とは別の測り方)。
-7. **エンジンの停止(22 本)**: 6 型。最多は VirtualQuery(6 本)で、eea3c21 の表の上限 16 によるもの(§4)。
+7. **エンジンの停止の記録(`engineStops > 0` の本は 22 本)**: 6 型(A〜F。14 本)と、起動の失敗の連鎖(error の本 8 本)。最多は VirtualQuery(6 本)で、eea3c21 の表の上限 16 によるもの(§4)。error の状態の本は全部で 33 本(§3-1)。
 8. **plugins**: 302 本のうち ok は 7 本。挿入の段を越えて窓・パラメータ・音声の段に届いた結果は **0**(前回と同じ)。原因の大半は、**道具の欠陥**: 一覧の読みが本の開始位置から始まり、共有の page では一覧が page の開始時に 1 回しか書かれないため、282 本が一覧の段で止まる(§8)。
 9. **新しい Issue**: 3 件(#1549・#1550・#1551。下書き 263・264・265)。閉じた Issue を指す印の残りは §5。
 
@@ -131,7 +131,7 @@
 - `page/visibility-presents-resume`(presents 72 → 76。File メニューが描かれない)・`plugins/plugin-database-browser-opens`・`input/mouse-right-click-mixer-hold`(ミキサーの右クリックの押し続け)・`menus/key-ctrl-n`(Ctrl+N の後の `TInAppShopForm`)・`menus/patterns-1-again`(名前の窓)。個別。
 - `resilience/demo-open-replace-50`(error。Ctrl+O の箱が 40 秒出ない。#1519 の後の箱の変化の可能性。推定)。`visual/black-dpr-random-2`(error。`Target crashed`。#1528 の撤収の後も 1 本残る)。
 
-## 4. エンジンが止まった本(22 本)と、型
+## 4. エンジンが止まった本(停止の記録は 22 本)と、型
 
 実測(`engineStop` の `stop.lastFle`・`engineStopReason`)。停止は `engineStops > 0` か、状態が error・exited の本。
 
@@ -143,9 +143,9 @@
 | D `fle: CompareStringW: lcid=0x400 ...`(ドイツ語・ベトナム語・日本語の言語) | 3 | settings/language-de・-vi・-ja(印 `new`・受理) | exited | `new` | 言語の切替で停止する既知の型。印が `new` のまま | #1395(開いている)。印を `#1395` にする |
 | E `fle: PathCleanupSpec: pszSpec holds an illegal character` | 1 | menus/tools-16-choose(無し) | exited | 無し | パスの予約文字 | #1428(開いている)。印 `#1428` を付ける |
 | F `act1-net #5 InternetOpenUrlW ... last error 12007` | 1 | resilience/reload-20(無し) | engine-idle | 無し | 外部の取得の失敗が呼び出し元で扱えない | #1529(閉じた)。印が無い |
-| (error) state error(エンジンの起動の失敗) | 33 | §3-1 | error | — | getSize(G1) | #1549(下書き 263) |
+| (error) state error(起動の失敗。停止の記録があるのは 8 本) | 8(全体 33) | §3-1 | error | — | getSize(G1) | #1549(下書き 263) |
 
-- 停止の全数: 22 本(型 A〜F)。前回の 9 件(外部の取得の失敗 3・Sytrus の demo 2・Edit > #3 2・書き出しの形式 1・閉じた #1409 の本 1)のうち、この run に出たのは外部の取得の失敗 1 本(`resilience/reload-20`。印が無い)だけ。Sytrus の demo・Edit > #3・書き出しの形式は、この run では出ていない(実測)。言語の 3 本(D)は前回には無く、この run で出た。
+- 停止の記録の全数: 22 本(型 A〜F の 14 本と、error の 8 本)。前回の 9 件(外部の取得の失敗 3・Sytrus の demo 2・Edit > #3 2・書き出しの形式 1・閉じた #1409 の本 1)のうち、この run に出たのは外部の取得の失敗 1 本(`resilience/reload-20`。印が無い)だけ。Sytrus の demo・Edit > #3・書き出しの形式は、この run では出ていない(実測)。言語の 3 本(D)は前回には無く、この run で出た。
 - 型 A(6 本)は、HEAD で直っている可能性が高い(推定)。次の run で確かめる。
 
 ## 5. 印(`expectFail`・`expectStop`)の状態
@@ -213,7 +213,7 @@
 | file の未印の失敗 | 52 | 62 | 増えた(テンプレート・デモ) |
 | settings の未印の失敗 | 14(dpr1 の退行) | 17 error(getSize の連鎖) | 前回の退行とは原因が違う(推定。前回の退行の本は、この run では error の連鎖に入った) |
 | plugins の挿入の段を越えた結果 | 0 | 0 | 変わらない。G3 が先に止める |
-| エンジンの停止 | 9 | 22(型 6) | 増えた(VirtualQuery 6 は eea3c21 の表の上限) |
+| エンジンの停止の記録 | 9 | 22(型 A〜F の 14 本と、error の 8 本) | 増えた(VirtualQuery 6 は eea3c21 の表の上限) |
 | 網羅の判定 | 不合格 | 不合格 | 変わらない |
 
 - **直ったこと(実測)**: 予算切れ・audio の書き出しの連鎖・visual の描画の停止の連鎖。
